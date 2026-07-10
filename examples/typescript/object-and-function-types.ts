@@ -1,3 +1,5 @@
+export {}
+
 type LessonStatus = 'draft' | 'published' | 'archived'
 
 interface Lesson {

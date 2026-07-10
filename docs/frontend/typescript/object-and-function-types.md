@@ -942,50 +942,7 @@ interface Props {
 
 `CreateLessonInput` 类似 Java 后端中的创建请求 DTO；`Lesson` 类似领域实体或响应模型。前后端都应该区分不同数据生命周期，而不是让一个模型承担所有职责。
 
-## 22. 练习题
-
-### 基础题
-
-1. `summary?: string` 和 `summary: string | undefined` 有什么区别？开启 `exactOptionalPropertyTypes` 后差异是什么？
-2. 为什么 `readonly metadata: Metadata` 不能阻止 `metadata.views += 1`？
-3. `(lesson: Lesson) => void` 中的 `void` 是否保证函数运行时一定返回 `undefined`？
-
-### 进阶题
-
-1. 为什么直接传入 `{ title: 'TS', typo: true }` 可能触发多余属性检查，而先保存到变量后可能通过？这是否代表变量更安全？
-2. 设计回调类型时，为什么不应该为了让调用方少写形参，就把后面的参数标记为可选？
-
-### 代码练习
-
-请实现一个严格类型的课程更新函数：
-
-```ts
-function updateLesson(/* 由你补充 */) {
-  // 由你实现
-}
-```
-
-要求：
-
-- 课程 `id` 不允许更新。
-- `title`、`summary`、`durationMinutes` 和 `status` 可以选择性更新。
-- 必须区分“不更新 summary”和“主动移除 summary”。
-- 不使用 `any`。
-- 不使用双重类型断言。
-- 返回一个新对象，不修改原对象。
-- 为非法的空标题和非正时长给出明确错误。
-- 自行决定使用联合类型、可辨识联合或其他对象结构，并解释选择原因。
-
-验收示例：
-
-```ts
-const updated = updateLesson(original, {
-  title: 'TypeScript 函数类型',
-  summary: { action: 'remove' }
-})
-```
-
-## 23. 面试题
+## 22. 面试题
 
 ### `type` 和 `interface` 有什么区别？
 
@@ -1015,7 +972,7 @@ const updated = updateLesson(original, {
 
 接口和类型别名在运行时通常不存在，断言也不会验证数据。外部 JSON 可能缺字段、类型错误或包含恶意内容，需要运行时校验后才能进入可信业务区域。
 
-## 24. 本节总结
+## 23. 本节总结
 
 - 对象类型描述数据结构，函数类型描述行为契约。
 - `interface` 和 `type` 在对象场景中大量重叠，但扩展能力和表达范围不同。
@@ -1029,7 +986,7 @@ const updated = updateLesson(original, {
 - 联合类型能清晰解决问题时优先于重载。
 - `strictFunctionTypes` 能阻止一部分不安全的函数赋值。
 
-## 25. 下一步学习
+## 24. 下一步学习
 
 下一节建议学习：**TypeScript 联合类型、交叉类型与类型收窄进阶**。
 
@@ -1040,7 +997,7 @@ const updated = updateLesson(original, {
 - 使用 `never` 检查状态处理是否完整。
 - 为 Vue 组件异步状态和后端接口结果建立安全模型。
 
-## 26. 参考资料
+## 25. 参考资料
 
 - [TypeScript Handbook：Object Types](https://www.typescriptlang.org/docs/handbook/2/objects.html)
 - [TypeScript Handbook：More on Functions](https://www.typescriptlang.org/docs/handbook/2/functions.html)

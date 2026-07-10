@@ -4,7 +4,7 @@ layout: home
 hero:
   name: AI 全栈学习站
   text: 从前端出发，走向全栈与 AI
-  tagline: 不追求知识点堆砌。沿着清晰路线学习、编码、练习，并把每个知识点放进真实项目。
+  tagline: 不追求知识点堆砌。沿着清晰路线学习、编码、验证，并把每个知识点放进真实项目。
   actions:
     - theme: brand
       text: 开始第一课
@@ -18,7 +18,7 @@ features:
     details: 明确前置知识、阶段目标和验收标准，知道现在学什么，也知道为什么学。
     icon: 01
   - title: 实践优先
-    details: 每个模块都配合可运行示例、练习题和项目任务，避免停留在“看懂了”。
+    details: 每个模块都配合可运行示例、原理分析和项目任务，避免停留在“看懂了”。
     icon: 02
   - title: 官方资料
     details: 优先参考官方文档、规范和原始论文，并记录适用版本与更新时间。
@@ -74,11 +74,11 @@ features:
   <div class="current-focus">
     <div>
       <span class="current-focus__label">阶段 01 · TypeScript 基础</span>
-      <h3>对象类型与函数类型</h3>
+      <h3>联合类型、交叉类型与类型收窄</h3>
     </div>
     <div>
-      <p>学习如何准确描述业务数据和函数契约，理解可选、只读、结构化类型、回调函数以及严格函数检查。</p>
-      <a href="./frontend/typescript/object-and-function-types">进入当前课程 →</a>
+      <p>学习如何组合类型、表达互斥业务状态，并通过控制流分析把宽泛类型安全地收窄为具体类型。</p>
+      <a href="./frontend/typescript/unions-intersections-and-narrowing">进入当前课程 →</a>
     </div>
   </div>
 </section>

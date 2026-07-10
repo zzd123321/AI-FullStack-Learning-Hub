@@ -75,6 +75,10 @@ export default defineConfig({
             {
               text: '对象类型与函数类型',
               link: '/frontend/typescript/object-and-function-types'
+            },
+            {
+              text: '联合类型、交叉类型与类型收窄',
+              link: '/frontend/typescript/unions-intersections-and-narrowing'
             }
           ]
         }

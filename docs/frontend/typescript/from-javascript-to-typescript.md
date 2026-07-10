@@ -328,37 +328,7 @@ const count: number = 1
 - 使用 `unknown` 表示真正未知的数据，缩小后再操作。
 - 类型名称表达业务含义，而不仅是数据形状。
 
-## 13. 练习题
-
-### 基础题
-
-1. TypeScript 的类型信息会不会保留到普通 JavaScript 运行时？为什么？
-2. `string | undefined` 表示什么？在调用字符串方法前需要做什么？
-3. 类型推断和类型标注分别适合哪些场景？
-
-### 进阶题
-
-1. 为什么 `response.json() as User` 不能保证接口数据一定符合 `User`？
-2. 把 `loading: boolean`、`error: string | null`、`data: Lesson[] | null` 改成可辨识联合类型，并说明它避免了哪些非法状态。
-
-### 代码练习
-
-为下面的 JavaScript 代码补充严格的 TypeScript 类型：
-
-```js
-function findLesson(lessons, id) {
-  return lessons.find((lesson) => lesson.id === id)
-}
-```
-
-要求：
-
-- `id` 同时支持数字和字符串。
-- 返回值正确表达“可能找不到”。
-- 调用方在读取 `title` 前必须处理未找到的情况。
-- 不允许使用 `any` 和双重类型断言。
-
-## 14. 面试题
+## 13. 面试题
 
 ### TypeScript 能完全消除运行时错误吗？
 
@@ -372,7 +342,7 @@ function findLesson(lessons, id) {
 
 类型收窄是通过 `typeof`、`instanceof`、属性判断或可辨识字段等运行时条件，让 TypeScript 在某个代码分支中确定更具体类型的过程。
 
-## 15. 本节总结
+## 14. 本节总结
 
 - TypeScript 在 JavaScript 之上增加静态类型检查。
 - 类型帮助我们描述并检查数据结构、输入输出和业务状态。
@@ -383,7 +353,7 @@ function findLesson(lessons, id) {
 
 下一节建议：TypeScript 对象类型、函数类型与可选属性。
 
-## 16. 参考资料
+## 15. 参考资料
 
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/handbook/intro.html)
 - [The Basics](https://www.typescriptlang.org/docs/handbook/2/basic-types.html)
