@@ -83,6 +83,10 @@ export default defineConfig({
             {
               text: '泛型基础与约束',
               link: '/frontend/typescript/generics-and-constraints'
+            },
+            {
+              text: 'keyof、typeof 与索引访问类型',
+              link: '/frontend/typescript/keyof-typeof-and-indexed-access'
             }
           ]
         }

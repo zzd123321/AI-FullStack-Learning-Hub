@@ -11,6 +11,7 @@
     "example:ts:object-functions": "tsc -p tsconfig.examples.json && node work/examples/typescript/object-and-function-types.js",
     "example:ts:narrowing": "tsc -p tsconfig.examples.json && node work/examples/typescript/unions-intersections-and-narrowing.js",
     "example:ts:generics": "tsc -p tsconfig.examples.json && node work/examples/typescript/generics-and-constraints.js",
+    "example:ts:type-operators": "tsc -p tsconfig.examples.json && node work/examples/typescript/keyof-typeof-and-indexed-access.js",
     "preview": "vitepress preview docs",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",

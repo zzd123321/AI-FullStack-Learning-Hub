@@ -1090,7 +1090,7 @@ TypeScript 的类型参数和大部分类型信息在生成 JavaScript 时都会
 
 ## 28. 下一步学习
 
-下一节建议学习：**TypeScript `keyof`、`typeof` 与索引访问类型进阶**。
+下一节建议学习：[**TypeScript `keyof`、`typeof` 与索引访问类型进阶**](/frontend/typescript/keyof-typeof-and-indexed-access)。
 
 本节已经使用了这些类型运算符的核心能力，下一节将系统讲解：
 

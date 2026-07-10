@@ -73,7 +73,8 @@ description: 面向有前端经验开发者的全栈与 AI 分阶段学习计划
 - [x] 学习“从 JavaScript 到 TypeScript”
 - [x] 学习 TypeScript 对象类型与函数类型
 - [x] 学习 TypeScript 联合类型、交叉类型与类型收窄
-- [ ] 学习 TypeScript 泛型基础与约束
+- [x] 学习 TypeScript 泛型基础与约束
+- [ ] 学习 TypeScript keyof、typeof 与索引访问类型
 - [ ] 进入 Vue 3 Composition API
 
-当前课程：[TypeScript 泛型基础与约束](/frontend/typescript/generics-and-constraints)
+当前课程：[TypeScript keyof、typeof 与索引访问类型](/frontend/typescript/keyof-typeof-and-indexed-access)

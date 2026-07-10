@@ -74,11 +74,11 @@ features:
   <div class="current-focus">
     <div>
       <span class="current-focus__label">阶段 01 · TypeScript 基础</span>
-      <h3>TypeScript 泛型基础与约束</h3>
+      <h3>keyof、typeof 与索引访问类型</h3>
     </div>
     <div>
-      <p>学习如何保留输入输出之间的类型关系，并通过约束、keyof 与索引访问设计安全、可复用的 API。</p>
-      <a href="./frontend/typescript/generics-and-constraints">进入当前课程 →</a>
+      <p>学习如何从已有类型和值派生新类型，让字段、配置和业务模型保持同步，减少重复声明。</p>
+      <a href="./frontend/typescript/keyof-typeof-and-indexed-access">进入当前课程 →</a>
     </div>
   </div>
 </section>
