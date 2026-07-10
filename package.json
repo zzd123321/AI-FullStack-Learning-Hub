@@ -12,6 +12,7 @@
     "example:ts:narrowing": "tsc -p tsconfig.examples.json && node work/examples/typescript/unions-intersections-and-narrowing.js",
     "example:ts:generics": "tsc -p tsconfig.examples.json && node work/examples/typescript/generics-and-constraints.js",
     "example:ts:type-operators": "tsc -p tsconfig.examples.json && node work/examples/typescript/keyof-typeof-and-indexed-access.js",
+    "example:ts:conditional-types": "tsc -p tsconfig.examples.json && node work/examples/typescript/conditional-types-and-infer.js",
     "preview": "vitepress preview docs",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",

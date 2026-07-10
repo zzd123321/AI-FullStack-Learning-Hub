@@ -24,5 +24,6 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [联合类型、交叉类型与类型收窄](/frontend/typescript/unions-intersections-and-narrowing)
 - [泛型基础与约束](/frontend/typescript/generics-and-constraints)
 - [`keyof`、`typeof` 与索引访问类型](/frontend/typescript/keyof-typeof-and-indexed-access)
+- [条件类型与 `infer`](/frontend/typescript/conditional-types-and-infer)
 
 完成本模块后，你应该能在严格模式下为 Vue 3 和接口数据建立可靠的类型边界。

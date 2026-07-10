@@ -74,11 +74,11 @@ features:
   <div class="current-focus">
     <div>
       <span class="current-focus__label">阶段 01 · TypeScript 基础</span>
-      <h3>keyof、typeof 与索引访问类型</h3>
+      <h3>TypeScript 条件类型与 infer</h3>
     </div>
     <div>
-      <p>学习如何从已有类型和值派生新类型，让字段、配置和业务模型保持同步，减少重复声明。</p>
-      <a href="./frontend/typescript/keyof-typeof-and-indexed-access">进入当前课程 →</a>
+      <p>学习如何在类型系统中表达分支、提取内部类型并安全过滤联合成员，理解常用工具类型的核心原理。</p>
+      <a href="./frontend/typescript/conditional-types-and-infer">进入当前课程 →</a>
     </div>
   </div>
 </section>

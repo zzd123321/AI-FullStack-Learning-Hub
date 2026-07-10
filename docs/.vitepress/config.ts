@@ -87,6 +87,10 @@ export default defineConfig({
             {
               text: 'keyof、typeof 与索引访问类型',
               link: '/frontend/typescript/keyof-typeof-and-indexed-access'
+            },
+            {
+              text: '条件类型与 infer',
+              link: '/frontend/typescript/conditional-types-and-infer'
             }
           ]
         }

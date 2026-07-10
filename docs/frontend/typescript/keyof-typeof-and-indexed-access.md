@@ -1064,7 +1064,7 @@ JavaScript `typeof` 在运行时执行并返回类型字符串，可用于分支
 
 ## 31. 下一步学习
 
-下一节建议学习：**TypeScript 条件类型与 `infer`**。
+下一节建议学习：[**TypeScript 条件类型与 `infer`**](/frontend/typescript/conditional-types-and-infer)。
 
 届时将继续解决：
 
