@@ -20,5 +20,6 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 ### TypeScript
 
 - [从 JavaScript 到 TypeScript](/frontend/typescript/from-javascript-to-typescript)
+- [对象类型与函数类型](/frontend/typescript/object-and-function-types)
 
 完成本模块后，你应该能在严格模式下为 Vue 3 和接口数据建立可靠的类型边界。

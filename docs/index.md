@@ -73,12 +73,12 @@ features:
   <h2>当前学习重点</h2>
   <div class="current-focus">
     <div>
-      <span class="current-focus__label">阶段 01 · 前端现代化</span>
-      <h3>从 JavaScript 走向 TypeScript</h3>
+      <span class="current-focus__label">阶段 01 · TypeScript 基础</span>
+      <h3>对象类型与函数类型</h3>
     </div>
     <div>
-      <p>先建立类型系统的思维，再进入 Vue 3。你会从熟悉的 JavaScript 代码出发，理解静态检查、类型推断与类型收窄。</p>
-      <a href="./frontend/typescript/from-javascript-to-typescript">进入第一课 →</a>
+      <p>学习如何准确描述业务数据和函数契约，理解可选、只读、结构化类型、回调函数以及严格函数检查。</p>
+      <a href="./frontend/typescript/object-and-function-types">进入当前课程 →</a>
     </div>
   </div>
 </section>

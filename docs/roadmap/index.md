@@ -70,9 +70,9 @@ description: 面向有前端经验开发者的全栈与 AI 分阶段学习计划
 ## 当前任务
 
 - [x] 创建站点 MVP
-- [ ] 完成“从 JavaScript 到 TypeScript”
+- [x] 学习“从 JavaScript 到 TypeScript”
 - [ ] 完成 TypeScript 基础练习
 - [ ] 学习 TypeScript 对象类型与函数类型
 - [ ] 进入 Vue 3 Composition API
 
-下一步：[开始第一课：从 JavaScript 到 TypeScript](/frontend/typescript/from-javascript-to-typescript)
+当前课程：[TypeScript 对象类型与函数类型](/frontend/typescript/object-and-function-types)

@@ -71,6 +71,10 @@ export default defineConfig({
             {
               text: '从 JavaScript 到 TypeScript',
               link: '/frontend/typescript/from-javascript-to-typescript'
+            },
+            {
+              text: '对象类型与函数类型',
+              link: '/frontend/typescript/object-and-function-types'
             }
           ]
         }

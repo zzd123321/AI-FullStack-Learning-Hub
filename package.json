@@ -7,6 +7,8 @@
     "dev": "vitepress dev docs",
     "build": "vitepress build docs",
     "build:sites": "vitepress build docs && node scripts/build-sites.mjs",
+    "check:examples": "tsc -p tsconfig.examples.json --noEmit",
+    "example:ts:object-functions": "tsc -p tsconfig.examples.json && node work/examples/typescript/object-and-function-types.js",
     "preview": "vitepress preview docs",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
@@ -17,6 +19,7 @@
   },
   "packageManager": "npm@10.9.2",
   "devDependencies": {
+    "typescript": "^7.0.2",
     "vitepress": "^1.6.4"
   }
 }
