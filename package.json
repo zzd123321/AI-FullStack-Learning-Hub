@@ -1,0 +1,22 @@
+{
+  "name": "ai-fullstack-learning",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev docs",
+    "build": "vitepress build docs",
+    "build:sites": "vitepress build docs && node scripts/build-sites.mjs",
+    "preview": "vitepress preview docs",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "npm@10.9.2",
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
+}
