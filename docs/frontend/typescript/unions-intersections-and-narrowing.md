@@ -1029,7 +1029,7 @@ type ApiResult<T> =
 
 ## 27. 下一步学习
 
-下一节建议学习：**TypeScript 泛型基础与约束**。
+下一节建议学习：[**TypeScript 泛型基础与约束**](/frontend/typescript/generics-and-constraints)。
 
 届时会重点解决：
 

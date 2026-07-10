@@ -79,6 +79,10 @@ export default defineConfig({
             {
               text: '联合类型、交叉类型与类型收窄',
               link: '/frontend/typescript/unions-intersections-and-narrowing'
+            },
+            {
+              text: '泛型基础与约束',
+              link: '/frontend/typescript/generics-and-constraints'
             }
           ]
         }

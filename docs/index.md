@@ -74,11 +74,11 @@ features:
   <div class="current-focus">
     <div>
       <span class="current-focus__label">阶段 01 · TypeScript 基础</span>
-      <h3>联合类型、交叉类型与类型收窄</h3>
+      <h3>TypeScript 泛型基础与约束</h3>
     </div>
     <div>
-      <p>学习如何组合类型、表达互斥业务状态，并通过控制流分析把宽泛类型安全地收窄为具体类型。</p>
-      <a href="./frontend/typescript/unions-intersections-and-narrowing">进入当前课程 →</a>
+      <p>学习如何保留输入输出之间的类型关系，并通过约束、keyof 与索引访问设计安全、可复用的 API。</p>
+      <a href="./frontend/typescript/generics-and-constraints">进入当前课程 →</a>
     </div>
   </div>
 </section>

@@ -72,7 +72,8 @@ description: 面向有前端经验开发者的全栈与 AI 分阶段学习计划
 - [x] 创建站点 MVP
 - [x] 学习“从 JavaScript 到 TypeScript”
 - [x] 学习 TypeScript 对象类型与函数类型
-- [ ] 学习 TypeScript 联合类型、交叉类型与类型收窄
+- [x] 学习 TypeScript 联合类型、交叉类型与类型收窄
+- [ ] 学习 TypeScript 泛型基础与约束
 - [ ] 进入 Vue 3 Composition API
 
-当前课程：[TypeScript 联合类型、交叉类型与类型收窄](/frontend/typescript/unions-intersections-and-narrowing)
+当前课程：[TypeScript 泛型基础与约束](/frontend/typescript/generics-and-constraints)
