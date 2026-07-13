@@ -22,8 +22,9 @@ description: 从 SQL 基础走向事务、索引、缓存和数据架构
 ### 关系模型与 SQL
 
 - [关系型数据库、表、行、列、主键与第一个 SQL 查询](/database/relational-model-and-first-query)
+- [连接并认识 MySQL 与 PostgreSQL](/database/mysql-postgresql-basics)
 
-这一课先把接口中的“用户列表”还原成数据库中的表和查询，建立后端读写数据时最基础的心智模型。
+先把接口中的“用户列表”还原成数据库中的表和查询，再建立客户端、服务器、连接、数据库与 schema 的边界。
 
 ## 阶段项目
 
