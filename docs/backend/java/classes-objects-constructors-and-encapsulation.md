@@ -440,7 +440,7 @@ java -cp out LearningAccountDemo 小朱 90 30 -5
 - 对象的 `==` 比较身份；内容相等需要定义 `equals`，并与 `hashCode` 保持契约。
 - 业务对象报告规则失败，最外层入口负责展示错误和选择退出方式。
 
-下一节建议：Java 继承、接口、多态与组合。
+下一节：[Java 继承、接口、多态与组合](/backend/java/inheritance-interfaces-polymorphism-and-composition)。
 
 ## 18. 参考资料
 
