@@ -851,7 +851,7 @@ Vue 的命名 `v-model` 使用 `update:modelName` 约定。模板字面量类型
 
 ## 42. 下一步学习
 
-下一节建议学习：**TypeScript 工程配置与模块边界**。
+下一节建议学习：[**TypeScript 工程配置与模块边界**](/frontend/typescript/project-configuration-and-module-boundaries)。
 
 届时将继续讲解：
 

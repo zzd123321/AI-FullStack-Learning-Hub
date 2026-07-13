@@ -99,6 +99,10 @@ export default defineConfig({
             {
               text: '模板字面量类型与类型安全契约',
               link: '/frontend/typescript/template-literal-types-and-type-safe-contracts'
+            },
+            {
+              text: '工程配置与模块边界',
+              link: '/frontend/typescript/project-configuration-and-module-boundaries'
             }
           ]
         }
@@ -119,6 +123,10 @@ export default defineConfig({
             {
               text: '变量、基本类型、运算符与控制流程',
               link: '/backend/java/variables-types-operators-and-control-flow'
+            },
+            {
+              text: '方法、参数传递、数组与可变参数',
+              link: '/backend/java/methods-parameter-passing-arrays-and-varargs'
             }
           ]
         }

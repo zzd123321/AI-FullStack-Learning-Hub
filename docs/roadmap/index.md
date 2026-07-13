@@ -77,9 +77,11 @@ description: 面向有前端经验开发者的全栈与 AI 分阶段学习计划
 - [x] 学习 TypeScript keyof、typeof 与索引访问类型
 - [x] 学习 TypeScript 条件类型与 infer
 - [x] 学习 TypeScript 映射类型与常用工具类型
-- [ ] 学习 TypeScript 模板字面量类型与类型安全契约
+- [x] 学习 TypeScript 模板字面量类型与类型安全契约
+- [ ] 学习 TypeScript 工程配置与模块边界
 - [x] 学习 Java 开发环境、JDK/JRE/JVM 与第一个程序
-- [ ] 学习 Java 变量、基本类型、运算符与控制流程
+- [x] 学习 Java 变量、基本类型、运算符与控制流程
+- [ ] 学习 Java 方法、参数传递、数组与可变参数
 - [ ] 进入 Vue 3 Composition API
 
-当前课程：[TypeScript 模板字面量类型与类型安全契约](/frontend/typescript/template-literal-types-and-type-safe-contracts)
+当前课程：[TypeScript 工程配置与模块边界](/frontend/typescript/project-configuration-and-module-boundaries)

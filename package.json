@@ -15,6 +15,7 @@
     "example:ts:conditional-types": "tsc -p tsconfig.examples.json && node work/examples/typescript/conditional-types-and-infer.js",
     "example:ts:mapped-types": "tsc -p tsconfig.examples.json && node work/examples/typescript/mapped-types-and-utility-types.js",
     "example:ts:template-literals": "tsc -p tsconfig.examples.json && node work/examples/typescript/template-literal-types-and-type-safe-contracts.js",
+    "example:ts:module-boundaries": "tsc -p tsconfig.examples.json && node work/examples/typescript/module-boundaries/index.js",
     "preview": "vitepress preview docs",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",

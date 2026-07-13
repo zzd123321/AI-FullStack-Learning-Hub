@@ -74,11 +74,11 @@ features:
   <div class="current-focus">
     <div>
       <span class="current-focus__label">阶段 01 · TypeScript 基础</span>
-      <h3>模板字面量类型与类型安全契约</h3>
+      <h3>TypeScript 工程配置与模块边界</h3>
     </div>
     <div>
-      <p>学习如何从字符串字面量派生事件、路由和配置契约，并明确外部动态字符串仍需运行时验证。</p>
-      <a href="./frontend/typescript/template-literal-types-and-type-safe-contracts">进入当前课程 →</a>
+      <p>理解 tsconfig、模块解析、类型导入和环境边界，区分 Vite 浏览器工程与 Node.js ESM 的配置策略。</p>
+      <a href="./frontend/typescript/project-configuration-and-module-boundaries">进入当前课程 →</a>
     </div>
   </div>
 </section>
