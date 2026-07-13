@@ -12,15 +12,15 @@ description: 从模型 API 走向 RAG、Agent、MCP、评估和安全
 1. [大模型应用的完整请求链路：从用户输入到模型输出](./request-lifecycle.md)
 2. [Token、上下文窗口与 Prompt：为一次请求建立预算](./tokens-context-and-prompts.md)
 3. [结构化输出与工具调用：让模型进入可控的软件流程](./structured-output-and-tool-calling.md)
+4. [Embedding、文档切分、向量检索与重排序：构建可靠的召回层](./embeddings-vector-retrieval.md)
 
 后续课程将依次覆盖：
 
-1. Embedding、文档切分、向量检索和重排序。
-2. RAG 架构、引用与上下文治理。
-3. 评估、幻觉发现与质量回归。
-4. Agent、确定性工作流与状态管理。
-5. MCP 的客户端、服务端与安全边界。
-6. 安全、成本、可观测性和部署。
+1. RAG 架构、引用与上下文治理。
+2. 评估、幻觉发现与质量回归。
+3. Agent、确定性工作流与状态管理。
+4. MCP 的客户端、服务端与安全边界。
+5. 安全、成本、可观测性和部署。
 
 每节课都会区分稳定的工程原则与快速变化的模型、SDK、协议细节。涉及外部服务的示例统一从环境变量读取密钥，不把凭据提交到仓库。
 
