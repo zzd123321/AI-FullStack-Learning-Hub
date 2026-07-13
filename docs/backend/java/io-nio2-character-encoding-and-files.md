@@ -467,7 +467,7 @@ Java 基础文件 API 通常是阻塞式的。在 Spring Boot 中，不要因为
 - 重要输出先写同目录临时文件，再原子移动或按明确策略降级，可减少半成品文件风险。
 - 数据格式错误与 IO 错误应保留不同语义，让边界选择合适响应。
 
-下一节建议：Java 集合框架概览与 `List`。
+下一节：[Java 集合框架概览与 `List`](/backend/java/collections-framework-and-list)。
 
 ## 19. 参考资料
 
