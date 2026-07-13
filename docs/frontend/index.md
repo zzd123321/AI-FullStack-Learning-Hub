@@ -38,3 +38,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [组件通信、依赖注入与可复用组件](/frontend/vue3/component-communication-and-reusable-components)
 - [Pinia 状态管理与服务层设计](/frontend/vue3/pinia-state-management-and-service-layer)
 - [Vue Router 4 与前端路由架构](/frontend/vue3/vue-router-and-routing-architecture)
+- [表单架构与复杂交互状态](/frontend/vue3/form-architecture-and-complex-interaction-state)
