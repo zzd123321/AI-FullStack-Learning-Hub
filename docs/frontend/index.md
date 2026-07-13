@@ -41,3 +41,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [表单架构与复杂交互状态](/frontend/vue3/form-architecture-and-complex-interaction-state)
 - [渲染机制、组件更新与性能优化](/frontend/vue3/rendering-mechanism-component-updates-and-performance)
 - [测试策略与可测试架构](/frontend/vue3/testing-strategy-and-testable-architecture)
+- [SSR、Hydration 与同构应用边界](/frontend/vue3/ssr-hydration-and-universal-application-boundaries)
