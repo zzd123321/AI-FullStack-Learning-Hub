@@ -335,7 +335,7 @@ java -cp out learning.backend.progress.ProgressFileApp data/missing.txt
 - `try-with-resources` 自动关闭 `AutoCloseable`，是文件、网络和数据库资源的首选管理方式。
 - 最外层边界负责把异常转换为命令行退出码、HTTP 响应或任务失败状态。
 
-下一节建议：Java IO、NIO.2、字符编码与文件操作。
+下一节：[Java IO、NIO.2、字符编码与文件操作](/backend/java/io-nio2-character-encoding-and-files)。
 
 ## 16. 参考资料
 
