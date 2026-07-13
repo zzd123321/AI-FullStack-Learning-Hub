@@ -680,7 +680,7 @@ Java 的 Future.get 放在请求线程上会占用该线程；虚拟线程能降
 - 并发集合应按读写比、顺序、容量和等待语义选择，而不是统一替换普通集合。
 - 虚拟线程每任务模型降低阻塞线程成本，但下游资源仍需限流和超时。
 
-下一节建议：Java CompletableFuture、异步编排、超时与异常恢复。
+下一节：[Java CompletableFuture、异步编排、超时与异常恢复](/backend/java/completable-future-async-composition-timeout-and-recovery)。
 
 ## 37. 参考资料
 
