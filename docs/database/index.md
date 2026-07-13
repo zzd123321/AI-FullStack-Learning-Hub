@@ -27,8 +27,9 @@ description: 从 SQL 基础走向事务、索引、缓存和数据架构
 - [从列表接口到可靠 SELECT：筛选、排序与分页](/database/select-filter-sort-pagination)
 - [多表关系与 JOIN](/database/relationships-and-joins)
 - [聚合查询：COUNT、SUM、GROUP BY 与 HAVING](/database/aggregates-group-by-having)
+- [子查询与 CTE：拆解复杂查询](/database/subqueries-and-cte)
 
-先把接口中的“用户列表”还原成数据库中的表和查询，再建立连接、类型与约束边界，实现可靠的列表查询、多表组合和分组统计。
+先把接口中的“用户列表”还原成数据库中的表和查询，再建立连接、类型与约束边界，实现可靠的列表查询、多表组合、分组统计和复杂查询拆解。
 
 ## 阶段项目
 
