@@ -653,7 +653,7 @@ JavaScript 的 const 与 Java final 都不自动深度不可变；Promise 完成
 - VarHandle 弱访问模式属于底层并发工具，业务代码优先使用高层组件。
 - 并发正确性来自规范证明和一致协议，压力测试只能补充验证。
 
-下一节建议：Java 类加载、字节码、JIT、栈、堆与垃圾回收基础。
+下一节：[Java 类加载、字节码、JIT、运行时内存与垃圾回收](/backend/java/class-loading-bytecode-jit-runtime-memory-and-gc)。
 
 ## 37. 参考资料
 

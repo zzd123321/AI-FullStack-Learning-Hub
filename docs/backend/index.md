@@ -33,8 +33,9 @@ Java 语法与面向对象 → 集合与泛型 → 异常与 IO → 并发 → J
 - [Java Lock、Condition、Semaphore 与高级同步器](/backend/java/locks-conditions-semaphores-and-synchronizers)
 - [Java 虚拟线程、结构化并发与 ScopedValue](/backend/java/virtual-threads-structured-concurrency-and-scoped-values)
 - [Java 内存模型、volatile、final 与 happens-before](/backend/java/memory-model-volatile-final-and-happens-before)
+- [Java 类加载、字节码、JIT、运行时内存与垃圾回收](/backend/java/class-loading-bytecode-jit-runtime-memory-and-gc)
 
-前十八课从工具链和程序执行过程开始，再建立静态类型、对象建模、多态、异常处理、文件 IO、集合、泛型、函数式处理与现代并发基础。完成后，你能安全处理资源与数据流水线，并通过 Executor、Future、同步器、虚拟线程和 Java 内存模型规则管理任务执行、共享状态与高并发 IO。
+前十九课从工具链和程序执行过程开始，再建立静态类型、对象建模、多态、异常处理、文件 IO、集合、泛型、现代并发与 JVM 基础。完成后，你能安全处理资源与数据流水线，理解代码从 class 文件加载、解释/JIT 执行到对象回收的主要过程，并使用内存模型规则管理共享状态。
 
 ## Python 辅线
 
