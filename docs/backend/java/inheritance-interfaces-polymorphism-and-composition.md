@@ -133,7 +133,7 @@ java -cp out NotificationDemo email user@example.com 学习提醒
 - 抽象类适合共享受控流程，接口适合稳定能力边界。
 - 组合通过持有接口引用替换协作者，降低业务代码与实现的耦合。
 
-下一节建议：Java 包、枚举、记录类与常用语言组织方式。
+下一节：[Java 包、枚举、记录类与代码组织](/backend/java/packages-enums-records-and-code-organization)。
 
 ## 12. 参考资料
 

@@ -20,8 +20,9 @@ Java 语法与面向对象 → 集合与泛型 → 异常与 IO → 并发 → J
 - [Java 方法、参数传递、数组与可变参数](/backend/java/methods-parameter-passing-arrays-and-varargs)
 - [Java 类、对象、构造方法与封装](/backend/java/classes-objects-constructors-and-encapsulation)
 - [Java 继承、接口、多态与组合](/backend/java/inheritance-interfaces-polymorphism-and-composition)
+- [Java 包、枚举、记录类与代码组织](/backend/java/packages-enums-records-and-code-organization)
 
-前四课从工具链和程序执行过程开始，再建立静态类型、流程控制、方法拆分、数组处理与对象建模基础。完成后，你能编译运行 Java 程序，处理输入错误，并用封装对象维护合法业务状态。
+前六课从工具链和程序执行过程开始，再建立静态类型、流程控制、方法拆分、对象建模、多态与代码组织基础。完成后，你能编译运行 Java 程序，处理输入错误，并用包、枚举和记录类组织类型安全的业务模型。
 
 ## Python 辅线
 
