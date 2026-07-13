@@ -428,7 +428,7 @@ Java 的非 Async 阶段可能在完成上游的线程内执行；Promise 回调
 - ThreadLocal、事务和日志上下文不会自动跨 Executor 安全传播。
 - 异步 API 应返回代表完整业务操作的最终 Stage，并明确所有权、容量、失败和取消语义。
 
-下一节建议：Java 锁、条件队列、信号量与高级同步器。
+下一节：[Java Lock、Condition、Semaphore 与高级同步器](/backend/java/locks-conditions-semaphores-and-synchronizers)。
 
 ## 25. 参考资料
 

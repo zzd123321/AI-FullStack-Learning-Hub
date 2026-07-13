@@ -30,8 +30,9 @@ Java 语法与面向对象 → 集合与泛型 → 异常与 IO → 并发 → J
 - [Java 并发基础、线程生命周期、共享状态与内存可见性](/backend/java/concurrency-threads-shared-state-and-memory-visibility)
 - [Java ExecutorService、Future、原子类与并发集合](/backend/java/executor-future-atomic-and-concurrent-collections)
 - [Java CompletableFuture、异步编排、超时与异常恢复](/backend/java/completable-future-async-composition-timeout-and-recovery)
+- [Java Lock、Condition、Semaphore 与高级同步器](/backend/java/locks-conditions-semaphores-and-synchronizers)
 
-前十五课从工具链和程序执行过程开始，再建立静态类型、对象建模、多态、异常处理、文件 IO、集合、泛型、函数式处理与并发基础。完成后，你能安全处理资源与数据流水线，并通过 Executor、Future 与 CompletableFuture 管理任务执行、结果和异步编排。
+前十六课从工具链和程序执行过程开始，再建立静态类型、对象建模、多态、异常处理、文件 IO、集合、泛型、函数式处理与并发基础。完成后，你能安全处理资源与数据流水线，并通过 Executor、Future、CompletableFuture、显式锁与同步器管理任务执行、共享状态和异步编排。
 
 ## Python 辅线
 
