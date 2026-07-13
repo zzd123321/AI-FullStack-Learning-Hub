@@ -78,10 +78,17 @@ description: 面向有前端经验开发者的全栈与 AI 分阶段学习计划
 - [x] 学习 TypeScript 条件类型与 infer
 - [x] 学习 TypeScript 映射类型与常用工具类型
 - [x] 学习 TypeScript 模板字面量类型与类型安全契约
-- [ ] 学习 TypeScript 工程配置与模块边界
+- [x] 学习 TypeScript 工程配置与模块边界
 - [x] 学习 Java 开发环境、JDK/JRE/JVM 与第一个程序
 - [x] 学习 Java 变量、基本类型、运算符与控制流程
-- [ ] 学习 Java 方法、参数传递、数组与可变参数
-- [ ] 进入 Vue 3 Composition API
+- [x] 学习 Java 方法、参数传递、数组与可变参数
+- [x] 学习 Java 类、对象、构造器与封装
+- [x] 学习 Java 继承、接口、多态与组合
+- [x] 学习 Vue 3 Composition API 与组件类型设计
+- [x] 学习 Vue 3 响应式系统与副作用管理
+- [x] 学习 Vue 3 组件通信与可复用组件
+- [x] 学习关系模型与第一条 SQL 查询
+- [x] 学习 AI、机器学习、深度学习与生成式 AI 基础
+- [x] 学习一次大模型请求的完整生命周期
 
-当前课程：[TypeScript 工程配置与模块边界](/frontend/typescript/project-configuration-and-module-boundaries)
+当前课程：[Vue 3 组件通信与可复用组件](/frontend/vue3/component-communication-and-reusable-components)

@@ -105,6 +105,24 @@ export default defineConfig({
               link: '/frontend/typescript/project-configuration-and-module-boundaries'
             }
           ]
+        },
+        {
+          text: 'Vue 3',
+          collapsed: false,
+          items: [
+            {
+              text: 'Composition API 与组件类型设计',
+              link: '/frontend/vue3/composition-api-and-component-typing'
+            },
+            {
+              text: '响应式系统与副作用管理',
+              link: '/frontend/vue3/reactivity-and-effect-management'
+            },
+            {
+              text: '组件通信与可复用组件',
+              link: '/frontend/vue3/component-communication-and-reusable-components'
+            }
+          ]
         }
       ],
       '/backend/': [
@@ -127,6 +145,14 @@ export default defineConfig({
             {
               text: '方法、参数传递、数组与可变参数',
               link: '/backend/java/methods-parameter-passing-arrays-and-varargs'
+            },
+            {
+              text: '类、对象、构造器与封装',
+              link: '/backend/java/classes-objects-constructors-and-encapsulation'
+            },
+            {
+              text: '继承、接口、多态与组合',
+              link: '/backend/java/inheritance-interfaces-polymorphism-and-composition'
             }
           ]
         }
@@ -134,19 +160,37 @@ export default defineConfig({
       '/database/': [
         {
           text: '数据库',
-          items: [{ text: '专题首页', link: '/database/' }]
+          items: [
+            { text: '专题首页', link: '/database/' },
+            {
+              text: '关系模型与第一条查询',
+              link: '/database/relational-model-and-first-query'
+            }
+          ]
         }
       ],
       '/ai/': [
         {
           text: '人工智能',
-          items: [{ text: '专题首页', link: '/ai/' }]
+          items: [
+            { text: '专题首页', link: '/ai/' },
+            {
+              text: 'AI、机器学习、深度学习与生成式 AI',
+              link: '/ai/foundations/ai-ml-dl-generative-ai'
+            }
+          ]
         }
       ],
       '/ai-application/': [
         {
           text: '大模型应用开发',
-          items: [{ text: '专题首页', link: '/ai-application/' }]
+          items: [
+            { text: '专题首页', link: '/ai-application/' },
+            {
+              text: '一次大模型请求的完整生命周期',
+              link: '/ai-application/request-lifecycle'
+            }
+          ]
         }
       ],
       '/projects/': [

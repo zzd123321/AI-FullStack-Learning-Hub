@@ -73,12 +73,12 @@ features:
   <h2>当前学习重点</h2>
   <div class="current-focus">
     <div>
-      <span class="current-focus__label">阶段 01 · TypeScript 基础</span>
-      <h3>TypeScript 工程配置与模块边界</h3>
+      <span class="current-focus__label">阶段 01 · Vue 3 组件设计</span>
+      <h3>组件通信与可复用组件</h3>
     </div>
     <div>
-      <p>理解 tsconfig、模块解析、类型导入和环境边界，区分 Vite 浏览器工程与 Node.js ESM 的配置策略。</p>
-      <a href="./frontend/typescript/project-configuration-and-module-boundaries">进入当前课程 →</a>
+      <p>系统掌握 Props、事件、插槽、v-model、依赖注入与受控组件边界，建立可维护的组件 API。</p>
+      <a href="./frontend/vue3/component-communication-and-reusable-components">进入当前课程 →</a>
     </div>
   </div>
 </section>
