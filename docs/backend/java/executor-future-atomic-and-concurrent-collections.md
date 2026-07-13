@@ -81,7 +81,7 @@ Runnable task = () -> saveAuditLog();
 - 不能声明任意受检异常。
 - 适合没有业务结果的动作。
 
-### Callable<V>
+### `Callable<V>`
 
 ```java
 Callable<ActivityResult> task = () -> process(job);

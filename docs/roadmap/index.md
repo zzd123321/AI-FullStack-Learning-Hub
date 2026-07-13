@@ -90,5 +90,10 @@ description: 面向有前端经验开发者的全栈与 AI 分阶段学习计划
 - [x] 学习关系模型与第一条 SQL 查询
 - [x] 学习 AI、机器学习、深度学习与生成式 AI 基础
 - [x] 学习一次大模型请求的完整生命周期
+- [x] 完成 Vue 3 状态管理、路由、表单、性能、测试、SSR 与迁移专题
+- [x] 进入 React，并完成核心模型、Effect、状态架构与数据路由
+- [x] 完成 Java 语言进阶、集合、泛型、Stream、并发与 JVM 基础专题
+- [x] 完成 SQL 查询、连接、聚合、子查询与安全写入基础专题
+- [x] 学习 Token 预算、结构化输出、工具调用与向量检索
 
-当前课程：[Vue 3 组件通信与可复用组件](/frontend/vue3/component-communication-and-reusable-components)
+当前课程：[React Router 数据路由与应用边界](/frontend/react/react-router-data-routing-and-application-boundaries)

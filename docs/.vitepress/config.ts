@@ -121,7 +121,24 @@ export default defineConfig({
             {
               text: '组件通信与可复用组件',
               link: '/frontend/vue3/component-communication-and-reusable-components'
-            }
+            },
+            { text: 'Pinia 状态管理与服务层', link: '/frontend/vue3/pinia-state-management-and-service-layer' },
+            { text: 'Vue Router 与路由架构', link: '/frontend/vue3/vue-router-and-routing-architecture' },
+            { text: '表单架构与复杂交互状态', link: '/frontend/vue3/form-architecture-and-complex-interaction-state' },
+            { text: '渲染机制、组件更新与性能', link: '/frontend/vue3/rendering-mechanism-component-updates-and-performance' },
+            { text: '测试策略与可测试架构', link: '/frontend/vue3/testing-strategy-and-testable-architecture' },
+            { text: 'SSR、Hydration 与同构边界', link: '/frontend/vue3/ssr-hydration-and-universal-application-boundaries' },
+            { text: 'Vue 2 到 Vue 3 渐进式迁移', link: '/frontend/vue3/vue2-to-vue3-progressive-migration-and-architecture' }
+          ]
+        },
+        {
+          text: 'React',
+          collapsed: false,
+          items: [
+            { text: '核心心智模型与 TypeScript 组件', link: '/frontend/react/core-mental-model-and-typescript-components' },
+            { text: 'Effect、Ref、异步竞争与自定义 Hook', link: '/frontend/react/effects-refs-async-races-and-custom-hooks' },
+            { text: 'Reducer、Context 与跨组件状态架构', link: '/frontend/react/reducer-context-and-cross-component-state-architecture' },
+            { text: 'React Router 数据路由与应用边界', link: '/frontend/react/react-router-data-routing-and-application-boundaries' }
           ]
         }
       ],
@@ -153,7 +170,21 @@ export default defineConfig({
             {
               text: '继承、接口、多态与组合',
               link: '/backend/java/inheritance-interfaces-polymorphism-and-composition'
-            }
+            },
+            { text: '包、枚举、记录与代码组织', link: '/backend/java/packages-enums-records-and-code-organization' },
+            { text: '异常、错误传播与资源清理', link: '/backend/java/exceptions-error-propagation-and-resource-cleanup' },
+            { text: 'IO、NIO.2、字符编码与文件', link: '/backend/java/io-nio2-character-encoding-and-files' },
+            { text: '集合框架与 List', link: '/backend/java/collections-framework-and-list' },
+            { text: 'Set、Map、相等性与哈希', link: '/backend/java/set-map-equality-and-hashing' },
+            { text: '泛型、通配符、类型擦除与 API 设计', link: '/backend/java/generics-wildcards-type-erasure-and-api-design' },
+            { text: 'Lambda、函数式接口、Optional 与 Stream', link: '/backend/java/lambda-functional-interfaces-optional-and-streams' },
+            { text: '线程、共享状态与内存可见性', link: '/backend/java/concurrency-threads-shared-state-and-memory-visibility' },
+            { text: '线程池、Future、原子类与并发集合', link: '/backend/java/executor-future-atomic-and-concurrent-collections' },
+            { text: 'CompletableFuture 异步编排', link: '/backend/java/completable-future-async-composition-timeout-and-recovery' },
+            { text: '锁、条件变量、信号量与同步器', link: '/backend/java/locks-conditions-semaphores-and-synchronizers' },
+            { text: '虚拟线程、结构化并发与 Scoped Values', link: '/backend/java/virtual-threads-structured-concurrency-and-scoped-values' },
+            { text: 'Java 内存模型与 happens-before', link: '/backend/java/memory-model-volatile-final-and-happens-before' },
+            { text: '类加载、字节码、JIT、运行时内存与 GC', link: '/backend/java/class-loading-bytecode-jit-runtime-memory-and-gc' }
           ]
         }
       ],
@@ -165,7 +196,14 @@ export default defineConfig({
             {
               text: '关系模型与第一条查询',
               link: '/database/relational-model-and-first-query'
-            }
+            },
+            { text: 'MySQL 与 PostgreSQL 基础', link: '/database/mysql-postgresql-basics' },
+            { text: '数据类型、默认值与约束', link: '/database/data-types-defaults-and-constraints' },
+            { text: 'SELECT、过滤、排序与分页', link: '/database/select-filter-sort-pagination' },
+            { text: '表关系与 JOIN', link: '/database/relationships-and-joins' },
+            { text: '聚合、GROUP BY 与 HAVING', link: '/database/aggregates-group-by-having' },
+            { text: '子查询与 CTE', link: '/database/subqueries-and-cte' },
+            { text: '安全的 INSERT、UPDATE 与 DELETE', link: '/database/safe-insert-update-delete' }
           ]
         }
       ],
@@ -189,7 +227,10 @@ export default defineConfig({
             {
               text: '一次大模型请求的完整生命周期',
               link: '/ai-application/request-lifecycle'
-            }
+            },
+            { text: 'Token、上下文窗口与 Prompt 预算', link: '/ai-application/tokens-context-and-prompts' },
+            { text: '结构化输出与工具调用', link: '/ai-application/structured-output-and-tool-calling' },
+            { text: 'Embedding 与向量检索', link: '/ai-application/embeddings-vector-retrieval' }
           ]
         }
       ],
