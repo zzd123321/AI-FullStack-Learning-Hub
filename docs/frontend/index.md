@@ -5,15 +5,16 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 
 # 前端开发
 
-这条路线不会重复铺陈已经熟悉的 HTML、CSS 和 JavaScript 入门内容，而是优先补齐现代前端所需的类型系统、Vue 3、浏览器原理、测试和架构能力。
+这条路线不会重复铺陈已经熟悉的 HTML、CSS 和 JavaScript 入门内容，而是优先补齐现代前端所需的类型系统、Vue 3、React、浏览器原理、测试和架构能力。
 
 ## 学习顺序
 
 1. **TypeScript**：类型系统、泛型、工程配置和类型设计。
 2. **Vue 3**：Composition API、响应式原理、组件与状态管理。
-3. **浏览器与网络**：事件循环、渲染流程、HTTP、缓存与安全。
-4. **工程化**：Vite、代码质量、测试、构建与发布。
-5. **性能与架构**：性能指标、模块设计、微前端和可维护性。
+3. **React**：渲染模型、Hooks、状态管理和应用架构。
+4. **浏览器与网络**：事件循环、渲染流程、HTTP、缓存与安全。
+5. **工程化**：Vite、代码质量、测试、构建与发布。
+6. **性能与架构**：性能指标、模块设计、微前端和可维护性。
 
 ## 当前模块
 
@@ -43,3 +44,9 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [测试策略与可测试架构](/frontend/vue3/testing-strategy-and-testable-architecture)
 - [SSR、Hydration 与同构应用边界](/frontend/vue3/ssr-hydration-and-universal-application-boundaries)
 - [Vue 2 到 Vue 3 的渐进式迁移与大型应用架构](/frontend/vue3/vue2-to-vue3-progressive-migration-and-architecture)
+
+完成本模块后，你应该能设计、测试和迁移具有明确状态边界的 Vue 3 应用。
+
+### React
+
+- [核心心智模型与 TypeScript 组件设计](/frontend/react/core-mental-model-and-typescript-components)
