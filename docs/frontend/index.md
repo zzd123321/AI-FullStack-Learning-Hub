@@ -52,3 +52,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [核心心智模型与 TypeScript 组件设计](/frontend/react/core-mental-model-and-typescript-components)
 - [Effect、Ref、异步竞态与自定义 Hook](/frontend/react/effects-refs-async-races-and-custom-hooks)
 - [Reducer、Context 与跨组件状态架构](/frontend/react/reducer-context-and-cross-component-state-architecture)
+- [React Router 数据路由与应用边界](/frontend/react/react-router-data-routing-and-application-boundaries)
