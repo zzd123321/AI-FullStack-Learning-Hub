@@ -605,7 +605,7 @@ Promise.all 在一个 Promise 拒绝后不会自动停止其他底层操作。St
 - 结构化子任务自动继承 ScopedValue，使上下文生命周期与任务树保持一致。
 - 虚拟线程、CompletableFuture 和计算池应按阻塞模型与业务结构选择，而非互相全面替代。
 
-下一节建议：Java 内存模型深入、volatile、final 安全发布与 happens-before。
+下一节：[Java 内存模型、volatile、final 与 happens-before](/backend/java/memory-model-volatile-final-and-happens-before)。
 
 ## 37. 参考资料
 
