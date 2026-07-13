@@ -328,7 +328,7 @@ java -cp out learning.backend.catalog.CourseCatalogApp java-006 "包与记录类
 - 记录类自动提供组件字段、访问器和值语义方法，适合透明值对象。
 - 紧凑构造方法用于校验和规范化组件，但记录类只保证浅层状态固定。
 
-下一节建议：Java 异常体系、错误传播与资源清理。
+下一节：[Java 异常体系、错误传播与资源清理](/backend/java/exceptions-error-propagation-and-resource-cleanup)。
 
 ## 17. 参考资料
 

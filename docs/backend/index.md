@@ -21,8 +21,9 @@ Java 语法与面向对象 → 集合与泛型 → 异常与 IO → 并发 → J
 - [Java 类、对象、构造方法与封装](/backend/java/classes-objects-constructors-and-encapsulation)
 - [Java 继承、接口、多态与组合](/backend/java/inheritance-interfaces-polymorphism-and-composition)
 - [Java 包、枚举、记录类与代码组织](/backend/java/packages-enums-records-and-code-organization)
+- [Java 异常体系、错误传播与资源清理](/backend/java/exceptions-error-propagation-and-resource-cleanup)
 
-前六课从工具链和程序执行过程开始，再建立静态类型、流程控制、方法拆分、对象建模、多态与代码组织基础。完成后，你能编译运行 Java 程序，处理输入错误，并用包、枚举和记录类组织类型安全的业务模型。
+前七课从工具链和程序执行过程开始，再建立静态类型、对象建模、多态、代码组织与异常处理基础。完成后，你能编译运行 Java 程序，建立类型安全的业务模型，并让错误携带上下文向边界传播、可靠释放外部资源。
 
 ## Python 辅线
 
