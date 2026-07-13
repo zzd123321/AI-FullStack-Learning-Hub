@@ -4,6 +4,9 @@ description: 把列表接口的查询参数转成安全、稳定、可分页的 
 prev:
   text: 数据类型、NULL、默认值与约束
   link: /database/data-types-defaults-and-constraints
+next:
+  text: 多表关系与 JOIN
+  link: /database/relationships-and-joins
 ---
 
 # 从列表接口到可靠 SELECT：筛选、排序与分页

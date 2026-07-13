@@ -25,8 +25,9 @@ description: 从 SQL 基础走向事务、索引、缓存和数据架构
 - [连接并认识 MySQL 与 PostgreSQL](/database/mysql-postgresql-basics)
 - [数据类型、NULL、默认值与约束](/database/data-types-defaults-and-constraints)
 - [从列表接口到可靠 SELECT：筛选、排序与分页](/database/select-filter-sort-pagination)
+- [多表关系与 JOIN](/database/relationships-and-joins)
 
-先把接口中的“用户列表”还原成数据库中的表和查询，再建立连接、类型与约束边界，最后实现可预测的筛选、排序和分页。
+先把接口中的“用户列表”还原成数据库中的表和查询，再建立连接、类型与约束边界，实现可靠的列表查询，最后学习通过 JOIN 组合相关数据。
 
 ## 阶段项目
 
