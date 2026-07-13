@@ -27,8 +27,9 @@ Java 语法与面向对象 → 集合与泛型 → 异常与 IO → 并发 → J
 - [Java Set、Map、相等性与哈希](/backend/java/set-map-equality-and-hashing)
 - [Java 泛型深入、通配符、类型擦除与 API 设计](/backend/java/generics-wildcards-type-erasure-and-api-design)
 - [Java Lambda、函数式接口、Optional 与 Stream](/backend/java/lambda-functional-interfaces-optional-and-streams)
+- [Java 并发基础、线程生命周期、共享状态与内存可见性](/backend/java/concurrency-threads-shared-state-and-memory-visibility)
 
-前十二课从工具链和程序执行过程开始，再建立静态类型、对象建模、多态、异常处理、文件 IO、集合、泛型与函数式数据处理基础。完成后，你能建立类型安全的业务模型，安全处理资源，并用集合与 Stream 构建清晰的数据转换流水线。
+前十三课从工具链和程序执行过程开始，再建立静态类型、对象建模、多态、异常处理、文件 IO、集合、泛型、函数式处理与并发基础。完成后，你能建立类型安全的业务模型，安全处理资源与数据流水线，并理解多线程共享状态的正确同步边界。
 
 ## Python 辅线
 
