@@ -368,85 +368,13 @@ while (remaining > 0) {
 
 ## 12. 完整示例：后端学习计划
 
-仓库示例位于 `examples/java/control-flow/BackendStudyPlan.java`。它接收星期和已学习分钟数，根据工作日或周末目标输出进度条和状态。
+仓库示例位于 `examples/java/control-flow/BackendStudyPlan.java`。它接收星期和已学习分钟数，根据工作日或周末目标输出进度条和状态。下面直接导入完整源码：
 
-```java
-public final class BackendStudyPlan {
-    private static final int WEEKDAY_TARGET_MINUTES = 45;
-    private static final int WEEKEND_TARGET_MINUTES = 90;
-    private static final int MAX_DAILY_MINUTES = 600;
-    private static final int PROGRESS_BAR_SIZE = 10;
+::: code-group
 
-    private BackendStudyPlan() {
-    }
+<<< ../../../examples/java/control-flow/BackendStudyPlan.java{java:line-numbers} [BackendStudyPlan.java]
 
-    public static void main(String[] args) {
-        if (args.length != 2) {
-            System.err.println("用法：java BackendStudyPlan <星期> <已学习分钟数>");
-            System.err.println("示例：java BackendStudyPlan 周六 75");
-            System.exit(2);
-            return;
-        }
-
-        String day = args[0].trim();
-        int completedMinutes;
-
-        try {
-            completedMinutes = Integer.parseInt(args[1]);
-        } catch (NumberFormatException error) {
-            System.err.println("错误：已学习分钟数必须是整数。");
-            System.exit(2);
-            return;
-        }
-
-        int targetMinutes = switch (day) {
-            case "周一", "周二", "周三", "周四", "周五" -> WEEKDAY_TARGET_MINUTES;
-            case "周六", "周日" -> WEEKEND_TARGET_MINUTES;
-            default -> -1;
-        };
-
-        if (targetMinutes == -1) {
-            System.err.println("错误：星期必须是周一到周日。");
-            System.exit(1);
-            return;
-        }
-
-        if (completedMinutes < 0 || completedMinutes > MAX_DAILY_MINUTES) {
-            System.err.printf("错误：已学习分钟数必须在 0 到 %d 之间。%n", MAX_DAILY_MINUTES);
-            System.exit(1);
-            return;
-        }
-
-        double completionRate = completedMinutes * 100.0 / targetMinutes;
-        int filledSlots = Math.min(
-                PROGRESS_BAR_SIZE,
-                completedMinutes * PROGRESS_BAR_SIZE / targetMinutes
-        );
-
-        String status;
-        if (completedMinutes >= targetMinutes) {
-            status = "今日达标";
-        } else if (completionRate >= 80.0) {
-            status = "接近目标";
-        } else if (completedMinutes > 0) {
-            status = "继续学习";
-        } else {
-            status = "尚未开始";
-        }
-
-        System.out.printf("学习日：%s%n", day);
-        System.out.printf("目标：%d 分钟，已完成：%d 分钟%n", targetMinutes, completedMinutes);
-        System.out.print("进度：[");
-
-        for (int slot = 0; slot < PROGRESS_BAR_SIZE; slot++) {
-            System.out.print(slot < filledSlots ? "#" : "-");
-        }
-
-        System.out.printf("] %.1f%%%n", completionRate);
-        System.out.printf("状态：%s%n", status);
-    }
-}
-```
+:::
 
 编译：
 
@@ -544,7 +472,7 @@ if ("周一".equals(day)) {
 - `if` 处理范围和复杂条件，`switch` 处理固定候选值，循环处理重复流程。
 - 外部字符串转数字可能失败，后端程序应提供清晰错误信息和可判断的失败状态。
 
-下一节建议：Java 方法、参数传递、数组与可变参数。
+下一节：[Java 方法、参数传递、数组与可变参数](/backend/java/methods-parameter-passing-arrays-and-varargs)。
 
 ## 15. 参考资料
 

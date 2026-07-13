@@ -17,8 +17,9 @@ Java 语法与面向对象 → 集合与泛型 → 异常与 IO → 并发 → J
 
 - [Java 开发环境、JDK/JRE/JVM 与第一个程序](/backend/java/development-environment-and-first-program)
 - [Java 变量、基本类型、运算符与控制流程](/backend/java/variables-types-operators-and-control-flow)
+- [Java 方法、参数传递、数组与可变参数](/backend/java/methods-parameter-passing-arrays-and-varargs)
 
-前两课从工具链和程序执行过程开始，再建立静态类型、表达式与流程控制基础。完成后，你能编译运行 Java 程序，并能处理来自命令行的正常输入和错误输入。
+前三课从工具链和程序执行过程开始，再建立静态类型、流程控制、方法拆分与数组处理基础。完成后，你能编译运行 Java 程序，处理输入错误，并把一段流程拆分成职责清晰的方法。
 
 ## Python 辅线
 

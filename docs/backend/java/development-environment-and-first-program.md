@@ -148,26 +148,13 @@ $env:JAVA_HOME
 
 ## 6. 第一个 Java 程序
 
-仓库示例位于 `examples/java/hello-world/HelloBackend.java`：
+仓库示例位于 `examples/java/hello-world/HelloBackend.java`。下面的代码由 VitePress 直接从该文件导入，页面内容与实际运行的源码始终一致：
 
-```java
-public final class HelloBackend {
-    private HelloBackend() {
-    }
+::: code-group
 
-    public static void main(String[] args) {
-        String learner = args.length > 0 ? args[0].trim() : "前端开发者";
+<<< ../../../examples/java/hello-world/HelloBackend.java{java:line-numbers} [HelloBackend.java]
 
-        if (learner.isEmpty()) {
-            System.err.println("错误：学习者名称不能为空。");
-            System.exit(1);
-        }
-
-        System.out.printf("你好，%s！%n", learner);
-        System.out.println("Java 后端学习环境已经就绪。");
-    }
-}
-```
+:::
 
 从仓库根目录进入示例目录：
 
