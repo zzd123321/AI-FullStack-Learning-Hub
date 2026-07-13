@@ -1072,7 +1072,7 @@ Java 常通过 DTO 类、Builder、注解处理器或代码生成建立对象变
 
 ## 42. 下一步学习
 
-下一节建议学习：**TypeScript 模板字面量类型与类型安全契约**。
+下一节建议学习：[**TypeScript 模板字面量类型与类型安全契约**](/frontend/typescript/template-literal-types-and-type-safe-contracts)。
 
 届时将继续讲解：
 

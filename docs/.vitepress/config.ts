@@ -91,6 +91,14 @@ export default defineConfig({
             {
               text: '条件类型与 infer',
               link: '/frontend/typescript/conditional-types-and-infer'
+            },
+            {
+              text: '映射类型与常用工具类型',
+              link: '/frontend/typescript/mapped-types-and-utility-types'
+            },
+            {
+              text: '模板字面量类型与类型安全契约',
+              link: '/frontend/typescript/template-literal-types-and-type-safe-contracts'
             }
           ]
         }
@@ -99,6 +107,20 @@ export default defineConfig({
         {
           text: '后端开发',
           items: [{ text: '专题首页', link: '/backend/' }]
+        },
+        {
+          text: 'Java 基础',
+          collapsed: false,
+          items: [
+            {
+              text: '开发环境、JDK/JRE/JVM 与第一个程序',
+              link: '/backend/java/development-environment-and-first-program'
+            },
+            {
+              text: '变量、基本类型、运算符与控制流程',
+              link: '/backend/java/variables-types-operators-and-control-flow'
+            }
+          ]
         }
       ],
       '/database/': [
