@@ -522,7 +522,7 @@ Java `await` 会释放锁、挂起线程并在返回前重新拿锁；JavaScript
 - 锁和同步器既提供协调，也建立内存可见性；共享状态仍需一致的保护协议。
 - 生产者—消费者场景优先使用 BlockingQueue 等成熟组件，减少手写同步协议。
 
-下一节建议：Java 虚拟线程、结构化并发与 ScopedValue。
+下一节：[Java 虚拟线程、结构化并发与 ScopedValue](/backend/java/virtual-threads-structured-concurrency-and-scoped-values)。
 
 ## 27. 参考资料
 
