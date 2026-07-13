@@ -26,8 +26,9 @@ description: 从 SQL 基础走向事务、索引、缓存和数据架构
 - [数据类型、NULL、默认值与约束](/database/data-types-defaults-and-constraints)
 - [从列表接口到可靠 SELECT：筛选、排序与分页](/database/select-filter-sort-pagination)
 - [多表关系与 JOIN](/database/relationships-and-joins)
+- [聚合查询：COUNT、SUM、GROUP BY 与 HAVING](/database/aggregates-group-by-having)
 
-先把接口中的“用户列表”还原成数据库中的表和查询，再建立连接、类型与约束边界，实现可靠的列表查询，最后学习通过 JOIN 组合相关数据。
+先把接口中的“用户列表”还原成数据库中的表和查询，再建立连接、类型与约束边界，实现可靠的列表查询、多表组合和分组统计。
 
 ## 阶段项目
 
