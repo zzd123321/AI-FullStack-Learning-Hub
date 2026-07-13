@@ -13,6 +13,12 @@ Java 语法与面向对象 → 集合与泛型 → 异常与 IO → 并发 → J
 
 学习基准以 JDK 25 LTS 为主，并在必要处标注 JDK 17/21 的兼容差异。
 
+### Java 基础
+
+- [Java 开发环境、JDK/JRE/JVM 与第一个程序](/backend/java/development-environment-and-first-program)
+
+第一课从工具链和程序执行过程开始。完成后，你会拥有可验证的 JDK 25 环境，并能区分编译错误、启动错误和程序主动报告的输入错误。
+
 ## Python 辅线
 
 Python 语法 → 类型标注 → 虚拟环境与包管理 → 生成器与装饰器 → 异步编程 → FastAPI → 数据处理 → AI 服务。
