@@ -4,6 +4,9 @@ description: 从订单筛选与统计接口出发，掌握标量子查询、EXIS
 prev:
   text: 聚合查询：COUNT、SUM、GROUP BY 与 HAVING
   link: /database/aggregates-group-by-having
+next:
+  text: 安全写入数据：INSERT、UPDATE、DELETE 与幂等边界
+  link: /database/safe-insert-update-delete
 ---
 
 # 子查询与 CTE：拆解复杂查询
