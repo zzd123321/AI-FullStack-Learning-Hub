@@ -852,7 +852,7 @@ Java 和 TypeScript 都不能把仅存在于静态类型系统的信息自动当
 - `@SuppressWarnings` 与 `@SafeVarargs` 是开发者承担证明责任，不是自动修复。
 - 泛型只解决静态类型关系，不自动解决输入校验、不可变性、并发安全或事务一致性。
 
-下一节建议：Java Lambda、函数式接口、Optional 与 Stream 流水线。
+下一节：[Java Lambda、函数式接口、Optional 与 Stream 流水线](/backend/java/lambda-functional-interfaces-optional-and-streams)。
 
 ## 37. 参考资料
 
