@@ -23,8 +23,9 @@ description: 从 SQL 基础走向事务、索引、缓存和数据架构
 
 - [关系型数据库、表、行、列、主键与第一个 SQL 查询](/database/relational-model-and-first-query)
 - [连接并认识 MySQL 与 PostgreSQL](/database/mysql-postgresql-basics)
+- [数据类型、NULL、默认值与约束](/database/data-types-defaults-and-constraints)
 
-先把接口中的“用户列表”还原成数据库中的表和查询，再建立客户端、服务器、连接、数据库与 schema 的边界。
+先把接口中的“用户列表”还原成数据库中的表和查询，再建立连接与命名空间边界，最后把接口字段落实为可靠的列类型和数据库约束。
 
 ## 阶段项目
 
