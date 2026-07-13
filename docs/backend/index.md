@@ -16,8 +16,9 @@ Java 语法与面向对象 → 集合与泛型 → 异常与 IO → 并发 → J
 ### Java 基础
 
 - [Java 开发环境、JDK/JRE/JVM 与第一个程序](/backend/java/development-environment-and-first-program)
+- [Java 变量、基本类型、运算符与控制流程](/backend/java/variables-types-operators-and-control-flow)
 
-第一课从工具链和程序执行过程开始。完成后，你会拥有可验证的 JDK 25 环境，并能区分编译错误、启动错误和程序主动报告的输入错误。
+前两课从工具链和程序执行过程开始，再建立静态类型、表达式与流程控制基础。完成后，你能编译运行 Java 程序，并能处理来自命令行的正常输入和错误输入。
 
 ## Python 辅线
 

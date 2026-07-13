@@ -359,7 +359,7 @@ java HelloBackend
 - 后端程序需要同时考虑正常输出、错误说明和进程退出状态。
 - 编译错误、启动错误和运行时错误发生在不同阶段，应使用不同线索排查。
 
-下一节建议：Java 变量、基本类型、运算符与控制流程。
+下一节：[Java 变量、基本类型、运算符与控制流程](/backend/java/variables-types-operators-and-control-flow)。
 
 ## 14. 参考资料
 
