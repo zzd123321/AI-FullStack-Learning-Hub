@@ -34,3 +34,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 ### Vue 3
 
 - [Composition API 与组件类型设计](/frontend/vue3/composition-api-and-component-typing)
+- [响应式原理与副作用管理](/frontend/vue3/reactivity-and-effect-management)
