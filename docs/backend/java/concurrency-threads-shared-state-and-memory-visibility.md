@@ -797,7 +797,7 @@ java -cp out learning.backend.concurrency.ConcurrencyBasicsApp
 - 死锁来自循环等待，活锁没有进展，饥饿是长期得不到资源；都需要结构化设计和诊断证据。
 - 生产后端应使用 Executor 等管理任务生命周期、容量、结果、异常和关闭。
 
-下一节建议：Java ExecutorService、Future、原子类与并发集合。
+下一节：[Java ExecutorService、Future、原子类与并发集合](/backend/java/executor-future-atomic-and-concurrent-collections)。
 
 ## 46. 参考资料
 
