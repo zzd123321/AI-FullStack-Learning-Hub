@@ -42,3 +42,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [渲染机制、组件更新与性能优化](/frontend/vue3/rendering-mechanism-component-updates-and-performance)
 - [测试策略与可测试架构](/frontend/vue3/testing-strategy-and-testable-architecture)
 - [SSR、Hydration 与同构应用边界](/frontend/vue3/ssr-hydration-and-universal-application-boundaries)
+- [Vue 2 到 Vue 3 的渐进式迁移与大型应用架构](/frontend/vue3/vue2-to-vue3-progressive-migration-and-architecture)
