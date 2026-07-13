@@ -917,6 +917,8 @@ const lessonFieldConfig: FieldConfig<LessonFormValue> = {
 examples/typescript/mapped-types-and-utility-types.ts
 ```
 
+<<< ../../../examples/typescript/mapped-types-and-utility-types.ts
+
 示例包含：
 
 1. `LessonEntity`：服务端课程实体。

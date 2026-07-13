@@ -850,6 +850,8 @@ function createLabel<Value extends string | number>(
 examples/typescript/conditional-types-and-infer.ts
 ```
 
+<<< ../../../examples/typescript/conditional-types-and-infer.ts
+
 示例包含：
 
 1. `ApiResult<Data, ErrorData>`：成功与失败联合。

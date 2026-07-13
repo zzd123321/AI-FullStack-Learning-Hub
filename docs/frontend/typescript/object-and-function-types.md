@@ -787,6 +787,8 @@ interface MethodSyntax {
 examples/typescript/object-and-function-types.ts
 ```
 
+<<< ../../../examples/typescript/object-and-function-types.ts
+
 运行环境：
 
 ```text

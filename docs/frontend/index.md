@@ -27,5 +27,6 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [条件类型与 `infer`](/frontend/typescript/conditional-types-and-infer)
 - [映射类型与常用工具类型](/frontend/typescript/mapped-types-and-utility-types)
 - [模板字面量类型与类型安全契约](/frontend/typescript/template-literal-types-and-type-safe-contracts)
+- [工程配置与模块边界](/frontend/typescript/project-configuration-and-module-boundaries)
 
 完成本模块后，你应该能在严格模式下为 Vue 3 和接口数据建立可靠的类型边界。

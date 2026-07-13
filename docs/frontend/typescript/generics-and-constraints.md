@@ -875,6 +875,8 @@ const wrapped = wrap('success')
 examples/typescript/generics-and-constraints.ts
 ```
 
+<<< ../../../examples/typescript/generics-and-constraints.ts
+
 示例包含：
 
 1. `Page<Item>`：用泛型表达分页容器与元素类型的关系。

@@ -716,6 +716,8 @@ flowchart TD
 examples/typescript/template-literal-types-and-type-safe-contracts.ts
 ```
 
+<<< ../../../examples/typescript/template-literal-types-and-type-safe-contracts.ts
+
 示例包含：
 
 1. 由资源名派生 API 端点。

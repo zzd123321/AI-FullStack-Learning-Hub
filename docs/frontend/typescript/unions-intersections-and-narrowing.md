@@ -837,6 +837,8 @@ type Payment =
 examples/typescript/unions-intersections-and-narrowing.ts
 ```
 
+<<< ../../../examples/typescript/unions-intersections-and-narrowing.ts
+
 示例组合了本节关键知识：
 
 1. 外部输入先以 `unknown` 接收。

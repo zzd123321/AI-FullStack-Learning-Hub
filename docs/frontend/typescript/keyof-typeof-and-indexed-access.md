@@ -906,6 +906,8 @@ if (isSortableField(keyFromUrl)) {
 examples/typescript/keyof-typeof-and-indexed-access.ts
 ```
 
+<<< ../../../examples/typescript/keyof-typeof-and-indexed-access.ts
+
 示例包含：
 
 1. `statusLabels`：组合 `as const` 和 `satisfies`。
