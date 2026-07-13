@@ -50,3 +50,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 ### React
 
 - [核心心智模型与 TypeScript 组件设计](/frontend/react/core-mental-model-and-typescript-components)
+- [Effect、Ref、异步竞态与自定义 Hook](/frontend/react/effects-refs-async-races-and-custom-hooks)
