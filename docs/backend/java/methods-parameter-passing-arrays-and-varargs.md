@@ -471,7 +471,7 @@ java -cp out StudyStatistics
 - 可变参数在方法内部表现为数组，并且必须位于参数列表最后。
 - 外部输入解析可能失败，应报告具体位置、原因和非零退出状态。
 
-下一节建议：Java 类、对象、构造方法与封装。
+下一节：[Java 类、对象、构造方法与封装](/backend/java/classes-objects-constructors-and-encapsulation)。
 
 ## 17. 参考资料
 
