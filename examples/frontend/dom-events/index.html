@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width" /><title>DOM 事件实验</title></head>
+  <body>
+    <main>
+      <h1>DOM 事件实验</h1>
+      <div role="toolbar" aria-label="课程操作">
+        <button tabindex="0">上一课</button><button tabindex="-1">收藏</button><button tabindex="-1">下一课</button>
+      </div>
+      <ul id="lessons">
+        <li><lesson-card lesson-id="event-loop">事件循环</lesson-card><button data-remove>移除</button></li>
+        <li><lesson-card lesson-id="network">浏览器网络</lesson-card><button data-remove>移除</button></li>
+      </ul>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

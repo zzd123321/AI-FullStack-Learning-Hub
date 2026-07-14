@@ -65,3 +65,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 
 - [事件循环、渲染流水线与长任务诊断](/frontend/browser/event-loop-rendering-and-long-tasks)
 - [从 URL 到响应：DNS、TLS、HTTP 缓存与 Fetch](/frontend/browser/url-dns-tls-http-cache-and-fetch)
+- [DOM、事件传播、Shadow DOM 与可访问交互](/frontend/browser/dom-events-shadow-dom-and-accessible-interactions)
