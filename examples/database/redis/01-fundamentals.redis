@@ -1,0 +1,61 @@
+ECHO "Redis 核心数据类型安全示例：所有 learning15: 键将在 10 分钟后过期"
+PING
+
+ECHO "String：对象、条件写入与原子计数"
+MULTI
+SET learning15:string:user:1001 '{"id":1001,"name":"Alice","status":"active"}' EX 600
+SET learning15:string:idempotency:req-001 processing EX 600 NX
+INCR learning15:string:request-counter
+EXPIRE learning15:string:request-counter 600
+EXEC
+GET learning15:string:user:1001
+GET learning15:string:idempotency:req-001
+GET learning15:string:request-counter
+TTL learning15:string:user:1001
+
+ECHO "Hash：字段映射与字段原子计数"
+MULTI
+HSET learning15:hash:user:1001 name Alice status active login_count 0
+HINCRBY learning15:hash:user:1001 login_count 1
+EXPIRE learning15:hash:user:1001 600
+EXEC
+HGET learning15:hash:user:1001 status
+HGETALL learning15:hash:user:1001
+TTL learning15:hash:user:1001
+
+ECHO "List：两端写入和有限范围读取"
+MULTI
+RPUSH learning15:list:notifications:user:1001 event-001 event-002
+LPUSH learning15:list:notifications:user:1001 event-000
+EXPIRE learning15:list:notifications:user:1001 600
+EXEC
+LRANGE learning15:list:notifications:user:1001 0 9
+LLEN learning15:list:notifications:user:1001
+TTL learning15:list:notifications:user:1001
+
+ECHO "Set：成员唯一、成员判断和基数"
+MULTI
+SADD learning15:set:user:1001:roles member editor member
+EXPIRE learning15:set:user:1001:roles 600
+EXEC
+SISMEMBER learning15:set:user:1001:roles editor
+SCARD learning15:set:user:1001:roles
+SMEMBERS learning15:set:user:1001:roles
+TTL learning15:set:user:1001:roles
+
+ECHO "Sorted Set：唯一成员按分数排序"
+MULTI
+ZADD learning15:zset:leaderboard 1200 user:1001 980 user:1002 1100 user:1003
+ZINCRBY learning15:zset:leaderboard 30 user:1002
+EXPIRE learning15:zset:leaderboard 600
+EXEC
+ZRANGE learning15:zset:leaderboard 0 -1 REV WITHSCORES
+ZCARD learning15:zset:leaderboard
+TTL learning15:zset:leaderboard
+
+ECHO "TYPE：检查各学习键的 value 类型"
+TYPE learning15:string:user:1001
+TYPE learning15:hash:user:1001
+TYPE learning15:list:notifications:user:1001
+TYPE learning15:set:user:1001:roles
+TYPE learning15:zset:leaderboard
