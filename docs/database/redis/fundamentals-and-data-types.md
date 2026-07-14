@@ -4,6 +4,9 @@ description: 从后端视角理解 Redis 的键空间、String、Hash、List、S
 prev:
   text: Redis 与缓存专题
   link: /database/redis/
+next:
+  text: Cache-Aside 与缓存一致性
+  link: /database/redis/cache-aside-and-consistency
 ---
 
 # Redis 基础与核心数据类型
