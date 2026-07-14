@@ -57,3 +57,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [渲染性能、并发特性与 Suspense](/frontend/react/rendering-performance-concurrency-and-suspense)
 - [测试策略与可测试架构](/frontend/react/testing-strategy-and-testable-architecture)
 - [Server Components、Server Functions 与现代全栈边界](/frontend/react/server-components-functions-and-fullstack-boundaries)
+- [大型应用架构、渐进迁移与生产治理](/frontend/react/large-scale-architecture-migration-and-production-governance)
