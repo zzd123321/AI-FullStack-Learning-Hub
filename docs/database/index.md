@@ -35,6 +35,7 @@ description: 从 SQL 基础走向事务、索引、缓存和数据架构
 ### 索引与执行计划
 
 - [索引如何加速查询：B-Tree、选择性与联合索引](/database/indexes-and-query-shapes)
+- [读懂执行计划：扫描、连接、排序与实际执行](/database/reading-query-plans)
 
 从真实接口的筛选与排序形状出发设计索引，再通过执行计划验证数据库是否采用了预期访问路径。
 

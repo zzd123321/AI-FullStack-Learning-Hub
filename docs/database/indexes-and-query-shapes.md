@@ -4,6 +4,9 @@ description: 从订单列表接口出发，理解 B-Tree、选择性、联合索
 prev:
   text: 安全写入数据：INSERT、UPDATE、DELETE 与幂等边界
   link: /database/safe-insert-update-delete
+next:
+  text: 读懂执行计划：扫描、连接、排序与实际执行
+  link: /database/reading-query-plans
 ---
 
 # 索引如何加速查询：B-Tree、选择性与联合索引
