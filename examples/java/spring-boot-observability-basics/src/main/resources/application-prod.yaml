@@ -1,0 +1,12 @@
+learning:
+  environment-label: production
+  greeting: 你好，生产环境
+
+logging:
+  level:
+    learning.backend.observability: INFO
+
+management:
+  endpoint:
+    health:
+      show-details: never

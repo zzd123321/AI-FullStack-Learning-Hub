@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: backend-observability
+  profiles:
+    group:
+      local-observe: dev,json-logs
+
+server:
+  port: 8080
+
+learning:
+  environment-label: default
+  greeting: 你好，配置系统
+
+logging:
+  level:
+    learning.backend.observability: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: never
+  info:
+    env:
+      enabled: true
+
+info:
+  application:
+    name: ${spring.application.name}
+    description: 配置与可观测性课程示例

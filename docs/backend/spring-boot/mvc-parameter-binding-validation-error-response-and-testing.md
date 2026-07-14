@@ -690,7 +690,7 @@ java -jar target/spring-boot-mvc-validation-1.0.0-SNAPSHOT.jar \
 - `@WebMvcTest` 是聚焦 slice；完整 Context 和随机端口测试用于更高集成层。
 - 测试必须隔离可变状态，不能依赖执行顺序。
 
-下一节建议：Spring Boot 配置分层、Profiles、日志、Actuator 与可观测性基础。
+下一节：[Spring Boot 配置分层、Profiles、日志、Actuator 与可观测性基础](/backend/spring-boot/config-profiles-logging-actuator-and-observability)。
 
 ## 46. 参考资料
 

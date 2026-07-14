@@ -1,0 +1,12 @@
+learning:
+  environment-label: development
+  greeting: 你好，开发环境
+
+logging:
+  level:
+    learning.backend.observability: DEBUG
+
+management:
+  endpoint:
+    health:
+      show-details: always
