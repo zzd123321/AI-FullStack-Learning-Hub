@@ -73,12 +73,12 @@ features:
   <h2>当前学习重点</h2>
   <div class="current-focus">
     <div>
-      <span class="current-focus__label">阶段 01 · React 应用架构</span>
-      <h3>React Router 数据路由与应用边界</h3>
+      <span class="current-focus__label">阶段 02 · Spring Boot Web 开发</span>
+      <h3>Spring MVC 参数绑定、校验、错误响应与测试</h3>
     </div>
     <div>
-      <p>理解数据路由、Loader、Action、错误边界和鉴权边界，建立大型 React 应用的清晰路由结构。</p>
-      <a href="./frontend/react/react-router-data-routing-and-application-boundaries">进入当前课程 →</a>
+      <p>从一个真实 API 出发，掌握请求参数绑定、Bean Validation、统一错误响应与 Web 层测试的完整边界。</p>
+      <a href="./backend/spring-boot/mvc-parameter-binding-validation-error-response-and-testing">进入当前课程 →</a>
     </div>
   </div>
 </section>

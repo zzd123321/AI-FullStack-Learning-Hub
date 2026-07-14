@@ -95,5 +95,9 @@ description: 面向有前端经验开发者的全栈与 AI 分阶段学习计划
 - [x] 完成 Java 语言进阶、集合、泛型、Stream、并发与 JVM 基础专题
 - [x] 完成 SQL 查询、连接、聚合、子查询与安全写入基础专题
 - [x] 学习 Token 预算、结构化输出、工具调用与向量检索
+- [x] 完成 React 表单、性能、测试、服务端边界与大型应用架构专题
+- [x] 完成浏览器事件循环、渲染、网络与 Fetch 专题
+- [x] 完成数据库索引、执行计划、事务、隔离级别、锁、MVCC、设计与 Redis 基础专题
+- [x] 完成 JVM 诊断、Maven 与 Spring Boot 首批 Web 开发课程
 
-当前课程：[React Router 数据路由与应用边界](/frontend/react/react-router-data-routing-and-application-boundaries)
+当前课程：[Spring MVC 参数绑定、校验、错误响应与测试](/backend/spring-boot/mvc-parameter-binding-validation-error-response-and-testing)

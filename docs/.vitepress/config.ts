@@ -138,7 +138,20 @@ export default defineConfig({
             { text: '核心心智模型与 TypeScript 组件', link: '/frontend/react/core-mental-model-and-typescript-components' },
             { text: 'Effect、Ref、异步竞争与自定义 Hook', link: '/frontend/react/effects-refs-async-races-and-custom-hooks' },
             { text: 'Reducer、Context 与跨组件状态架构', link: '/frontend/react/reducer-context-and-cross-component-state-architecture' },
-            { text: 'React Router 数据路由与应用边界', link: '/frontend/react/react-router-data-routing-and-application-boundaries' }
+            { text: 'React Router 数据路由与应用边界', link: '/frontend/react/react-router-data-routing-and-application-boundaries' },
+            { text: '表单架构、Action 与复杂交互', link: '/frontend/react/form-architecture-actions-and-complex-interactions' },
+            { text: '渲染性能、并发特性与 Suspense', link: '/frontend/react/rendering-performance-concurrency-and-suspense' },
+            { text: '测试策略与可测试架构', link: '/frontend/react/testing-strategy-and-testable-architecture' },
+            { text: 'Server Components、Server Functions 与全栈边界', link: '/frontend/react/server-components-functions-and-fullstack-boundaries' },
+            { text: '大型应用架构、渐进迁移与生产治理', link: '/frontend/react/large-scale-architecture-migration-and-production-governance' }
+          ]
+        },
+        {
+          text: '浏览器原理',
+          collapsed: false,
+          items: [
+            { text: '事件循环、渲染与长任务', link: '/frontend/browser/event-loop-rendering-and-long-tasks' },
+            { text: 'URL、DNS、TLS、HTTP 缓存与 Fetch', link: '/frontend/browser/url-dns-tls-http-cache-and-fetch' }
           ]
         }
       ],
@@ -184,7 +197,19 @@ export default defineConfig({
             { text: '锁、条件变量、信号量与同步器', link: '/backend/java/locks-conditions-semaphores-and-synchronizers' },
             { text: '虚拟线程、结构化并发与 Scoped Values', link: '/backend/java/virtual-threads-structured-concurrency-and-scoped-values' },
             { text: 'Java 内存模型与 happens-before', link: '/backend/java/memory-model-volatile-final-and-happens-before' },
-            { text: '类加载、字节码、JIT、运行时内存与 GC', link: '/backend/java/class-loading-bytecode-jit-runtime-memory-and-gc' }
+            { text: '类加载、字节码、JIT、运行时内存与 GC', link: '/backend/java/class-loading-bytecode-jit-runtime-memory-and-gc' },
+            { text: 'GC 日志、JFR、线程转储、堆转储与排障', link: '/backend/java/gc-logs-jfr-thread-dumps-heap-dumps-and-troubleshooting' },
+            { text: 'Maven 项目模型、依赖、生命周期与插件', link: '/backend/java/maven-project-model-dependencies-lifecycle-and-plugins' }
+          ]
+        },
+        {
+          text: 'Spring Boot',
+          collapsed: false,
+          items: [
+            { text: '专题首页', link: '/backend/spring-boot/' },
+            { text: '项目结构、自动配置、配置与第一个 API', link: '/backend/spring-boot/project-structure-auto-configuration-config-and-first-api' },
+            { text: 'Bean 生命周期、Java Config、Scope、代理与循环依赖', link: '/backend/spring-boot/bean-lifecycle-java-config-scopes-proxies-and-circular-dependencies' },
+            { text: 'MVC 参数绑定、校验、错误响应与测试', link: '/backend/spring-boot/mvc-parameter-binding-validation-error-response-and-testing' }
           ]
         }
       ],
@@ -203,7 +228,14 @@ export default defineConfig({
             { text: '表关系与 JOIN', link: '/database/relationships-and-joins' },
             { text: '聚合、GROUP BY 与 HAVING', link: '/database/aggregates-group-by-having' },
             { text: '子查询与 CTE', link: '/database/subqueries-and-cte' },
-            { text: '安全的 INSERT、UPDATE 与 DELETE', link: '/database/safe-insert-update-delete' }
+            { text: '安全的 INSERT、UPDATE 与 DELETE', link: '/database/safe-insert-update-delete' },
+            { text: '索引与查询形状', link: '/database/indexes-and-query-shapes' },
+            { text: '读懂查询执行计划', link: '/database/reading-query-plans' },
+            { text: '事务与 ACID', link: '/database/transactions-and-acid' },
+            { text: '事务隔离级别', link: '/database/transaction-isolation-levels' },
+            { text: '锁与 MVCC', link: '/database/locks-and-mvcc' },
+            { text: '数据库设计与范式', link: '/database/database-design-and-normalization' },
+            { text: 'Redis 基础与数据类型', link: '/database/redis/fundamentals-and-data-types' }
           ]
         }
       ],
