@@ -6,10 +6,11 @@ export function delegate<K extends keyof HTMLElementEventMap>(
   options?: AddEventListenerOptions,
 ): () => void {
   const listener: EventListener = (event) => {
-    const matched = event.composedPath().find(
-      (node): node is HTMLElement => node instanceof HTMLElement && node.matches(selector),
-    );
-    if (matched && (matched === container || container.contains(matched))) {
+    const matched = event.composedPath().find((node): node is HTMLElement =>
+      node instanceof HTMLElement &&
+      (node === container || container.contains(node)) &&
+      node.matches(selector));
+    if (matched) {
       handler(event as HTMLElementEventMap[K], matched);
     }
   };

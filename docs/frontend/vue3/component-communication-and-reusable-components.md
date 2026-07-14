@@ -723,7 +723,7 @@ examples/frontend/vue3-components/LessonCatalog.vue
 - 不要用旧式全局 Event Bus 替代清晰组件通信。
 - Mixins 中的隐式注入依赖应迁移为显式组合式函数或类型化上下文。
 
-## 44. 面试知识
+## 44. 概念辨析与因果回顾
 
 ### 为什么 Props 是单向的？
 

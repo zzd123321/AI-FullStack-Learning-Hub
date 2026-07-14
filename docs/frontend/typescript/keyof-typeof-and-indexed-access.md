@@ -1020,7 +1020,7 @@ TypeScript 的结构化类型、字面量联合和从常量派生类型也更贴
 
 生产环境应让 OpenAPI、JSON Schema、验证 Schema 或明确领域模型成为契约来源，并同时保留运行时验证。
 
-## 29. 面试知识
+## 29. 概念辨析与因果回顾
 
 ### 类型位置的 `typeof` 与 JavaScript `typeof` 有什么区别？
 

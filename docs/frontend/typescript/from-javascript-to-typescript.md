@@ -6,7 +6,7 @@ outline: deep
 
 # 从 JavaScript 到 TypeScript
 
-> 适用环境：TypeScript 5.x、Node.js 22 或更高版本。本文聚焦稳定的语言基础，不依赖特定框架。
+> 适用环境：本站锁定的 TypeScript 严格模式与 Node.js 22+。本文只依赖长期稳定的语言基础；具体编译选项以项目 `tsconfig.json` 和锁文件为准。
 
 ## 1. 学习目标
 
@@ -56,7 +56,7 @@ TypeScript 的核心价值不是让代码显得更“高级”，而是让数据
 
 ## 4. TypeScript 与 JavaScript 的关系
 
-TypeScript 是 JavaScript 的带类型超集。合法的 JavaScript 语法通常也是合法的 TypeScript 语法，但 TypeScript 增加了一套静态类型系统。
+TypeScript 在 JavaScript 语法之上增加静态类型语法和检查器。JavaScript 文件通常可以作为迁移起点，但“语法可被解析”不代表它在严格模式下一定没有类型错误；这些错误正是迁移要逐步显式化的隐含假设。
 
 关键过程如下：
 
@@ -83,6 +83,44 @@ const user = (await response.json()) as ApiUser
 ```
 
 这里的 `as ApiUser` 只是告诉编译器“请相信我”，并没有检查服务器返回的数据。真实项目中，外部数据仍然需要运行时校验。
+
+### 两个世界：静态模型与运行时值
+
+理解 TypeScript 最重要的不是背类型语法，而是始终区分两个世界：
+
+```text
+静态世界：源码中的类型、控制流、可赋值性
+                 ↓ 检查通过后擦除类型
+运行时世界：JavaScript 值、对象、网络数据、异常
+```
+
+类型系统回答的是：“如果调用方遵守这些声明，这个操作是否安全？”它不会替你发请求、转换字符串、冻结对象或捕获异常。`number | string` 也不是一个运行时容器；运行时仍只有某个具体值，联合类型只是编译器对当前可能性的描述。
+
+### 可赋值性比“变量属于哪个类”更重要
+
+TypeScript 主要采用结构化类型系统。一个值能否赋给目标类型，取决于它是否提供目标所要求的结构：
+
+```ts
+type Named = { name: string }
+
+const account = { id: 1, name: 'Ada', role: 'admin' }
+const named: Named = account // account 至少满足 Named 所需结构
+```
+
+这让普通 JavaScript 对象容易接入，但也意味着类型不是运行时品牌。若业务必须区分相同结构的 UserId 与 LessonId，需要额外的品牌类型或领域对象；外部数据仍要先验证。
+
+### 控制流分析为什么能够收窄
+
+检查器不仅看声明，还沿分支追踪值的可能性：
+
+```ts
+function printLength(value: string | null) {
+  if (value === null) return
+  console.log(value.length)
+}
+```
+
+`return` 之后，`null` 路径已经不可达，所以剩余路径中的 `value` 只能是 `string`。这就是控制流分析。好的 TypeScript 代码通常把真实的运行时判断写清楚，让检查器从代码事实推导类型，而不是用 `as` 跳过证明。
 
 ## 5. 类型推断与类型标注
 
@@ -237,6 +275,24 @@ function printTitle(title: string | undefined): void {
 
 不要用大量 `any` 或类型断言消除错误。错误通常在提示：数据边界还没有被描述清楚。
 
+### 严格模式不是“更挑剔的格式检查”
+
+`strict` 的价值是让调用方和实现方共同面对缺失信息。例如关闭 Null Check 时，`string` 实际可能接收 `null`，函数签名无法表达真实前置条件；开启后，调用方必须先处理缺失值，或者函数明确接受 `string | null`。
+
+严格模式不会保证程序完全正确。它缩小的是“声明与使用不一致”这一类错误空间，业务规则、并发、权限和外部数据仍需运行时设计。
+
+## 9.1 渐进迁移的正确顺序
+
+已有 JavaScript 项目不应先给每个变量补类型。更有效的顺序是：
+
+1. 建立可重复的类型检查命令，不改变运行时构建结果。
+2. 先描述模块入口、API DTO、组件 Props 和共享状态等边界。
+3. 对未知外部值使用 `unknown`，在边界解析成可信领域类型。
+4. 让局部变量依靠推断，只修复检查器暴露的真实不一致。
+5. 按目录逐步提高严格度并清理临时 `any`，避免永久债务。
+
+迁移目标不是“所有地方都有类型注解”，而是让错误数据无法悄悄穿过关键边界。
+
 ## 10. 完整示例：学习进度统计
 
 新建 `progress.ts`：
@@ -328,7 +384,7 @@ const count: number = 1
 - 使用 `unknown` 表示真正未知的数据，缩小后再操作。
 - 类型名称表达业务含义，而不仅是数据形状。
 
-## 13. 面试题
+## 13. 概念辨析与因果回顾
 
 ### TypeScript 能完全消除运行时错误吗？
 

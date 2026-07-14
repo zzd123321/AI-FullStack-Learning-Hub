@@ -944,7 +944,7 @@ interface Props {
 
 `CreateLessonInput` 类似 Java 后端中的创建请求 DTO；`Lesson` 类似领域实体或响应模型。前后端都应该区分不同数据生命周期，而不是让一个模型承担所有职责。
 
-## 22. 面试题
+## 22. 概念辨析与因果回顾
 
 ### `type` 和 `interface` 有什么区别？
 

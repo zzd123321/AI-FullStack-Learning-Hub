@@ -418,9 +418,9 @@ await cache.put(request, response)
 
 API Response 交给 HTTP Cache/应用数据层，不在 Service Worker 复制一份模糊 Freshness。Install/Activate 使用版本化 Cache Name 并删除旧 Shell Cache。
 
-这仍是教学实现：`cache.addAll()` 任一资源失败会使 Install Reject；真实 PWA 应设计 Atomic Shell、更新提示、Storage Quota 和 Offline Data Migration。Cache-first Miss 后若希望存入，还需明确 `cache.put` 与合法 Response 条件。
+这仍是教学实现：`cache.addAll()` 任一资源失败会使 Install Reject；真实 PWA 应设计 Atomic Shell、更新提示、Storage Quota 和 Offline Data Migration。示例在 Cache-first Miss 后只缓存 Same-origin、成功的 Hashed Asset，避免把错误 Response 永久化。
 
-注册也要处理 Secure Context、失败和更新：
+注册也要处理 Secure Context 与失败。浏览器会按 Service Worker 更新算法检查新脚本，不应在每次页面加载后无条件再调用 `registration.update()` 制造重复检查：
 
 <<< ../../../examples/frontend/browser-network-fetch/register-service-worker.ts
 

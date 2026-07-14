@@ -4,13 +4,19 @@ export function observeSearchInput(
 ): () => void {
   const controller = new AbortController();
   let composing = false;
+  let lastSearchedValue: string | null = null;
+  const commit = () => {
+    if (input.value === lastSearchedValue) return;
+    lastSearchedValue = input.value;
+    search(input.value);
+  };
   input.addEventListener("compositionstart", () => { composing = true; }, { signal: controller.signal });
   input.addEventListener("compositionend", () => {
     composing = false;
-    search(input.value);
+    commit();
   }, { signal: controller.signal });
   input.addEventListener("input", () => {
-    if (!composing) search(input.value);
+    if (!composing) commit();
   }, { signal: controller.signal });
   return () => controller.abort();
 }

@@ -1047,7 +1047,7 @@ type LessonPageResponse = ResponseBody<Page<Lesson>>
 
 但 `ResponseBody<Page<Lesson>>` 仍只是静态类型。通过网络获得的 JSON 必须在运行时验证，泛型不会自动生成校验器。
 
-## 26. 面试知识
+## 26. 概念辨析与因果回顾
 
 ### 泛型和 `any` 有什么区别？
 

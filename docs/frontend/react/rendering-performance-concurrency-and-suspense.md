@@ -526,6 +526,12 @@ Effect 在 Commit 后才运行，Suspense 只响应 Render 阶段的受支持等
 - [React `hydrateRoot`](https://react.dev/reference/react-dom/client/hydrateRoot)
 - [web.dev Interaction to Next Paint](https://web.dev/articles/inp)
 
-## 22. 下一节预告
+## 22. 本节小结
+
+React 性能问题要先区分 Render 计算、Commit、DOM 数量、浏览器 Layout/Paint 与网络等待。Memo 只可能跳过部分 React 计算；Transition 和 Deferred Value 改善调度响应性，不减少算法总工作；Suspense 管理等待内容的 Reveal Boundary，不会自动发现任意 Effect Fetch。
+
+因此优化顺序应是：用真实交互定位成本，删除不必要工作和 DOM，缩小 State/Effect 边界，再用 Memo、并发调度、窗口化或代码分割解决已证明的瓶颈。最终结果必须同时通过 React Profiler、浏览器 Trace 和生产用户指标验证。
+
+## 23. 下一节预告
 
 下一节进入 **React 测试策略与可测试架构**：系统设计纯逻辑单测、组件交互测试、Router/Action 集成测试、Mock 边界、异步稳定性、可访问性断言与端到端关键路径。

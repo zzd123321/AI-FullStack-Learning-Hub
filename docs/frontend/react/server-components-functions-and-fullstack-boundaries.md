@@ -674,6 +674,12 @@ types / dto / contract
 - [Next.js `use cache`](https://nextjs.org/docs/app/api-reference/directives/use-cache)
 - [Next.js Revalidating](https://nextjs.org/docs/app/getting-started/revalidating)
 
-## 29. 下一节预告
+## 29. 本节小结
+
+RSC、SSR 与 Server Function 解决不同问题：RSC 决定哪些组件模块不进入客户端，SSR 产生初始 HTML，Hydration 恢复客户端交互，Server Function 提供由框架承载的服务端调用边界。只有先分清产物与执行位置，`'use client'`、Streaming 和 Cache 才不会变成模糊口号。
+
+Server/Client Boundary 同时是 Bundle、序列化和数据泄露边界；Server Function 同时是公开网络入口。可靠全栈 React 需要最小 DTO、集中数据访问、请求级与跨请求缓存分层、重新认证授权、幂等写入，以及对 Node/Edge、多实例和部署版本交叉的明确治理。
+
+## 30. 下一节预告
 
 下一节完成 React 模块：**React 大型应用架构、渐进迁移与生产治理**。将整合模块边界、状态与数据所有权、设计系统、微前端取舍、Vue 2/Vue 3 与 React 共存迁移、可观测性和发布策略。

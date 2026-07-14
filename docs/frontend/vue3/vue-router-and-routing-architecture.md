@@ -522,7 +522,7 @@ export const lessonRoutes: RouteRecordRaw[] = [/* ... */]
 - 页面标题、焦点和滚动是否支持 SPA 导航？
 - SSR 是否为每个请求创建独立 Router？
 
-## 33. 面试知识
+## 33. 概念辨析与因果回顾
 
 ### `$route` 和 `$router` 有什么区别？
 

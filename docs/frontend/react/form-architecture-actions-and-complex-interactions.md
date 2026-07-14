@@ -416,6 +416,12 @@ editing → validating → submitting → success
 - [MDN FormData](https://developer.mozilla.org/docs/Web/API/FormData)
 - [MDN Using FormData Objects](https://developer.mozilla.org/docs/Web/API/XMLHttpRequest_API/Using_FormData_Objects)
 
-## 19. 下一节预告
+## 19. 本节小结
+
+React 表单不是“给每个输入框配一个 State”，而是浏览器表单协议、草稿状态、校验状态和服务端命令的交汇点。受控与非受控的选择取决于谁需要持续拥有当前值；FormData 只是浏览器提交格式，进入领域层前必须解析和校验。
+
+Action、Pending 与 Optimistic UI 改善提交编排，却不能代替服务端授权、事务和幂等。可靠设计应让失败保留用户输入、旧异步结果失去写权限、乐观变化可回滚，并让错误通过字段关联、焦点和 Live Region 被所有用户理解。
+
+## 20. 下一节预告
 
 下一节进入 **React 渲染性能、并发特性与 Suspense**：从 Render/Commit 成本、Profiler 和 Memo 化边界出发，再理解 `useTransition`、`useDeferredValue`、Suspense 数据流、Streaming 与可中断渲染。

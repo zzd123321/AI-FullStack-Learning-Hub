@@ -33,6 +33,17 @@ async function networkFirst(request: Request): Promise<Response> {
   }
 }
 
+async function cacheFirst(request: Request): Promise<Response> {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+  const response = await fetch(request);
+  if (response.ok) {
+    const cache = await caches.open(CACHE_VERSION);
+    await cache.put(request, response.clone());
+  }
+  return response;
+}
+
 sw.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
@@ -44,6 +55,6 @@ sw.addEventListener("fetch", (event) => {
   }
 
   if (/\.[a-f0-9]{8,}\.(?:js|css|woff2|png|svg)$/.test(url.pathname)) {
-    event.respondWith(caches.match(request).then((cached) => cached ?? fetch(request)));
+    event.respondWith(cacheFirst(request));
   }
 });

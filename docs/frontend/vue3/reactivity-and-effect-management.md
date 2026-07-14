@@ -710,7 +710,7 @@ examples/frontend/vue3-reactivity/LessonSearch.vue
 - Options API 的 `watch` 仍可用，但 Composition API 更适合显式 getter、多来源和清理。
 - 不要把 Vue 2 深度 watcher 的习惯原样搬到大型 Vue 3 状态树。
 
-## 45. 面试知识
+## 45. 概念辨析与因果回顾
 
 ### Vue 3 如何实现对象响应式？
 

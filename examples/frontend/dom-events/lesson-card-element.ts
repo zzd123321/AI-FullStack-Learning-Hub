@@ -12,7 +12,9 @@ export class LessonCardElement extends HTMLElement {
     this.#controller = new AbortController();
     this.shadowRoot?.querySelector("button")?.addEventListener("click", () => {
       const lessonId = this.getAttribute("lesson-id");
-      if (lessonId) emitLessonOpen(this, { version: 1, lessonId, source: "card" });
+      if (!lessonId) return;
+      const accepted = emitLessonOpen(this, { version: 1, lessonId, source: "card" });
+      this.toggleAttribute("data-open-accepted", accepted);
     }, { signal: this.#controller.signal });
   }
 

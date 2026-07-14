@@ -7,7 +7,6 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
       updateViaCache: "none",
       type: "module",
     });
-    await registration.update();
     return registration;
   } catch (error) {
     console.error("Service worker registration failed", error);

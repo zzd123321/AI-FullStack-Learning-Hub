@@ -14,16 +14,21 @@ export async function* parseNdjsonStream<T>(
     while (true) {
       const { done, value } = await reader.read();
       buffer += decoder.decode(value, { stream: !done });
-      if (new TextEncoder().encode(buffer).byteLength > maximumLineBytes) {
-        throw new Error("NDJSON line exceeds the configured limit");
-      }
 
       let newline = buffer.indexOf("\n");
       while (newline >= 0) {
         const line = buffer.slice(0, newline).trim();
         buffer = buffer.slice(newline + 1);
-        if (line) yield parse(JSON.parse(line) as unknown);
+        if (line) {
+          if (new TextEncoder().encode(line).byteLength > maximumLineBytes) {
+            throw new Error("NDJSON line exceeds the configured limit");
+          }
+          yield parse(JSON.parse(line) as unknown);
+        }
         newline = buffer.indexOf("\n");
+      }
+      if (new TextEncoder().encode(buffer).byteLength > maximumLineBytes) {
+        throw new Error("NDJSON line exceeds the configured limit");
       }
       if (done) break;
     }
