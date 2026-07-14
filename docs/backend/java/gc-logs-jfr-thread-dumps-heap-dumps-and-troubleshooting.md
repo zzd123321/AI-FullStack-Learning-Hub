@@ -769,7 +769,7 @@ Node 主事件循环卡顿常表现为单线程 CPU 或同步调用阻塞；Java
 - OOM 必须按具体消息和容器退出原因分流，不能统一扩大堆。
 - 诊断完成标准是根因可解释、修复可复现、指标有改善并形成防复发机制。
 
-下一节建议：Maven 项目模型、依赖管理、生命周期、插件与可复现构建。
+下一节：[Maven 项目模型、依赖管理、生命周期与插件](/backend/java/maven-project-model-dependencies-lifecycle-and-plugins)。
 
 ## 46. 参考资料
 

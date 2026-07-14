@@ -35,8 +35,9 @@ Java 语法与面向对象 → 集合与泛型 → 异常与 IO → 并发 → J
 - [Java 内存模型、volatile、final 与 happens-before](/backend/java/memory-model-volatile-final-and-happens-before)
 - [Java 类加载、字节码、JIT、运行时内存与垃圾回收](/backend/java/class-loading-bytecode-jit-runtime-memory-and-gc)
 - [Java GC 日志、JFR、线程转储、堆转储与故障排查](/backend/java/gc-logs-jfr-thread-dumps-heap-dumps-and-troubleshooting)
+- [Maven 项目模型、依赖管理、生命周期与插件](/backend/java/maven-project-model-dependencies-lifecycle-and-plugins)
 
-前二十课从工具链和程序执行过程开始，再建立静态类型、对象建模、多态、异常处理、文件 IO、集合、泛型、现代并发与 JVM 基础。完成后，你能理解代码从 class 文件加载、解释/JIT 执行到对象回收的过程，并使用 GC 日志、JFR 和各类转储为性能与故障判断建立证据链。
+前二十一课从工具链和程序执行过程开始，再建立静态类型、对象建模、多态、异常处理、文件 IO、集合、泛型、现代并发、JVM 与 Maven 基础。完成后，你能理解代码从编译、运行、诊断到多模块依赖和构建生命周期的主要过程，并为后续 Spring Boot 工程建立可维护的构建模型。
 
 ## Python 辅线
 
