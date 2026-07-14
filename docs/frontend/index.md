@@ -54,3 +54,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [Reducer、Context 与跨组件状态架构](/frontend/react/reducer-context-and-cross-component-state-architecture)
 - [React Router 数据路由与应用边界](/frontend/react/react-router-data-routing-and-application-boundaries)
 - [表单架构、Actions 与复杂交互状态](/frontend/react/form-architecture-actions-and-complex-interactions)
+- [渲染性能、并发特性与 Suspense](/frontend/react/rendering-performance-concurrency-and-suspense)
