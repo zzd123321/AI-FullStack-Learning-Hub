@@ -4,6 +4,9 @@ description: 掌握 MySQL 与 PostgreSQL 的计划树、估算行数、扫描方
 prev:
   text: 索引如何加速查询：B-Tree、选择性与联合索引
   link: /database/indexes-and-query-shapes
+next:
+  text: 事务与 ACID：从转账接口到原子提交
+  link: /database/transactions-and-acid
 ---
 
 # 读懂执行计划：扫描、连接、排序与实际执行
