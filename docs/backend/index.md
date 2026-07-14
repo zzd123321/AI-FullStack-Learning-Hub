@@ -37,8 +37,9 @@ Java 语法与面向对象 → 集合与泛型 → 异常与 IO → 并发 → J
 - [Java GC 日志、JFR、线程转储、堆转储与故障排查](/backend/java/gc-logs-jfr-thread-dumps-heap-dumps-and-troubleshooting)
 - [Maven 项目模型、依赖管理、生命周期与插件](/backend/java/maven-project-model-dependencies-lifecycle-and-plugins)
 - [Spring Boot 项目结构、启动流程、自动配置、配置系统与第一个 HTTP API](/backend/java/spring-boot-project-structure-auto-configuration-config-and-first-api)
+- [Spring Boot Bean 生命周期、Java 配置、作用域、代理与循环依赖](/backend/java/spring-boot-bean-lifecycle-java-config-scopes-proxies-and-circular-dependencies)
 
-前二十二课从工具链和程序执行过程开始，再建立静态类型、对象建模、多态、异常处理、文件 IO、集合、泛型、现代并发、JVM、Maven 与 Spring Boot 基础。完成后，你能理解代码从编译、运行、诊断到构建和 HTTP 请求处理的主要过程，并能创建具有外部配置、业务分层和统一错误协议的第一个 Spring Boot API。
+前二十三课从工具链和程序执行过程开始，再建立静态类型、对象建模、多态、异常处理、文件 IO、集合、泛型、现代并发、JVM、Maven 与 Spring Boot 基础。完成后，你能理解代码从编译、运行、诊断到构建、HTTP 请求处理和 Bean 生命周期的主要过程，并能创建具有外部配置、业务分层、统一错误协议和清晰作用域边界的 Spring Boot API。
 
 ## Python 辅线
 

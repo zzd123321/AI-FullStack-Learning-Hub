@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: spring-boot-bean-lifecycle
+
+server:
+  port: 8080
+
+logging:
+  level:
+    learning.backend.beans: INFO

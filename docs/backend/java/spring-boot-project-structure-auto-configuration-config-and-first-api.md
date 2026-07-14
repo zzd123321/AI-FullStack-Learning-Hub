@@ -1291,7 +1291,7 @@ Java 17 compilation target
 - `@RestControllerAdvice` 与 `ProblemDetail` 能建立稳定统一的错误协议。
 - 可执行 JAR 包含业务 classes、嵌套依赖和 Boot Loader，应以最终制品验证启动。
 
-下一节建议：Spring Boot Bean 生命周期、Java 配置、作用域、代理与循环依赖。
+下一节：[Spring Boot Bean 生命周期、Java 配置、作用域、代理与循环依赖](/backend/java/spring-boot-bean-lifecycle-java-config-scopes-proxies-and-circular-dependencies)。
 
 ## 71. 参考资料
 
