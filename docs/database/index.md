@@ -43,6 +43,7 @@ description: 从 SQL 基础走向事务、索引、缓存和数据架构
 
 - [事务与 ACID：从转账接口到原子提交](/database/transactions-and-acid)
 - [并发异常与事务隔离级别](/database/transaction-isolation-levels)
+- [锁、MVCC 与并发等待](/database/locks-and-mvcc)
 
 从多步写入的原子边界开始，再逐步理解并发事务之间的可见性、锁等待和多版本并发控制。
 
