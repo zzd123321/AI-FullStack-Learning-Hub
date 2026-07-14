@@ -55,3 +55,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [React Router 数据路由与应用边界](/frontend/react/react-router-data-routing-and-application-boundaries)
 - [表单架构、Actions 与复杂交互状态](/frontend/react/form-architecture-actions-and-complex-interactions)
 - [渲染性能、并发特性与 Suspense](/frontend/react/rendering-performance-concurrency-and-suspense)
+- [测试策略与可测试架构](/frontend/react/testing-strategy-and-testable-architecture)
