@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>事件循环与渲染实验室</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>事件循环与渲染实验室</h1>
+      <p>打开开发者工具的 Performance 面板，可同时观察页面输出与主线程轨迹。</p>
+
+      <section>
+        <h2>调度顺序</h2>
+        <button id="run-order" type="button">运行顺序实验</button>
+        <ol id="order-output" aria-live="polite"></ol>
+      </section>
+
+      <section>
+        <h2>长任务拆分</h2>
+        <button id="run-chunked" type="button">分片处理 20,000 条记录</button>
+        <progress id="chunk-progress" max="20000" value="0"></progress>
+        <output id="chunk-output" aria-live="polite"></output>
+      </section>
+
+      <section>
+        <h2>Worker 计算</h2>
+        <button id="run-worker" type="button">在 Worker 中计算质数</button>
+        <button id="cancel-worker" type="button">取消</button>
+        <output id="worker-output" aria-live="polite"></output>
+      </section>
+
+      <section>
+        <h2>基于时间戳的动画</h2>
+        <button id="toggle-animation" type="button">开始/停止</button>
+        <div class="track"><div id="dot" class="dot"></div></div>
+      </section>
+
+      <section>
+        <h2>性能记录</h2>
+        <ul id="performance-output" aria-live="polite"></ul>
+      </section>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

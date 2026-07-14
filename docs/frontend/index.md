@@ -58,3 +58,9 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [测试策略与可测试架构](/frontend/react/testing-strategy-and-testable-architecture)
 - [Server Components、Server Functions 与现代全栈边界](/frontend/react/server-components-functions-and-fullstack-boundaries)
 - [大型应用架构、渐进迁移与生产治理](/frontend/react/large-scale-architecture-migration-and-production-governance)
+
+完成本模块后，你应该能设计、测试和渐进迁移具有清晰边界的 React 应用。
+
+### 浏览器与网络
+
+- [事件循环、渲染流水线与长任务诊断](/frontend/browser/event-loop-rendering-and-long-tasks)
