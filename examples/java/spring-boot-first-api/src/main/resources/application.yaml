@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: spring-boot-first-api
+
+server:
+  port: 8080
+
+learning:
+  catalog-title: AI 全栈后端学习目录
+  welcome-message: 从第一个可观察、可配置的 HTTP API 开始

@@ -886,7 +886,7 @@ mvn -X verify
 - 固定插件、依赖、Maven/JDK、编码和 outputTimestamp 能提高可复现性。
 - 多模块边界应形成明确单向依赖，为 Spring Boot 工程分层打基础。
 
-下一节建议：Spring Boot 项目结构、自动配置、配置文件与第一个 HTTP API。
+下一节：[Spring Boot 项目结构、启动流程、自动配置、配置系统与第一个 HTTP API](/backend/java/spring-boot-project-structure-auto-configuration-config-and-first-api)。
 
 ## 56. 参考资料
 
