@@ -1,0 +1,21 @@
+name: translation-contract
+
+on:
+  pull_request:
+    paths:
+      - 'src/i18n/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node --experimental-strip-types src/i18n/check-catalogs.mts
+      - run: npm run test:i18n
+      - run: npm run build:pseudo-locale
+      - run: npm run test:e2e:i18n

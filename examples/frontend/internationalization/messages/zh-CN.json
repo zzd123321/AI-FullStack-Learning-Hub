@@ -1,0 +1,7 @@
+{
+  "app.title": "AI 全栈学习站",
+  "welcome": "你好，{name}",
+  "course.startsAt": "课程开始时间：{date}",
+  "price.total": "合计：{amount}",
+  "inbox.unread": { "other": "{count} 条未读消息" }
+}

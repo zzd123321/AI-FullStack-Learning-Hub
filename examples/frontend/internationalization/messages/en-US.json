@@ -1,0 +1,10 @@
+{
+  "app.title": "AI Full-Stack Learning",
+  "welcome": "Hello, {name}",
+  "course.startsAt": "Course starts {date}",
+  "price.total": "Total: {amount}",
+  "inbox.unread": {
+    "one": "{count} unread message",
+    "other": "{count} unread messages"
+  }
+}

@@ -81,3 +81,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [大型前端架构：模块边界、领域分层与微前端](/frontend/architecture/large-scale-frontend-modules-boundaries-and-micro-frontends)
 - [前端可观测性与生产治理：从错误采集到灰度和事故响应](/frontend/architecture/frontend-observability-release-governance-and-incident-response)
 - [前端设计系统与跨框架组件平台](/frontend/architecture/design-system-tokens-accessibility-and-cross-framework-components)
+- [前端国际化与本地化工程](/frontend/architecture/frontend-internationalization-localization-and-rtl-engineering)
