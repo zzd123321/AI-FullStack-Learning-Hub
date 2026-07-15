@@ -1,0 +1,10 @@
+{
+  "minimumSamples": 1000,
+  "maximumAbsoluteErrorRate": 0.02,
+  "maximumErrorRateRatio": 1.5,
+  "maximumP75LcpMs": 2500,
+  "maximumP75InpMs": 200,
+  "maximumCheckoutRegression": 0.02,
+  "steps": [1, 5, 20, 50, 100],
+  "minimumObservationMinutes": 30
+}

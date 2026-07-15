@@ -1,0 +1,29 @@
+name: frontend-release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+        env:
+          RELEASE_ID: ${{ github.sha }}
+          GIT_SHA: ${{ github.sha }}
+      - name: Upload source maps before deploy
+        run: node --experimental-strip-types scripts/upload-source-maps.mts dist "${{ github.sha }}"
+        env:
+          SOURCE_MAP_ENDPOINT: ${{ secrets.SOURCE_MAP_ENDPOINT }}
+          SOURCE_MAP_TOKEN: ${{ secrets.SOURCE_MAP_TOKEN }}
+      - name: Deploy immutable artifacts and start 1% canary
+        run: ./scripts/deploy-canary.sh 1
+      - name: Evaluate release health
+        run: ./scripts/evaluate-release-health.sh "${{ github.sha }}"
