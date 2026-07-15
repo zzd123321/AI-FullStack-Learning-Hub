@@ -781,7 +781,7 @@ python learning_backend/cli.py
 - stdout、stderr 和退出状态共同构成 CLI 契约。
 - 环境问题应沿“命令 → 可执行文件 → prefix → site-packages → import path”逐层诊断。
 
-下一节建议：Python 基础语法与对象模型——名称绑定、不可变与可变对象、数字、字符串、布尔值、`None`、运算符和真值判断。
+下一节：[Python 基础语法与对象模型：名称绑定、可变性、数字、字符串与真值](/backend/python/basic-syntax-object-model-mutability-numbers-strings-and-truthiness)。
 
 ## 35. 参考资料
 
