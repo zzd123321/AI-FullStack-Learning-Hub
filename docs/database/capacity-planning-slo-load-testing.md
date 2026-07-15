@@ -4,6 +4,9 @@ description: 从接口 SLO、工作负载和排队关系推导吞吐、并发、
 prev:
   text: 数据库权限、租户隔离与审计
   link: /database/access-control-tenant-isolation-auditing
+next:
+  text: 数据库事故响应、故障切换与复盘
+  link: /database/incident-response-failover-postmortem
 ---
 
 # 数据库容量规划、SLO 与压测
