@@ -1054,7 +1054,7 @@ curl -i -X POST http://localhost:18085/api/courses \
 - `@Version` 用条件 UPDATE 检测并发覆盖，但冲突处理仍由业务决定。
 - 关闭 OSIV 并使用 DTO，让查询边界和 HTTP 协议都更清晰。
 
-下一节建议：Spring Data JPA 分页、排序、Specification、批量写入与生产数据库测试。
+下一节：[Spring Data JPA 分页、Specification、批量写入与 Testcontainers](/backend/spring-boot/jpa-pagination-specification-batch-and-testcontainers)。
 
 ## 62. 参考资料
 
