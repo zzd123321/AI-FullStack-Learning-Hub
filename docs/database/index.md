@@ -74,8 +74,9 @@ description: 从 SQL 基础走向事务、索引、缓存和数据架构
 - [数据库事故响应、故障切换与复盘](/database/incident-response-failover-postmortem)
 - [数据库版本升级、兼容性与回退设计](/database/version-upgrades-compatibility-rollback)
 - [数据质量、跨系统对账与安全修复](/database/data-quality-reconciliation-safe-repair)
+- [数据库技术选型、架构评审与演进决策](/database/technology-selection-architecture-review-evolution)
 
-从端到端接口延迟出发，使用工作负载聚合、执行计划、等待事件和锁证据定位瓶颈，再逐步进入 SQL、索引、连接、容量、分区、读写分离、分库分表，以及跨系统数据正确性治理。
+从端到端接口延迟出发，使用工作负载聚合、执行计划、等待事件和锁证据定位瓶颈，再逐步进入 SQL、索引、连接、容量、分区、读写分离、分库分表、跨系统数据正确性治理与架构决策。
 
 ## 阶段项目
 
