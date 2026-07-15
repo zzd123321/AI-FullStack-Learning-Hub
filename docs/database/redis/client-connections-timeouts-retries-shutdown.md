@@ -4,6 +4,9 @@ description: 从一次接口请求的时间预算出发，理解连接池与 mul
 prev:
   text: 安全、ACL、TLS、监控与容量规划
   link: /database/redis/security-observability-capacity-planning
+next:
+  text: 数据库性能诊断：从慢接口到根因
+  link: /database/database-performance-diagnosis
 ---
 
 # 客户端连接、超时、重试与优雅停机
