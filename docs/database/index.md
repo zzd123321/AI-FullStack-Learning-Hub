@@ -67,6 +67,7 @@ description: 从 SQL 基础走向事务、索引、缓存和数据架构
 - [读写分离、复制延迟与一致性](/database/read-write-splitting-replication-consistency)
 - [分区表、数据生命周期与归档](/database/partitioning-data-lifecycle-archiving)
 - [分库分表、路由键与全局一致性](/database/sharding-routing-global-consistency)
+- [备份、时间点恢复与灾难演练](/database/backup-pitr-disaster-recovery)
 
 从端到端接口延迟出发，使用工作负载聚合、执行计划、等待事件和锁证据定位瓶颈，再逐步进入 SQL、索引、连接、容量、分区、读写分离与分库分表。
 
