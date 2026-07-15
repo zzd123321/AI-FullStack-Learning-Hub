@@ -4,6 +4,9 @@ description: 区分小版本与主版本升级，比较原地、蓝绿、pg_upgr
 prev:
   text: 数据库事故响应、故障切换与复盘
   link: /database/incident-response-failover-postmortem
+next:
+  text: 数据质量、跨系统对账与安全修复
+  link: /database/data-quality-reconciliation-safe-repair
 ---
 
 # 数据库版本升级、兼容性与回退设计
