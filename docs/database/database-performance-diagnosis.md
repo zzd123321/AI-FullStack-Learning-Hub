@@ -4,6 +4,9 @@ description: 从接口 SLO 和调用链开始，用 MySQL Performance Schema、P
 prev:
   text: 客户端连接、超时、重试与优雅停机
   link: /database/redis/client-connections-timeouts-retries-shutdown
+next:
+  text: SQL 与索引优化实战
+  link: /database/sql-and-index-optimization
 ---
 
 # 数据库性能诊断：从慢接口到根因

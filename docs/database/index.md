@@ -62,6 +62,7 @@ description: 从 SQL 基础走向事务、索引、缓存和数据架构
 ### 性能优化与数据架构
 
 - [数据库性能诊断：从慢接口到根因](/database/database-performance-diagnosis)
+- [SQL 与索引优化实战](/database/sql-and-index-optimization)
 
 从端到端接口延迟出发，使用工作负载聚合、执行计划、等待事件和锁证据定位瓶颈，再逐步进入 SQL、索引、连接、容量、分区、读写分离与分库分表。
 
