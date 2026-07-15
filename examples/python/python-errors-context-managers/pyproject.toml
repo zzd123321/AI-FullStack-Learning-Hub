@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "safe-config-example"
+version = "0.1.0"
+description = "Runnable example for Python exceptions, context managers, and atomic file writes"
+requires-python = ">=3.11"
+
+[tool.setuptools]
+packages = ["safe_config"]
