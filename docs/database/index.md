@@ -72,6 +72,7 @@ description: 从 SQL 基础走向事务、索引、缓存和数据架构
 - [数据库权限、租户隔离与审计](/database/access-control-tenant-isolation-auditing)
 - [数据库容量规划、SLO 与压测](/database/capacity-planning-slo-load-testing)
 - [数据库事故响应、故障切换与复盘](/database/incident-response-failover-postmortem)
+- [数据库版本升级、兼容性与回退设计](/database/version-upgrades-compatibility-rollback)
 
 从端到端接口延迟出发，使用工作负载聚合、执行计划、等待事件和锁证据定位瓶颈，再逐步进入 SQL、索引、连接、容量、分区、读写分离与分库分表。
 
