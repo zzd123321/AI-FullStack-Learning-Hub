@@ -86,3 +86,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [前端实时同步与多人协作架构](/frontend/architecture/frontend-realtime-sync-and-collaboration-architecture)
 - [前端 AI 应用的流式交互、任务状态与生成式 UI 架构](/frontend/architecture/frontend-ai-streaming-task-state-and-generative-ui-architecture)
 - [前端语音、音频与实时多模态交互架构](/frontend/architecture/frontend-realtime-voice-audio-and-multimodal-interaction-architecture)
+- [前端文件上传、媒体资产处理与大文件传输架构](/frontend/architecture/frontend-file-upload-media-assets-and-large-file-transfer-architecture)
