@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: spring-boot-async-scheduling
+  lifecycle:
+    timeout-per-shutdown-phase: 10s
+
+server:
+  port: 18088
+  shutdown: graceful
+
+app:
+  jobs:
+    reconciliation:
+      initial-delay: PT1H
+      fixed-delay: PT30S
+
+logging:
+  pattern:
+    level: "%5p [correlationId:%X{correlationId:-system}]"
