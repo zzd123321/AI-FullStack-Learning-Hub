@@ -1,0 +1,33 @@
+@property --ds-button-radius {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 8px;
+}
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --ds-color-text-default: #121727;
+  --ds-color-surface-canvas: #ffffff;
+  --ds-color-action-primary-background: #2550c2;
+  --ds-color-action-primary-background-hover: #1a3b9c;
+  --ds-color-action-primary-foreground: #ffffff;
+  --ds-button-padding-inline: 16px;
+  --ds-button-padding-block: 8px;
+  --ds-button-radius: 8px;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --ds-color-text-default: #f9fafc;
+  --ds-color-surface-canvas: #121727;
+  --ds-color-action-primary-background: #2550c2;
+  --ds-color-action-primary-background-hover: #1a3b9c;
+  --ds-color-action-primary-foreground: #ffffff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ds-motion-duration-normal: 0ms;
+  }
+}

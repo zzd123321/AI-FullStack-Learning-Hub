@@ -1,0 +1,33 @@
+{
+  "name": "@learning/design-system",
+  "version": "3.2.0",
+  "type": "module",
+  "sideEffects": ["./dist/register.js", "./dist/tokens.css"],
+  "exports": {
+    "./tokens.css": "./dist/tokens.css",
+    "./tokens": {
+      "types": "./dist/tokens.generated.d.ts",
+      "default": "./dist/tokens.generated.js"
+    },
+    "./elements": {
+      "types": "./dist/ds-tabs.d.ts",
+      "default": "./dist/ds-tabs.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "default": "./dist/react/index.js"
+    },
+    "./vue": {
+      "types": "./dist/vue/index.d.ts",
+      "default": "./dist/vue/index.js"
+    }
+  },
+  "peerDependencies": {
+    "react": ">=18 <20",
+    "vue": ">=3.4 <4"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "vue": { "optional": true }
+  }
+}

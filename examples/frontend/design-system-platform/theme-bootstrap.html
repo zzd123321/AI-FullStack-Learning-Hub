@@ -1,0 +1,10 @@
+<script>
+  // 放在 <head> 中、主样式之前执行，避免主题闪烁。
+  (() => {
+    const saved = localStorage.getItem('theme');
+    const theme = saved === 'light' || saved === 'dark'
+      ? saved
+      : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = theme;
+  })();
+</script>
