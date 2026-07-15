@@ -1,0 +1,7 @@
+dist
+coverage
+node_modules
+public/vendor
+*.min.js
+*.generated.*
+package-lock.json

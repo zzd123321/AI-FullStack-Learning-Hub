@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint . --cache --cache-location node_modules/.cache/eslint --max-warnings=0",
+    "lint:fix": "eslint . --cache --cache-location node_modules/.cache/eslint --max-warnings=0 --fix",
+    "typecheck": "vue-tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "test:run": "vitest run",
+    "build": "vite build",
+    "precommit": "lint-staged",
+    "prepare": "husky",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:run && npm run build"
+  }
+}

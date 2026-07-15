@@ -72,3 +72,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 ### 前端工程化
 
 - [Vite 开发服务器、模块图、插件流水线与生产构建](/frontend/engineering/vite-dev-server-module-graph-plugins-and-production-build)
+- [代码质量：ESLint、Prettier、TypeScript、Git Hooks 与 CI 门禁](/frontend/engineering/code-quality-eslint-prettier-typescript-git-hooks-and-ci-gates)
