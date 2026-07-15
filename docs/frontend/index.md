@@ -84,3 +84,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [前端国际化与本地化工程](/frontend/architecture/frontend-internationalization-localization-and-rtl-engineering)
 - [前端数据可视化与复杂交互架构](/frontend/architecture/frontend-data-visualization-rendering-interaction-and-accessibility)
 - [前端实时同步与多人协作架构](/frontend/architecture/frontend-realtime-sync-and-collaboration-architecture)
+- [前端 AI 应用的流式交互、任务状态与生成式 UI 架构](/frontend/architecture/frontend-ai-streaming-task-state-and-generative-ui-architecture)
