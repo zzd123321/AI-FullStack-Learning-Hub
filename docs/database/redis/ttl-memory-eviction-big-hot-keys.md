@@ -4,6 +4,9 @@ description: 理解 Redis 过期删除、maxmemory、淘汰策略、容量与碎
 prev:
   text: List、Pub/Sub 与 Streams 消息模型
   link: /database/redis/lists-pubsub-streams-messaging
+next:
+  text: RDB、AOF、复制、Sentinel 与故障转移
+  link: /database/redis/persistence-replication-sentinel-failover
 ---
 
 # TTL、内存淘汰、大 key 与热 key 治理
