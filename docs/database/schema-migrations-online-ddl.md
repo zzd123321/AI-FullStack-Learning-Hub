@@ -4,6 +4,9 @@ description: 使用 expand–migrate–contract 管理应用与 schema 兼容窗
 prev:
   text: 备份、时间点恢复与灾难演练
   link: /database/backup-pitr-disaster-recovery
+next:
+  text: 数据库权限、租户隔离与审计
+  link: /database/access-control-tenant-isolation-auditing
 ---
 
 # 数据库变更、在线 DDL 与安全发布
