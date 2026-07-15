@@ -1,0 +1,7 @@
+{
+  "scripts": {
+    "architecture:check": "node --experimental-strip-types scripts/check-dependencies.mts",
+    "typecheck:build": "tsc -b --pretty false",
+    "architecture:ci": "npm run architecture:check && npm run typecheck:build"
+  }
+}

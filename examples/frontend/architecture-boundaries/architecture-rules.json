@@ -1,0 +1,11 @@
+{
+  "sourceRoot": "src",
+  "publicEntrypoint": "index.ts",
+  "internalPackagePrefix": "@learning/",
+  "allowedLayerDependencies": {
+    "domain": ["domain"],
+    "application": ["domain", "application"],
+    "infrastructure": ["domain", "application", "infrastructure"],
+    "ui": ["domain", "application", "ui"]
+  }
+}
