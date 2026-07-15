@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: spring-boot-messaging-outbox
+  datasource:
+    url: jdbc:h2:mem:messaging-outbox;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: ""
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  rabbitmq:
+    host: localhost
+    port: 5672
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+server:
+  port: 18089
+
+app:
+  outbox:
+    initial-delay: PT1H
+    fixed-delay: PT2S

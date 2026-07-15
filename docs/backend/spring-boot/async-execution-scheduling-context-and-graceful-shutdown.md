@@ -1064,7 +1064,7 @@ ThreadLocal/MDC 没有自动跨线程。检查：
 - graceful shutdown 只能等待有限时间，无法抵御崩溃与 SIGKILL。
 - 不能丢的任务需要持久消息、outbox、幂等消费和恢复状态。
 
-下一节建议：Spring Boot 消息驱动架构、RabbitMQ/Kafka 基础、可靠投递、重复消费与 Outbox。
+下一节：[Spring Boot 消息驱动、RabbitMQ、Kafka、可靠投递与 Transactional Outbox](/backend/spring-boot/messaging-rabbitmq-kafka-reliability-and-outbox)。
 
 ## 66. 参考资料
 
