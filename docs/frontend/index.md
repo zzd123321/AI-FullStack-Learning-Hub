@@ -88,3 +88,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [前端语音、音频与实时多模态交互架构](/frontend/architecture/frontend-realtime-voice-audio-and-multimodal-interaction-architecture)
 - [前端文件上传、媒体资产处理与大文件传输架构](/frontend/architecture/frontend-file-upload-media-assets-and-large-file-transfer-architecture)
 - [PWA、Service Worker、后台同步与离线应用架构](/frontend/architecture/pwa-service-worker-background-sync-and-offline-application-architecture)
+- [Web Push、通知权限与后台消息架构](/frontend/architecture/web-push-notification-permission-and-background-messaging-architecture)
