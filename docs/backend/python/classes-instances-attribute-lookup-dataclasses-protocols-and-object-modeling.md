@@ -747,7 +747,7 @@ PY
 - Protocol 把 duck typing 写成静态结构合同，实现者无需显式继承。
 - 应用 service 负责编排，domain object 负责自身规则，adapter 负责外部边界。
 
-下一节建议：Python 类型提示、泛型、类型收窄、静态检查与自动化测试策略。
+下一节：[Python 类型提示、泛型、类型收窄、静态分析与自动化测试](/backend/python/type-hints-generics-narrowing-static-analysis-and-automated-testing)。
 
 ## 49. 参考资料
 
