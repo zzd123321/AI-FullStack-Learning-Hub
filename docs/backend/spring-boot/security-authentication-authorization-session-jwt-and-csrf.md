@@ -757,7 +757,7 @@ curl -sS -b cookies.txt http://localhost:8080/session/me
 - CORS 控制浏览器跨源访问，不能替代认证、授权或 CSRF。
 - 安全测试的价值主要体现在证明不该成功的请求确实失败。
 
-Spring Boot 核心专题至此已覆盖应用结构、容器、MVC、配置、数据访问、缓存、异步、消息与安全。下一阶段建议进入 Python 基础：开发环境、解释器、虚拟环境、类型模型，以及与 JavaScript / Java 的关键差异。
+Spring Boot 核心专题至此已覆盖应用结构、容器、MVC、配置、数据访问、缓存、异步、消息与安全。下一阶段进入 [Python 开发环境、解释器、虚拟环境、执行模型与第一个程序](/backend/python/environment-interpreter-venv-execution-model-and-first-program)。
 
 ## 33. 参考资料
 
