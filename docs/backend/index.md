@@ -49,6 +49,12 @@ Spring Boot 独立专题覆盖项目启动、IoC、Bean 生命周期、Spring MV
 
 Python 语法 → 类型标注 → 虚拟环境与包管理 → 生成器与装饰器 → 异步编程 → FastAPI → 数据处理 → AI 服务。
 
+## FastAPI 专题
+
+- [FastAPI 专题首页与完整学习路线](/backend/fastapi/)
+
+FastAPI 独立专题覆盖 ASGI、Pydantic、依赖注入、数据访问、安全、测试、可观测性、AI 推理服务与生产架构。
+
 ## 阶段项目
 
 先构建用户与权限 API，再分别使用 Java 和 Python 实现小型服务，比较两种语言的类型系统、并发模型和工程组织方式。
