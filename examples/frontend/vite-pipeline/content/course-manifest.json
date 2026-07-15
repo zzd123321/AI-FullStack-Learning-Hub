@@ -1,0 +1,6 @@
+{
+  "courses": [
+    { "id": "vite-pipeline", "title": "Vite 开发与构建流水线" },
+    { "id": "quality-gates", "title": "代码质量与持续集成" }
+  ]
+}

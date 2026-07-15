@@ -68,3 +68,7 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [DOM、事件传播、Shadow DOM 与可访问交互](/frontend/browser/dom-events-shadow-dom-and-accessible-interactions)
 - [浏览器存储、IndexedDB 与离线一致性](/frontend/browser/browser-storage-indexeddb-cache-and-offline-consistency)
 - [浏览器安全模型：XSS、CSRF、CSP 与跨源隔离](/frontend/browser/browser-security-xss-csrf-csp-and-cross-origin-isolation)
+
+### 前端工程化
+
+- [Vite 开发服务器、模块图、插件流水线与生产构建](/frontend/engineering/vite-dev-server-module-graph-plugins-and-production-build)

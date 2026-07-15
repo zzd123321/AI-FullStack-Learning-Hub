@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-labelledby="title">
+  <title id="title">Vite 模块图</title>
+  <rect width="640" height="360" fill="#161827"/>
+  <path d="M100 180h150m140 0h150M250 180l70-90 70 90-70 90z" fill="none" stroke="#bd9cff" stroke-width="12"/>
+  <circle cx="100" cy="180" r="34" fill="#68e0cf"/>
+  <circle cx="540" cy="180" r="34" fill="#ffc66d"/>
+</svg>
