@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: spring-boot-security-auth
+
+server:
+  error:
+    include-message: never
+
+app:
+  security:
+    # 仅供本地课程示例。生产环境必须从 Secret Manager 或环境变量注入并支持轮换。
+    jwt-secret: ${APP_JWT_SECRET:local-learning-secret-change-me-32-bytes-minimum}
