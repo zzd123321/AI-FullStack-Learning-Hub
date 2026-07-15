@@ -601,7 +601,7 @@ except Exception:
 - 原子文件替换仍不是数据库事务，也不自动解决并发丢更新和所有断电持久性问题。
 - 入口边界应把领域异常转换成 stderr、退出码或受控 HTTP 响应。
 
-下一节建议：Python 类、实例、属性查找、数据类、协议与面向对象建模。
+下一节：[Python 类、实例、属性查找、数据类、协议与面向对象建模](/backend/python/classes-instances-attribute-lookup-dataclasses-protocols-and-object-modeling)。
 
 ## 36. 参考资料
 
