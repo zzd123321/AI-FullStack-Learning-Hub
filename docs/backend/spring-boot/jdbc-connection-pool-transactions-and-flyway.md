@@ -836,7 +836,7 @@ curl -i -X POST http://localhost:18084/api/accounts/1001/enrollments \
 - Flyway 在启动时校验并按版本迁移，已应用脚本不应修改。
 - H2 快速但不等于生产数据库，关键路径需真实数据库集成测试。
 
-下一节建议：Spring Boot JPA、实体生命周期、关联映射、查询与 N+1 问题。
+下一节：[Spring Boot JPA、实体生命周期、关联映射、查询与 N+1](/backend/spring-boot/jpa-entity-lifecycle-associations-queries-and-n-plus-one)。
 
 ## 49. 参考资料
 
