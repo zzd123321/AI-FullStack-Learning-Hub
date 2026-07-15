@@ -49,8 +49,9 @@ Redis 不只是给 SQL 查询加速的键值缓存。它同时提供内存数据
 
 - [Redis 基础与核心数据类型](/database/redis/fundamentals-and-data-types)
 - [Cache-Aside 与缓存一致性](/database/redis/cache-aside-and-consistency)
+- [缓存穿透、击穿、雪崩与热点治理](/database/redis/cache-penetration-breakdown-avalanche)
 
-第一课建立数据结构、键命名、TTL、事务、流水线和运行边界；第二课把 Redis 与关系数据库组合起来，分析缓存读写路径、竞态窗口与最终一致性方案。
+第一课建立数据结构、键命名、TTL、事务、流水线和运行边界；第二课把 Redis 与关系数据库组合起来，分析缓存读写路径、竞态窗口与最终一致性方案；第三课分析 miss 和流量倾斜怎样被并发放大，并用负缓存、布隆过滤器、请求合并、逻辑过期、TTL 抖动与过载保护逐层治理。
 
 ## 与数据库主线的关系
 
