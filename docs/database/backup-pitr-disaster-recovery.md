@@ -4,6 +4,9 @@ description: 区分副本、备份与归档，理解 RPO、RTO、全量备份、
 prev:
   text: 分库分表、路由键与全局一致性
   link: /database/sharding-routing-global-consistency
+next:
+  text: 数据库变更、在线 DDL 与安全发布
+  link: /database/schema-migrations-online-ddl
 ---
 
 # 备份、时间点恢复与灾难演练
