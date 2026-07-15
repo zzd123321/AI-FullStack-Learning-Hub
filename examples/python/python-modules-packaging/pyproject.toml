@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "learning-backend-config"
+version = "0.1.0"
+description = "A src-layout package demonstrating imports, resources, and entry points"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+learning-config = "learning_config.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+learning_config = ["defaults.json"]

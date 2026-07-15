@@ -1,0 +1,5 @@
+{
+  "environment": "development",
+  "log_level": "INFO",
+  "service_name": "learning-api"
+}
