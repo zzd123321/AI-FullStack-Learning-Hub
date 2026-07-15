@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "python-concurrency-lab"
+version = "0.1.0"
+description = "Runnable examples for threads, processes, and structured asyncio"
+requires-python = ">=3.11"
+
+[tool.setuptools]
+packages = ["concurrency_lab"]

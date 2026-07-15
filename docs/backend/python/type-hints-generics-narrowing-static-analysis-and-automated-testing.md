@@ -759,7 +759,7 @@ cast 不验证。使用 parser/schema validator，失败返回结构化错误。
 - Fake 更适合可读状态行为，mock 只应锁定重要协作合同。
 - Coverage 是风险线索，不是正确性百分比。
 
-下一节建议：Python 并发模型、线程、进程、GIL、asyncio 与结构化异步 I/O。
+下一节：[Python 并发模型：线程、进程、GIL、asyncio 与结构化异步 I/O](/backend/python/concurrency-threads-processes-gil-asyncio-and-structured-async-io)。
 
 ## 52. 参考资料
 
