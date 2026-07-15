@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="csrf-token" content="由服务器按会话生成的不可预测值" />
+    <title>浏览器安全边界示例</title>
+  </head>
+  <body>
+    <main>
+      <h1>安全 DOM 与跨源隔离</h1>
+      <section id="comments" aria-label="评论"></section>
+      <a id="download">下载课程资料</a>
+      <output id="status" aria-live="polite"></output>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

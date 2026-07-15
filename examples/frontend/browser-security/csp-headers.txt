@@ -1,0 +1,17 @@
+Content-Security-Policy:
+  default-src 'none';
+  script-src 'nonce-{PER_RESPONSE_RANDOM_NONCE}' 'strict-dynamic';
+  style-src 'self' 'nonce-{PER_RESPONSE_RANDOM_NONCE}';
+  img-src 'self' data:;
+  font-src 'self';
+  connect-src 'self' https://api.example.com;
+  object-src 'none';
+  base-uri 'none';
+  form-action 'self';
+  frame-ancestors 'none';
+  require-trusted-types-for 'script';
+  trusted-types app-html;
+  upgrade-insecure-requests;
+  report-to csp-endpoint
+
+Reporting-Endpoints: csp-endpoint="https://reports.example.com/csp"
