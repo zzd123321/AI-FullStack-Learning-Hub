@@ -70,6 +70,7 @@ description: 从 SQL 基础走向事务、索引、缓存和数据架构
 - [备份、时间点恢复与灾难演练](/database/backup-pitr-disaster-recovery)
 - [数据库变更、在线 DDL 与安全发布](/database/schema-migrations-online-ddl)
 - [数据库权限、租户隔离与审计](/database/access-control-tenant-isolation-auditing)
+- [数据库容量规划、SLO 与压测](/database/capacity-planning-slo-load-testing)
 
 从端到端接口延迟出发，使用工作负载聚合、执行计划、等待事件和锁证据定位瓶颈，再逐步进入 SQL、索引、连接、容量、分区、读写分离与分库分表。
 
