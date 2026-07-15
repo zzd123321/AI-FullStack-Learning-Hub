@@ -4,6 +4,9 @@ description: 从网络隔离、Redis ACL、TLS 和密钥轮换建立安全基线
 prev:
   text: Redis Cluster、分片、hash slot 与多 key 限制
   link: /database/redis/cluster-sharding-hash-slots-multi-key
+next:
+  text: 客户端连接、超时、重试与优雅停机
+  link: /database/redis/client-connections-timeouts-retries-shutdown
 ---
 
 # 安全、ACL、TLS、监控与容量规划

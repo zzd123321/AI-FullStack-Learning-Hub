@@ -42,6 +42,7 @@ Redis 不只是给 SQL 查询加速的键值缓存。它同时提供内存数据
 7. RDB、AOF、复制、Sentinel 与故障转移。
 8. Redis Cluster、分片、hash slot 与多键限制。
 9. 安全、ACL、TLS、监控与容量规划。
+10. 客户端连接、超时、重试与优雅停机。
 
 课程会逐步补充；每一课都明确哪些数据可丢失、哪些操作具备原子性，以及 Redis 不可用时接口如何处理。
 
@@ -56,8 +57,9 @@ Redis 不只是给 SQL 查询加速的键值缓存。它同时提供内存数据
 - [RDB、AOF、复制、Sentinel 与故障转移](/database/redis/persistence-replication-sentinel-failover)
 - [Redis Cluster、分片、hash slot 与多 key 限制](/database/redis/cluster-sharding-hash-slots-multi-key)
 - [安全、ACL、TLS、监控与容量规划](/database/redis/security-observability-capacity-planning)
+- [客户端连接、超时、重试与优雅停机](/database/redis/client-connections-timeouts-retries-shutdown)
 
-前两课从数据结构走到 Cache-Aside 与一致性；第三至五课处理缓存故障、分布式协调和消息交付；第六至九课进入内存治理、持久化、高可用、Cluster、安全与容量规划。九课共同组成 Redis 生产基础路线，每一课都明确原子性、数据丢失和故障恢复边界。
+前两课从数据结构走到 Cache-Aside 与一致性；第三至五课处理缓存故障、分布式协调和消息交付；第六至九课进入内存治理、持久化、高可用、Cluster、安全与容量规划；第十课回到应用进程，完整串联连接、截止时间、结果不确定性、拓扑刷新和停机。十课共同组成 Redis 生产基础路线，每一课都明确原子性、数据丢失和故障恢复边界。
 
 ## 与数据库主线的关系
 
