@@ -74,3 +74,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [Vite 开发服务器、模块图、插件流水线与生产构建](/frontend/engineering/vite-dev-server-module-graph-plugins-and-production-build)
 - [代码质量：ESLint、Prettier、TypeScript、Git Hooks 与 CI 门禁](/frontend/engineering/code-quality-eslint-prettier-typescript-git-hooks-and-ci-gates)
 - [前端测试工程化：单元、组件、集成与端到端测试](/frontend/engineering/frontend-testing-unit-component-e2e-and-reliability)
+- [前端性能工程：Core Web Vitals、RUM 与持续性能预算](/frontend/engineering/frontend-performance-core-web-vitals-rum-and-budgets)

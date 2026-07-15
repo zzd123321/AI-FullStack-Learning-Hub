@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>课程详情</title>
+
+    <!-- 只为首屏必需且跨源的连接预热；滥用会争抢 Socket 与 CPU。 -->
+    <link rel="preconnect" href="https://static.example.com" crossorigin />
+    <link
+      rel="preload"
+      as="image"
+      href="https://static.example.com/course-1280.avif"
+      imagesrcset="
+        https://static.example.com/course-640.avif 640w,
+        https://static.example.com/course-1280.avif 1280w
+      "
+      imagesizes="(max-width: 720px) 100vw, 720px"
+      fetchpriority="high"
+      type="image/avif"
+    />
+  </head>
+  <body>
+    <main>
+      <h1>TypeScript 工程边界</h1>
+      <!-- 首屏 LCP 候选不做 lazy-load；尺寸属性预留比例，减少布局偏移。 -->
+      <img
+        src="https://static.example.com/course-1280.avif"
+        srcset="
+          https://static.example.com/course-640.avif 640w,
+          https://static.example.com/course-1280.avif 1280w
+        "
+        sizes="(max-width: 720px) 100vw, 720px"
+        width="1280"
+        height="720"
+        fetchpriority="high"
+        decoding="async"
+        alt="TypeScript 课程封面"
+      />
+
+      <!-- 非首屏资源才使用原生懒加载。 -->
+      <img
+        src="https://static.example.com/instructor-480.avif"
+        width="480"
+        height="480"
+        loading="lazy"
+        decoding="async"
+        alt="课程讲师"
+      />
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

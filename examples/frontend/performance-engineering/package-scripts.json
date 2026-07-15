@@ -1,0 +1,7 @@
+{
+  "scripts": {
+    "performance:budget": "node --experimental-strip-types scripts/check-performance-budget.mts",
+    "performance:lab": "lhci autorun",
+    "performance:ci": "npm run build && npm run performance:budget && npm run performance:lab"
+  }
+}

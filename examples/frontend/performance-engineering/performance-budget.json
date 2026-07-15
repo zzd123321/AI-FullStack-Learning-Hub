@@ -1,0 +1,8 @@
+{
+  "entrySource": "src/main.ts",
+  "maxInitialJsGzipBytes": 174080,
+  "maxInitialCssGzipBytes": 51200,
+  "maxAnyJsFileGzipBytes": 102400,
+  "maxTotalJsGzipBytes": 409600,
+  "maxStaticAssetRawBytes": 512000
+}
