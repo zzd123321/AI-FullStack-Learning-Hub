@@ -618,7 +618,7 @@ curl -i http://localhost:18083/actuator/env
 - 指标标签必须控制基数，用户 ID 和请求 ID 不应成为 tag。
 - 测试应验证最终配置结果、运行信号和未暴露端点，而不只验证启动成功。
 
-下一节建议：Spring Boot JDBC、连接池、事务边界与数据库迁移。
+下一节：[Spring Boot JDBC、连接池、事务边界与 Flyway 数据库迁移](/backend/spring-boot/jdbc-connection-pool-transactions-and-flyway)。
 
 ## 31. 参考资料
 
