@@ -4,6 +4,9 @@ description: 理解 MySQL 与 PostgreSQL 复制流水线、异步和同步确认
 prev:
   text: 数据库连接池、超时与过载保护
   link: /database/connection-pools-timeouts-overload
+next:
+  text: 分区表、数据生命周期与归档
+  link: /database/partitioning-data-lifecycle-archiving
 ---
 
 # 读写分离、复制延迟与一致性

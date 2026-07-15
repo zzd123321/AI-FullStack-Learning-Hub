@@ -65,6 +65,7 @@ description: 从 SQL 基础走向事务、索引、缓存和数据架构
 - [SQL 与索引优化实战](/database/sql-and-index-optimization)
 - [数据库连接池、超时与过载保护](/database/connection-pools-timeouts-overload)
 - [读写分离、复制延迟与一致性](/database/read-write-splitting-replication-consistency)
+- [分区表、数据生命周期与归档](/database/partitioning-data-lifecycle-archiving)
 
 从端到端接口延迟出发，使用工作负载聚合、执行计划、等待事件和锁证据定位瓶颈，再逐步进入 SQL、索引、连接、容量、分区、读写分离与分库分表。
 
