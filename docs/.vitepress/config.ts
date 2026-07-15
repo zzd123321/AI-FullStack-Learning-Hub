@@ -170,7 +170,14 @@ export default defineConfig({
             { text: '前端可观测性、发布治理与事故响应', link: '/frontend/architecture/frontend-observability-release-governance-and-incident-response' },
             { text: '设计系统、无障碍与跨框架组件', link: '/frontend/architecture/design-system-tokens-accessibility-and-cross-framework-components' },
             { text: '国际化、本地化与 RTL 工程', link: '/frontend/architecture/frontend-internationalization-localization-and-rtl-engineering' },
-            { text: '数据可视化、交互与无障碍架构', link: '/frontend/architecture/frontend-data-visualization-rendering-interaction-and-accessibility' }
+            { text: '数据可视化、交互与无障碍架构', link: '/frontend/architecture/frontend-data-visualization-rendering-interaction-and-accessibility' },
+            { text: '实时同步、协作与冲突解决架构', link: '/frontend/architecture/frontend-realtime-sync-and-collaboration-architecture' },
+            { text: 'AI 流式界面、任务状态与生成式 UI 架构', link: '/frontend/architecture/frontend-ai-streaming-task-state-and-generative-ui-architecture' },
+            { text: '实时语音、音频与多模态交互架构', link: '/frontend/architecture/frontend-realtime-voice-audio-and-multimodal-interaction-architecture' },
+            { text: '文件上传、媒体资源与大文件传输架构', link: '/frontend/architecture/frontend-file-upload-media-assets-and-large-file-transfer-architecture' },
+            { text: 'PWA、Service Worker、后台同步与离线应用架构', link: '/frontend/architecture/pwa-service-worker-background-sync-and-offline-application-architecture' },
+            { text: 'Web Push、通知权限与后台消息架构', link: '/frontend/architecture/web-push-notification-permission-and-background-messaging-architecture' },
+            { text: 'WebView、Electron 与跨端前端架构', link: '/frontend/architecture/webview-electron-and-cross-platform-frontend-architecture' }
           ]
         }
       ],
@@ -241,7 +248,21 @@ export default defineConfig({
         }
         ,{
           text: 'Python', collapsed: false, items: [
-            { text: '环境、解释器、虚拟环境、执行模型与第一个程序', link: '/backend/python/environment-interpreter-venv-execution-model-and-first-program' }
+            { text: '环境、解释器、虚拟环境、执行模型与第一个程序', link: '/backend/python/environment-interpreter-venv-execution-model-and-first-program' },
+            { text: '对象模型、可变性、数值、字符串与真值判断', link: '/backend/python/basic-syntax-object-model-mutability-numbers-strings-and-truthiness' },
+            { text: '容器、切片、推导式、迭代器、生成器与惰性求值', link: '/backend/python/containers-slicing-comprehensions-iterators-generators-and-laziness' },
+            { text: '函数、参数、作用域、闭包、装饰器与函数式抽象', link: '/backend/python/functions-parameters-scope-closures-decorators-and-functional-abstraction' },
+            { text: '模块、包、导入系统、pyproject 与依赖管理', link: '/backend/python/modules-packages-import-system-pyproject-and-dependency-management' },
+            { text: '异常、错误建模、上下文管理器、文件 IO 与资源安全', link: '/backend/python/exceptions-error-modeling-context-managers-file-io-and-resource-safety' },
+            { text: '类、实例、属性查找、dataclass、Protocol 与对象建模', link: '/backend/python/classes-instances-attribute-lookup-dataclasses-protocols-and-object-modeling' },
+            { text: '类型标注、泛型、类型收窄、静态分析与自动化测试', link: '/backend/python/type-hints-generics-narrowing-static-analysis-and-automated-testing' },
+            { text: '线程、进程、GIL、asyncio 与结构化异步 IO', link: '/backend/python/concurrency-threads-processes-gil-asyncio-and-structured-async-io' }
+          ]
+        },
+        {
+          text: 'FastAPI', collapsed: false, items: [
+            { text: '专题首页', link: '/backend/fastapi/' },
+            { text: 'ASGI、Lifespan、路由、校验与第一个 API', link: '/backend/fastapi/asgi-lifespan-routing-validation-and-first-api' }
           ]
         }
       ],
@@ -283,6 +304,17 @@ export default defineConfig({
             ,{ text: '连接池、超时与过载保护', link: '/database/connection-pools-timeouts-overload' }
             ,{ text: '读写分离、复制延迟与一致性', link: '/database/read-write-splitting-replication-consistency' }
             ,{ text: '分区表、数据生命周期与归档', link: '/database/partitioning-data-lifecycle-archiving' }
+            ,{ text: '分库分表、路由与全局一致性', link: '/database/sharding-routing-global-consistency' }
+            ,{ text: '备份、PITR 与灾难恢复', link: '/database/backup-pitr-disaster-recovery' }
+            ,{ text: 'Schema 迁移与在线 DDL', link: '/database/schema-migrations-online-ddl' }
+            ,{ text: '访问控制、租户隔离与审计', link: '/database/access-control-tenant-isolation-auditing' }
+            ,{ text: '容量规划、SLO 与压测', link: '/database/capacity-planning-slo-load-testing' }
+            ,{ text: '故障响应、切换与复盘', link: '/database/incident-response-failover-postmortem' }
+            ,{ text: '版本升级、兼容性与回滚', link: '/database/version-upgrades-compatibility-rollback' }
+            ,{ text: '数据质量、对账与安全修复', link: '/database/data-quality-reconciliation-safe-repair' }
+            ,{ text: '技术选型、架构评审与演进', link: '/database/technology-selection-architecture-review-evolution' }
+            ,{ text: 'CDC、Transactional Outbox 与可靠事件传播', link: '/database/cdc-transactional-outbox-reliable-events' }
+            ,{ text: '大规模数据回填、分批与检查点', link: '/database/large-scale-backfills-batching-checkpoints' }
           ]
         }
       ],
