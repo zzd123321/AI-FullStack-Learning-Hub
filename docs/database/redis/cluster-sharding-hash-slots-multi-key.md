@@ -4,6 +4,9 @@ description: 理解 Redis Cluster 的 16384 个 hash slot、hash tag、cluster-a
 prev:
   text: RDB、AOF、复制、Sentinel 与故障转移
   link: /database/redis/persistence-replication-sentinel-failover
+next:
+  text: 安全、ACL、TLS、监控与容量规划
+  link: /database/redis/security-observability-capacity-planning
 ---
 
 # Redis Cluster、分片、hash slot 与多 key 限制

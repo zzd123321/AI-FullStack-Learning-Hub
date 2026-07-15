@@ -55,8 +55,9 @@ Redis 不只是给 SQL 查询加速的键值缓存。它同时提供内存数据
 - [TTL、内存淘汰、大 key 与热 key 治理](/database/redis/ttl-memory-eviction-big-hot-keys)
 - [RDB、AOF、复制、Sentinel 与故障转移](/database/redis/persistence-replication-sentinel-failover)
 - [Redis Cluster、分片、hash slot 与多 key 限制](/database/redis/cluster-sharding-hash-slots-multi-key)
+- [安全、ACL、TLS、监控与容量规划](/database/redis/security-observability-capacity-planning)
 
-第一课建立数据结构、键命名、TTL、事务、流水线和运行边界；第二课把 Redis 与关系数据库组合起来，分析缓存读写路径、竞态窗口与最终一致性方案；第三课分析 miss 和流量倾斜怎样被并发放大，并用负缓存、布隆过滤器、请求合并、逻辑过期、TTL 抖动与过载保护逐层治理；第四课区分并发互斥、重复请求、原子计数和流量配额，建立租约、fencing token、幂等状态机及限流算法的正确性边界；第五课比较 List、Pub/Sub 和 Streams 的保留、分发、确认与重放语义，并建立 consumer group 的故障恢复流程；第六课进入内存生命周期和生产诊断，区分过期与淘汰，并治理大 key、热 key、碎片和容量风险；第七课用 RPO/RTO 串联 RDB、AOF、异步复制、Sentinel 判障和客户端故障恢复；第八课建立 Cluster 的 slot 路由、同 slot 原子边界、在线 resharding 与分片容量模型。
+前两课从数据结构走到 Cache-Aside 与一致性；第三至五课处理缓存故障、分布式协调和消息交付；第六至九课进入内存治理、持久化、高可用、Cluster、安全与容量规划。九课共同组成 Redis 生产基础路线，每一课都明确原子性、数据丢失和故障恢复边界。
 
 ## 与数据库主线的关系
 
