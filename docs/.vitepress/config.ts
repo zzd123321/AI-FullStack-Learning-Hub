@@ -152,6 +152,25 @@ export default defineConfig({
           items: [
             { text: '事件循环、渲染与长任务', link: '/frontend/browser/event-loop-rendering-and-long-tasks' },
             { text: 'URL、DNS、TLS、HTTP 缓存与 Fetch', link: '/frontend/browser/url-dns-tls-http-cache-and-fetch' }
+            ,{ text: 'DOM 事件、Shadow DOM 与可访问交互', link: '/frontend/browser/dom-events-shadow-dom-and-accessible-interactions' }
+            ,{ text: '浏览器存储、IndexedDB 与离线一致性', link: '/frontend/browser/browser-storage-indexeddb-cache-and-offline-consistency' }
+            ,{ text: '浏览器安全：XSS、CSRF、CSP 与跨源隔离', link: '/frontend/browser/browser-security-xss-csrf-csp-and-cross-origin-isolation' }
+          ]
+        }
+        ,{
+          text: '前端工程化', collapsed: false, items: [
+            { text: 'Vite 开发服务器、模块图、插件与生产构建', link: '/frontend/engineering/vite-dev-server-module-graph-plugins-and-production-build' },
+            { text: '代码质量与 CI 门禁', link: '/frontend/engineering/code-quality-eslint-prettier-typescript-git-hooks-and-ci-gates' },
+            { text: '前端测试工程化', link: '/frontend/engineering/frontend-testing-unit-component-e2e-and-reliability' },
+            { text: '前端性能工程：Core Web Vitals、RUM 与预算', link: '/frontend/engineering/frontend-performance-core-web-vitals-rum-and-budgets' }
+          ]
+        }, {
+          text: '前端架构', collapsed: false, items: [
+            { text: '大型前端架构、模块边界与微前端', link: '/frontend/architecture/large-scale-frontend-modules-boundaries-and-micro-frontends' },
+            { text: '前端可观测性、发布治理与事故响应', link: '/frontend/architecture/frontend-observability-release-governance-and-incident-response' },
+            { text: '设计系统、无障碍与跨框架组件', link: '/frontend/architecture/design-system-tokens-accessibility-and-cross-framework-components' },
+            { text: '国际化、本地化与 RTL 工程', link: '/frontend/architecture/frontend-internationalization-localization-and-rtl-engineering' },
+            { text: '数据可视化、交互与无障碍架构', link: '/frontend/architecture/frontend-data-visualization-rendering-interaction-and-accessibility' }
           ]
         }
       ],
@@ -210,6 +229,19 @@ export default defineConfig({
             { text: '项目结构、自动配置、配置与第一个 API', link: '/backend/spring-boot/project-structure-auto-configuration-config-and-first-api' },
             { text: 'Bean 生命周期、Java Config、Scope、代理与循环依赖', link: '/backend/spring-boot/bean-lifecycle-java-config-scopes-proxies-and-circular-dependencies' },
             { text: 'MVC 参数绑定、校验、错误响应与测试', link: '/backend/spring-boot/mvc-parameter-binding-validation-error-response-and-testing' }
+            ,{ text: '配置、Profile、日志、Actuator 与可观测性', link: '/backend/spring-boot/config-profiles-logging-actuator-and-observability' }
+            ,{ text: 'JDBC、连接池、事务与 Flyway', link: '/backend/spring-boot/jdbc-connection-pool-transactions-and-flyway' }
+            ,{ text: 'JPA 实体生命周期、关联、查询与 N+1', link: '/backend/spring-boot/jpa-entity-lifecycle-associations-queries-and-n-plus-one' }
+            ,{ text: 'JPA 分页、Specification、批量写入与 Testcontainers', link: '/backend/spring-boot/jpa-pagination-specification-batch-and-testcontainers' }
+            ,{ text: '缓存抽象、Caffeine、Redis 与一致性', link: '/backend/spring-boot/cache-abstraction-caffeine-redis-and-consistency' }
+            ,{ text: '异步、调度、上下文与优雅停机', link: '/backend/spring-boot/async-execution-scheduling-context-and-graceful-shutdown' }
+            ,{ text: 'RabbitMQ、Kafka、可靠投递与 Outbox', link: '/backend/spring-boot/messaging-rabbitmq-kafka-reliability-and-outbox' }
+            ,{ text: 'Spring Security：认证、授权、Session、JWT 与 CSRF', link: '/backend/spring-boot/security-authentication-authorization-session-jwt-and-csrf' }
+          ]
+        }
+        ,{
+          text: 'Python', collapsed: false, items: [
+            { text: '环境、解释器、虚拟环境、执行模型与第一个程序', link: '/backend/python/environment-interpreter-venv-execution-model-and-first-program' }
           ]
         }
       ],
@@ -236,6 +268,21 @@ export default defineConfig({
             { text: '锁与 MVCC', link: '/database/locks-and-mvcc' },
             { text: '数据库设计与范式', link: '/database/database-design-and-normalization' },
             { text: 'Redis 基础与数据类型', link: '/database/redis/fundamentals-and-data-types' }
+            ,{ text: 'Redis 专题首页', link: '/database/redis/' }
+            ,{ text: 'Cache-Aside 与缓存一致性', link: '/database/redis/cache-aside-and-consistency' }
+            ,{ text: '缓存穿透、击穿与雪崩', link: '/database/redis/cache-penetration-breakdown-avalanche' }
+            ,{ text: '分布式锁、幂等、计数器与限流', link: '/database/redis/distributed-locks-idempotency-counters-rate-limiting' }
+            ,{ text: 'List、Pub/Sub 与 Streams 消息模型', link: '/database/redis/lists-pubsub-streams-messaging' }
+            ,{ text: 'TTL、内存淘汰、大 key 与热 key', link: '/database/redis/ttl-memory-eviction-big-hot-keys' }
+            ,{ text: 'RDB、AOF、复制、Sentinel 与故障转移', link: '/database/redis/persistence-replication-sentinel-failover' }
+            ,{ text: 'Redis Cluster、分片与 hash slot', link: '/database/redis/cluster-sharding-hash-slots-multi-key' }
+            ,{ text: 'Redis 安全、可观测性与容量规划', link: '/database/redis/security-observability-capacity-planning' }
+            ,{ text: 'Redis 客户端、超时、重试与优雅停机', link: '/database/redis/client-connections-timeouts-retries-shutdown' }
+            ,{ text: '数据库性能诊断', link: '/database/database-performance-diagnosis' }
+            ,{ text: 'SQL 与索引优化', link: '/database/sql-and-index-optimization' }
+            ,{ text: '连接池、超时与过载保护', link: '/database/connection-pools-timeouts-overload' }
+            ,{ text: '读写分离、复制延迟与一致性', link: '/database/read-write-splitting-replication-consistency' }
+            ,{ text: '分区表、数据生命周期与归档', link: '/database/partitioning-data-lifecycle-archiving' }
           ]
         }
       ],
