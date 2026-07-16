@@ -92,3 +92,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [WebView、Electron 与跨端前端架构](/frontend/architecture/webview-electron-and-cross-platform-frontend-architecture)
 - [前端权限、设备能力与隐私工程架构](/frontend/architecture/frontend-permissions-device-capabilities-and-privacy-engineering)
 - [Web Worker、SharedWorker、WebAssembly 与前端计算架构](/frontend/architecture/web-worker-sharedworker-webassembly-and-frontend-compute-architecture)
+- [前端身份认证、会话、Token 与授权架构](/frontend/architecture/frontend-authentication-session-token-and-authorization-architecture)
