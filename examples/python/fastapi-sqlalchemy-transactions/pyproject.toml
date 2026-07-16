@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sql-task-api"
+version = "0.1.0"
+description = "FastAPI, SQLAlchemy transactions, repository, and Alembic example"
+requires-python = ">=3.11"
+dependencies = [
+    "alembic>=1.18,<1.19",
+    "fastapi>=0.139,<0.140",
+    "pydantic-settings>=2.14,<2.15",
+    "sqlalchemy>=2.0.51,<2.1",
+    "uvicorn>=0.51,<0.52",
+]
+
+[project.optional-dependencies]
+test = [
+    "httpx2>=2.7,<3",
+    "pytest>=9,<10",
+]
+
+[tool.setuptools.packages.find]
+include = ["sql_task_api*"]
+
+[tool.pytest.ini_options]
+addopts = "-W error"
+testpaths = ["tests"]
