@@ -25,6 +25,7 @@ HTTP API 合同
 
 1. [HTTP API 资源建模、方法语义、错误、分页、并发控制与版本演进](/backend/architecture/http-api-resource-modeling-semantics-errors-pagination-concurrency-and-versioning)
 2. [HTTP 缓存、CDN、重新验证、缓存键与失效](/backend/architecture/http-cache-cdn-revalidation-keys-and-invalidation)
+3. [应用数据缓存与 Redis：cache-aside、TTL、并发回填与一致性](/backend/architecture/application-cache-redis-cache-aside-ttl-stampede-and-consistency)
 
 后续课程将在本目录继续追加。课程不把某个框架的默认行为冒充 HTTP 标准；关键语义优先依据 IETF RFC、IANA 和 OpenAPI 官方规范，并用 Spring Boot/FastAPI 的实现经验对照。
 
