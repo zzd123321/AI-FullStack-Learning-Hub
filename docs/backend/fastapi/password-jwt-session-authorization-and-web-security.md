@@ -410,7 +410,7 @@ monitoring 系统变成 credential database。redact headers/body/query 和 exce
 - RBAC 不能替代 resource ownership/ABAC；每个 action 都要防止 IDOR/BOLA。
 - Cookie/CSRF、CORS 与 XSS 分属不同 browser security 边界，不能相互替代。
 
-下一节建议：FastAPI 测试体系、结构化日志、request ID、metrics、tracing、敏感数据清洗与生产可观测性。
+下一节：[FastAPI 测试、结构化日志、Metrics、Tracing 与生产可观测性](/backend/fastapi/testing-structured-logging-metrics-tracing-and-observability)。
 
 ## 28. 参考资料
 
