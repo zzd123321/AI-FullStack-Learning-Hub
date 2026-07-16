@@ -1,0 +1,54 @@
+-- MySQL 8.4：只读盘点 routines、triggers 与 scheduled events。
+-- 不输出对象 body，避免诊断结果携带敏感业务逻辑或常量。
+
+SELECT
+  ROUTINE_SCHEMA,
+  ROUTINE_NAME,
+  ROUTINE_TYPE,
+  DATA_TYPE AS RETURN_DATA_TYPE,
+  IS_DETERMINISTIC,
+  SQL_DATA_ACCESS,
+  SECURITY_TYPE,
+  DEFINER,
+  SQL_MODE,
+  CREATED,
+  LAST_ALTERED
+FROM information_schema.ROUTINES
+WHERE ROUTINE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+ORDER BY ROUTINE_SCHEMA, ROUTINE_TYPE, ROUTINE_NAME;
+
+SELECT
+  TRIGGER_SCHEMA,
+  TRIGGER_NAME,
+  EVENT_MANIPULATION,
+  EVENT_OBJECT_SCHEMA,
+  EVENT_OBJECT_TABLE,
+  ACTION_TIMING,
+  ACTION_ORIENTATION,
+  DEFINER,
+  CREATED
+FROM information_schema.TRIGGERS
+WHERE TRIGGER_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+ORDER BY TRIGGER_SCHEMA, EVENT_OBJECT_TABLE, TRIGGER_NAME;
+
+SELECT
+  @@GLOBAL.event_scheduler AS event_scheduler_status;
+
+SELECT
+  EVENT_SCHEMA,
+  EVENT_NAME,
+  DEFINER,
+  TIME_ZONE,
+  EVENT_TYPE,
+  EXECUTE_AT,
+  INTERVAL_VALUE,
+  INTERVAL_FIELD,
+  STARTS,
+  ENDS,
+  STATUS,
+  ON_COMPLETION,
+  LAST_EXECUTED,
+  SQL_MODE
+FROM information_schema.EVENTS
+WHERE EVENT_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+ORDER BY EVENT_SCHEMA, EVENT_NAME;
