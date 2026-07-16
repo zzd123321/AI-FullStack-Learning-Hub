@@ -97,3 +97,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [前端多租户、权限系统与企业级管理后台架构](/frontend/architecture/frontend-multi-tenant-permission-and-enterprise-admin-architecture)
 - [前端复杂表单、审批工作流与低代码配置架构](/frontend/architecture/frontend-complex-forms-approval-workflow-and-low-code-architecture)
 - [前端搜索、筛选、排序与数据查询体验架构](/frontend/architecture/frontend-search-filter-sort-and-data-query-experience-architecture)
+- [前端数据导入、导出、报表与大规模异步任务架构](/frontend/architecture/frontend-data-import-export-reporting-and-large-async-job-architecture)
