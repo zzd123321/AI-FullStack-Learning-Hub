@@ -2,11 +2,8 @@
 title: SQL 与索引优化实战
 description: 从查询形状出发优化可搜索条件、联合与覆盖索引、分页、N+1、批量读取、排序聚合，并用 MySQL 与 PostgreSQL 执行计划验证收益和写入代价
 prev:
-  text: 数据库性能诊断：从慢接口到根因
-  link: /database/database-performance-diagnosis
-next:
-  text: 数据库连接池、超时与过载保护
-  link: /database/connection-pools-timeouts-overload
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # SQL 与索引优化实战

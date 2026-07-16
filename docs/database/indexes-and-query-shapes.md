@@ -2,8 +2,8 @@
 title: 索引如何加速查询：B-Tree、选择性与联合索引
 description: 从订单列表接口出发，理解 B-Tree、选择性、联合索引、覆盖查询和索引写入成本
 prev:
-  text: 安全写入数据：INSERT、UPDATE、DELETE 与幂等边界
-  link: /database/safe-insert-update-delete
+  text: 子查询与 CTE：拆解复杂查询
+  link: /database/subqueries-and-cte
 next:
   text: 读懂执行计划：扫描、连接、排序与实际执行
   link: /database/reading-query-plans

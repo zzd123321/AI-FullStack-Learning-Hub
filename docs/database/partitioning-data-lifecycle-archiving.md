@@ -2,11 +2,8 @@
 title: 分区表、数据生命周期与归档
 description: 从接口查询和保留策略推导分区键与粒度，理解分区裁剪、索引和约束边界，并建立可验证、可恢复的数据归档流程
 prev:
-  text: 读写分离、复制延迟与一致性
-  link: /database/read-write-splitting-replication-consistency
-next:
-  text: 分库分表、路由键与全局一致性
-  link: /database/sharding-routing-global-consistency
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # 分区表、数据生命周期与归档

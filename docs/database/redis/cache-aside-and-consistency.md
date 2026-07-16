@@ -5,8 +5,8 @@ prev:
   text: Redis 基础与核心数据类型
   link: /database/redis/fundamentals-and-data-types
 next:
-  text: 缓存穿透、击穿、雪崩与热点治理
-  link: /database/redis/cache-penetration-breakdown-avalanche
+  text: 返回数据库分层导航（全栈必修主线已完成）
+  link: /database/
 ---
 
 # Cache-Aside 与缓存一致性

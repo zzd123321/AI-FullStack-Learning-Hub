@@ -2,11 +2,8 @@
 title: 读写分离、复制延迟与一致性
 description: 理解 MySQL 与 PostgreSQL 复制流水线、异步和同步确认点、读写路由、写后读与单调读、延迟度量、Hot Standby 冲突、故障切换和副本容量边界
 prev:
-  text: 数据库连接池、超时与过载保护
-  link: /database/connection-pools-timeouts-overload
-next:
-  text: 分区表、数据生命周期与归档
-  link: /database/partitioning-data-lifecycle-archiving
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # 读写分离、复制延迟与一致性

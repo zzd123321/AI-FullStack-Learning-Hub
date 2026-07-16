@@ -2,11 +2,8 @@
 title: 分布式锁、幂等、计数器与限流
 description: 理解 Redis 租约锁、所有者令牌、fencing token、接口幂等状态机、原子计数，以及固定窗口、滑动窗口和令牌桶限流的正确性与故障边界
 prev:
-  text: 缓存穿透、击穿、雪崩与热点治理
-  link: /database/redis/cache-penetration-breakdown-avalanche
-next:
-  text: List、Pub/Sub 与 Streams 消息模型
-  link: /database/redis/lists-pubsub-streams-messaging
+  text: Redis 分层导航
+  link: /database/redis/
 ---
 
 # 分布式锁、幂等、计数器与限流

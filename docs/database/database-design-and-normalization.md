@@ -5,8 +5,8 @@ prev:
   text: 锁、MVCC 与并发等待
   link: /database/locks-and-mvcc
 next:
-  text: Redis 与缓存专题
-  link: /database/redis/
+  text: ORM、数据库驱动与 Repository 边界
+  link: /database/orm-drivers-repository-boundaries
 ---
 
 # 从业务需求到表结构：实体、关系、范式与约束

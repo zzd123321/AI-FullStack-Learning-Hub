@@ -5,8 +5,8 @@ prev:
   text: 聚合查询：COUNT、SUM、GROUP BY 与 HAVING
   link: /database/aggregates-group-by-having
 next:
-  text: 安全写入数据：INSERT、UPDATE、DELETE 与幂等边界
-  link: /database/safe-insert-update-delete
+  text: 索引如何加速查询：B-Tree、选择性与联合索引
+  link: /database/indexes-and-query-shapes
 ---
 
 # 子查询与 CTE：拆解复杂查询

@@ -2,11 +2,8 @@
 title: CDC、Transactional Outbox 与可靠事件传播
 description: 解释数据库与消息系统双写的原子性缺口，使用事务 Outbox 或日志型 CDC 捕获已提交事实，并以幂等、版本、水位和对账构建可靠事件链路
 prev:
-  text: 数据库技术选型、架构评审与演进决策
-  link: /database/technology-selection-architecture-review-evolution
-next:
-  text: 大规模数据回填、批处理与断点续跑
-  link: /database/large-scale-backfills-batching-checkpoints
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # CDC、Transactional Outbox 与可靠事件传播

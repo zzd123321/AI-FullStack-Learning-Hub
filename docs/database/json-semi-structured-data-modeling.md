@@ -2,11 +2,8 @@
 title: JSON 与半结构化数据建模
 description: 在关系模型中安全使用 JSON，理解类型差异、路径语义、schema 验证、部分更新、索引、并发、迁移与容量治理
 prev:
-  text: ORM、数据库驱动与 Repository 边界
-  link: /database/orm-drivers-repository-boundaries
-next:
-  text: 数据库全文检索、相关度与搜索架构
-  link: /database/full-text-search-ranking-architecture
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # JSON 与半结构化数据建模

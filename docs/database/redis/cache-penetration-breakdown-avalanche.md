@@ -2,11 +2,8 @@
 title: 缓存穿透、击穿、雪崩与热点治理
 description: 从故障放大链路理解缓存穿透、热点 key 击穿、缓存雪崩和热 key，并掌握负缓存、布隆过滤器、请求合并、逻辑过期、TTL 抖动与过载保护
 prev:
-  text: Cache-Aside 与缓存一致性
-  link: /database/redis/cache-aside-and-consistency
-next:
-  text: 分布式锁、幂等、计数器与限流
-  link: /database/redis/distributed-locks-idempotency-counters-rate-limiting
+  text: Redis 分层导航
+  link: /database/redis/
 ---
 
 # 缓存穿透、击穿、雪崩与热点治理

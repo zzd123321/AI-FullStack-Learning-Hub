@@ -2,11 +2,8 @@
 title: RDB、AOF、复制、Sentinel 与故障转移
 description: 从 RPO/RTO 理解 Redis RDB、AOF、fork 与 rewrite、异步复制、PSYNC、WAIT，以及 Sentinel 的 SDOWN、ODOWN、quorum、选主和客户端恢复
 prev:
-  text: TTL、内存淘汰、大 key 与热 key 治理
-  link: /database/redis/ttl-memory-eviction-big-hot-keys
-next:
-  text: Redis Cluster、分片、hash slot 与多 key 限制
-  link: /database/redis/cluster-sharding-hash-slots-multi-key
+  text: Redis 分层导航
+  link: /database/redis/
 ---
 
 # RDB、AOF、复制、Sentinel 与故障转移

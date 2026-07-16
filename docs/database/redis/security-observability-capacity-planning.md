@@ -2,11 +2,8 @@
 title: 安全、ACL、TLS、监控与容量规划
 description: 从网络隔离、Redis ACL、TLS 和密钥轮换建立安全基线，再用 INFO、SLOWLOG、LATENCY、ACL LOG、应用指标与故障余量完成监控、告警和容量规划
 prev:
-  text: Redis Cluster、分片、hash slot 与多 key 限制
-  link: /database/redis/cluster-sharding-hash-slots-multi-key
-next:
-  text: 客户端连接、超时、重试与优雅停机
-  link: /database/redis/client-connections-timeouts-retries-shutdown
+  text: Redis 分层导航
+  link: /database/redis/
 ---
 
 # 安全、ACL、TLS、监控与容量规划

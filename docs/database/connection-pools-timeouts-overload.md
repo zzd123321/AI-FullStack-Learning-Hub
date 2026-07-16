@@ -2,11 +2,8 @@
 title: 数据库连接池、超时与过载保护
 description: 从接口 deadline 出发理解连接池的准入控制、Little 定律、连接与会话状态、MySQL/PostgreSQL 超时语义、取消与未知结果、重试放大、背压和优雅停机
 prev:
-  text: SQL 与索引优化实战
-  link: /database/sql-and-index-optimization
-next:
-  text: 读写分离、复制延迟与一致性
-  link: /database/read-write-splitting-replication-consistency
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # 数据库连接池、超时与过载保护

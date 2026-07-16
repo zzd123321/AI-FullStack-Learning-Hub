@@ -2,11 +2,8 @@
 title: 视图、物化视图、汇总表与派生读模型
 description: 区分查询抽象与预计算，理解视图展开、物化刷新、增量汇总、幂等消费、影子重建和新鲜度治理
 prev:
-  text: 数据库测试、测试数据与 CI 发布门禁
-  link: /database/testing-test-data-ci-release-gates
-next:
-  text: 时间语义、历史版本与时态数据建模
-  link: /database/time-semantics-history-temporal-modeling
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # 视图、物化视图、汇总表与派生读模型

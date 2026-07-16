@@ -2,11 +2,8 @@
 title: List、Pub/Sub 与 Streams 消息模型
 description: 从消息保留、竞争消费、广播、确认和重放出发，掌握 Redis List 队列、Pub/Sub、Streams、consumer group、PEL、XACK、XAUTOCLAIM、毒消息和 Outbox
 prev:
-  text: 分布式锁、幂等、计数器与限流
-  link: /database/redis/distributed-locks-idempotency-counters-rate-limiting
-next:
-  text: TTL、内存淘汰、大 key 与热 key 治理
-  link: /database/redis/ttl-memory-eviction-big-hot-keys
+  text: Redis 分层导航
+  link: /database/redis/
 ---
 
 # List、Pub/Sub 与 Streams 消息模型

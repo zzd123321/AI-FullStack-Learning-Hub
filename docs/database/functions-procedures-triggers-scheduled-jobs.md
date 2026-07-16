@@ -2,11 +2,8 @@
 title: 数据库函数、存储过程、触发器与任务调度
 description: 理解数据库端函数、过程、触发器和调度任务的执行边界，建立原子性、权限、重试、发布与可观测性治理
 prev:
-  text: 时间语义、历史版本与时态数据建模
-  link: /database/time-semantics-history-temporal-modeling
-next:
-  text: ORM、数据库驱动与 Repository 边界
-  link: /database/orm-drivers-repository-boundaries
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # 数据库函数、存储过程、触发器与任务调度

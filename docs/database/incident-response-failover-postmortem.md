@@ -2,11 +2,8 @@
 title: 数据库事故响应、故障切换与复盘
 description: 从告警和接口症状建立事故分级、证据采集、限流隔离、锁与容量处置、未知提交、故障切换 fencing、PITR、业务验证和无责复盘
 prev:
-  text: 数据库容量规划、SLO 与压测
-  link: /database/capacity-planning-slo-load-testing
-next:
-  text: 数据库版本升级、兼容性与回退设计
-  link: /database/version-upgrades-compatibility-rollback
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # 数据库事故响应、故障切换与复盘

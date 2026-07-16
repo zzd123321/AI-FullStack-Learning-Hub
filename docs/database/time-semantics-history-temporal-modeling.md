@@ -2,11 +2,8 @@
 title: 时间语义、历史版本与时态数据建模
 description: 区分时间点、本地日历规则、有效时间与记录时间，使用半开区间、历史版本、as-of 查询和并发约束构建可解释的时间线
 prev:
-  text: 视图、物化视图、汇总表与派生读模型
-  link: /database/views-materialized-views-summary-read-models
-next:
-  text: 数据库函数、存储过程、触发器与任务调度
-  link: /database/functions-procedures-triggers-scheduled-jobs
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # 时间语义、历史版本与时态数据建模

@@ -2,11 +2,11 @@
 title: 数据库变更、在线 DDL 与安全发布
 description: 使用 expand–migrate–contract 管理应用与 schema 兼容窗口，理解 MySQL online DDL、PostgreSQL concurrent index、锁、回填、约束验证、失败恢复和分片迁移
 prev:
-  text: 备份、时间点恢复与灾难演练
-  link: /database/backup-pitr-disaster-recovery
+  text: ORM、数据库驱动与 Repository 边界
+  link: /database/orm-drivers-repository-boundaries
 next:
-  text: 数据库权限、租户隔离与审计
-  link: /database/access-control-tenant-isolation-auditing
+  text: 数据库测试、测试数据与 CI 发布门禁
+  link: /database/testing-test-data-ci-release-gates
 ---
 
 # 数据库变更、在线 DDL 与安全发布

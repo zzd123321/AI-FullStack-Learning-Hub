@@ -2,11 +2,11 @@
 title: 安全写入数据：INSERT、UPDATE、DELETE 与幂等边界
 description: 从创建和修改账号接口出发，掌握受约束写入、影响行数、乐观并发控制、软删除与 UPSERT
 prev:
-  text: 子查询与 CTE：拆解复杂查询
-  link: /database/subqueries-and-cte
+  text: 从列表接口到可靠 SELECT
+  link: /database/select-filter-sort-pagination
 next:
-  text: 索引如何加速查询：B-Tree、选择性与联合索引
-  link: /database/indexes-and-query-shapes
+  text: 多表关系与 JOIN
+  link: /database/relationships-and-joins
 ---
 
 # 安全写入数据：INSERT、UPDATE、DELETE 与幂等边界

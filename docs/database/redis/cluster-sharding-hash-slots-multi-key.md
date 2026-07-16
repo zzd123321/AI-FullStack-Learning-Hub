@@ -2,11 +2,8 @@
 title: Redis Cluster、分片、hash slot 与多 key 限制
 description: 理解 Redis Cluster 的 16384 个 hash slot、hash tag、cluster-aware 客户端、MOVED/ASK、同 slot 多 key 原子边界、resharding、分片故障转移和容量倾斜
 prev:
-  text: RDB、AOF、复制、Sentinel 与故障转移
-  link: /database/redis/persistence-replication-sentinel-failover
-next:
-  text: 安全、ACL、TLS、监控与容量规划
-  link: /database/redis/security-observability-capacity-planning
+  text: Redis 分层导航
+  link: /database/redis/
 ---
 
 # Redis Cluster、分片、hash slot 与多 key 限制

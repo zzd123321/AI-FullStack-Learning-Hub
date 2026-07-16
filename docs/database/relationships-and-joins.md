@@ -2,8 +2,8 @@
 title: 多表关系与 JOIN
 description: 从订单接口出发，理解一对多、多对多、主外键和可靠的多表查询
 prev:
-  text: 从列表接口到可靠 SELECT
-  link: /database/select-filter-sort-pagination
+  text: 安全写入数据：INSERT、UPDATE、DELETE 与幂等边界
+  link: /database/safe-insert-update-delete
 next:
   text: 聚合查询：COUNT、SUM、GROUP BY 与 HAVING
   link: /database/aggregates-group-by-having

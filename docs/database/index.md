@@ -1,92 +1,229 @@
 ---
 title: 数据库
-description: 从 SQL 基础走向事务、索引、缓存和数据架构
+description: 面向全栈工程师的数据库必修路线，以及按需查阅的后端与架构专题
 ---
 
 # 数据库
 
-数据库学习不会只停留在 SQL 语法，而是围绕“数据如何被正确保存、快速查询并安全更新”展开。
+数据库专题分成三层，**不要求按页面数量全部学完**：
 
-## 学习顺序
+1. **全栈必修主线**：第一次学习只走这一层，完成后即可继续做全栈项目。
+2. **后端工程进阶**：遇到性能、权限、复制、搜索等真实需求时选学。
+3. **架构与运维参考**：用于大型系统和生产事故，平时查阅，不作为入门进度。
 
-1. 关系模型与 SQL。
-2. MySQL 和 PostgreSQL 的基础使用。
-3. 索引结构与查询计划。
-4. 事务、隔离级别、锁和 MVCC。
-5. 数据库设计。
-6. Redis 与缓存一致性。
-7. 性能优化与分库分表。
+::: tip 先记住停止点
+完成“全栈必修主线”和 Redis 前两课后，数据库入门阶段就已经结束。你不需要先掌握分库分表、CDC、PITR、双时态模型或数据库事故响应，才能继续学习后端和完成项目。
+:::
 
-## 当前课程
+## 怎样使用这套课程
 
-### 关系模型与 SQL
+- 第一次学习只选一个主数据库。项目使用 MySQL 就以 MySQL 为主，使用 PostgreSQL 就以 PostgreSQL 为主；另一种数据库只了解关键差异。
+- 不背配置项和执行计划字段。先理解它解决什么问题，需要时再查官方资料。
+- 每学完一个阶段就回到接口代码，实际完成一次查询、写入或事务联调。
+- 标为“进阶”或“参考”的页面可以跳过；页面存在不等于当前必须掌握。
+- 遇到不理解的高级段落时，先继续项目，不用为了“全部看懂”停住主线。
+
+## 第一层：全栈必修主线
+
+建议按下面 15 个阶段学习。部分阶段包含两篇紧密相关的页面，但它们共同解决一个能力目标。
+
+### 阶段 1：认识关系数据库
 
 - [关系型数据库、表、行、列、主键与第一个 SQL 查询](/database/relational-model-and-first-query)
 - [连接并认识 MySQL 与 PostgreSQL](/database/mysql-postgresql-basics)
+
+目标：能解释浏览器请求怎样经过后端到达数据库，并能安全连接自己的学习数据库。
+
+### 阶段 2：类型和数据边界
+
 - [数据类型、NULL、默认值与约束](/database/data-types-defaults-and-constraints)
+
+目标：知道字符串、整数、金额、时间和 NULL 为什么不能随意互换，并用约束拒绝明显坏数据。
+
+### 阶段 3：完成可靠列表接口
+
 - [从列表接口到可靠 SELECT：筛选、排序与分页](/database/select-filter-sort-pagination)
-- [多表关系与 JOIN](/database/relationships-and-joins)
-- [聚合查询：COUNT、SUM、GROUP BY 与 HAVING](/database/aggregates-group-by-having)
-- [子查询与 CTE：拆解复杂查询](/database/subqueries-and-cte)
+
+目标：实现带参数绑定、稳定排序和分页上限的列表查询。
+
+### 阶段 4：安全写入
+
 - [安全写入数据：INSERT、UPDATE、DELETE 与幂等边界](/database/safe-insert-update-delete)
 
-先把接口中的“用户列表”还原成数据库中的表和查询，再建立连接、类型与约束边界，实现可靠的查询与复杂查询拆解，最后建立安全、可并发的写入习惯。
+目标：完成安全新增和条件更新，理解 affected rows、生成 ID 与幂等键。
 
-### 索引与执行计划
+### 阶段 5：表之间的关系
+
+- [多表关系与 JOIN](/database/relationships-and-joins)
+
+目标：能表达一对一、一对多和多对多关系，并避免简单 N+1 查询。
+
+### 阶段 6：统计和复杂查询
+
+- [聚合查询：COUNT、SUM、GROUP BY 与 HAVING](/database/aggregates-group-by-having)
+- [子查询与 CTE：拆解复杂查询](/database/subqueries-and-cte)
+
+目标：完成常用统计接口，并能把复杂 SQL 分成可验证的步骤。第一次学习不必掌握所有高级写法。
+
+### 阶段 7：索引
 
 - [索引如何加速查询：B-Tree、选择性与联合索引](/database/indexes-and-query-shapes)
+
+目标：根据接口的等值筛选、范围、排序和分页设计一个合理联合索引。
+
+### 阶段 8：执行计划
+
 - [读懂执行计划：扫描、连接、排序与实际执行](/database/reading-query-plans)
 
-从真实接口的筛选与排序形状出发设计索引，再通过执行计划验证数据库是否采用了预期访问路径。
+目标：能判断查询在全表扫描、使用哪个索引、读取多少行以及是否额外排序；不要求背完所有节点。
 
-### 事务、锁与 MVCC
+### 阶段 9：事务
 
 - [事务与 ACID：从转账接口到原子提交](/database/transactions-and-acid)
+
+目标：让多步数据库写入在同一连接和事务中一起提交或回滚。
+
+### 阶段 10：并发、隔离与锁
+
 - [并发异常与事务隔离级别](/database/transaction-isolation-levels)
 - [锁、MVCC 与并发等待](/database/locks-and-mvcc)
 
-从多步写入的原子边界开始，再逐步理解并发事务之间的可见性、锁等待和多版本并发控制。
+目标：理解丢失更新、锁等待和死锁，能使用条件更新、唯一约束或明确锁解决一个真实并发问题。MVCC 内部细节可留待以后。
 
-### 数据库设计
+### 阶段 11：数据库设计
 
 - [从业务需求到表结构：实体、关系、范式与约束](/database/database-design-and-normalization)
 
-从接口字段和业务不变量识别实体、关系与约束，再用范式控制冗余，并为查询、演进和数据生命周期保留清晰边界。
+目标：从接口需求识别实体、候选键、关系和业务不变量，而不是把响应 JSON 原样做成一张表。
 
-### Redis 与缓存
+### 阶段 12：应用数据访问层
 
-- [Redis 与缓存专题](/database/redis/)
+- [ORM、数据库驱动与 Repository 边界](/database/orm-drivers-repository-boundaries)
 
-先把 Redis 看作提供多种数据结构和原子命令的内存数据服务，建立键、过期、内存、持久化与安全边界，再进入缓存一致性设计。
+目标：理解 ORM 不会替代数据库设计，确保类型映射、事务连接和生成 SQL 可观察。第一次学习重点阅读 Repository、类型映射、N+1、flush/commit 四部分。
 
-### 性能优化与数据架构
+### 阶段 13：数据库迁移
+
+- [数据库变更、在线 DDL 与安全发布](/database/schema-migrations-online-ddl)
+
+目标：掌握 migration 版本、先扩展后收缩和应用/数据库兼容顺序。大型在线 DDL 工具和锁评估属于进阶内容，可先略读。
+
+### 阶段 14：数据库测试
+
+- [数据库测试、测试数据与 CI 发布门禁](/database/testing-test-data-ci-release-gates)
+
+目标：用真实目标数据库测试 repository、migration、约束和事务，而不只 mock ORM。
+
+### 阶段 15：Redis 与缓存入门
+
+- [Redis 基础与核心数据类型](/database/redis/fundamentals-and-data-types)
+- [Cache-Aside 与缓存一致性](/database/redis/cache-aside-and-consistency)
+
+目标：把关系数据库作为事实来源，使用可过期、可重建的缓存副本，并理解缓存失效的基本竞态。
+
+::: info 全栈主线完成标准
+能独立设计一个中小型业务表结构，实现带 JOIN 和分页的接口，在事务中完成多表写入，为查询设计索引并查看执行计划，再为一个热点读取加入 Cache-Aside，即可认为数据库主线完成。
+:::
+
+## 第二层：后端工程进阶
+
+这些专题解决常见生产问题，但不要求连续学习。根据项目现状选择：
+
+### 性能与可靠访问
 
 - [数据库性能诊断：从慢接口到根因](/database/database-performance-diagnosis)
 - [SQL 与索引优化实战](/database/sql-and-index-optimization)
 - [数据库连接池、超时与过载保护](/database/connection-pools-timeouts-overload)
-- [读写分离、复制延迟与一致性](/database/read-write-splitting-replication-consistency)
-- [分区表、数据生命周期与归档](/database/partitioning-data-lifecycle-archiving)
-- [分库分表、路由键与全局一致性](/database/sharding-routing-global-consistency)
-- [备份、时间点恢复与灾难演练](/database/backup-pitr-disaster-recovery)
-- [数据库变更、在线 DDL 与安全发布](/database/schema-migrations-online-ddl)
+
+适合：接口出现慢查询、连接池耗尽、超时或数据库过载时。
+
+### 权限、备份与复制
+
 - [数据库权限、租户隔离与审计](/database/access-control-tenant-isolation-auditing)
-- [数据库容量规划、SLO 与压测](/database/capacity-planning-slo-load-testing)
-- [数据库事故响应、故障切换与复盘](/database/incident-response-failover-postmortem)
-- [数据库版本升级、兼容性与回退设计](/database/version-upgrades-compatibility-rollback)
-- [数据质量、跨系统对账与安全修复](/database/data-quality-reconciliation-safe-repair)
-- [数据库技术选型、架构评审与演进决策](/database/technology-selection-architecture-review-evolution)
-- [CDC、Transactional Outbox 与可靠事件传播](/database/cdc-transactional-outbox-reliable-events)
-- [大规模数据回填、批处理与断点续跑](/database/large-scale-backfills-batching-checkpoints)
-- [数据库测试、测试数据与 CI 发布门禁](/database/testing-test-data-ci-release-gates)
-- [视图、物化视图、汇总表与派生读模型](/database/views-materialized-views-summary-read-models)
-- [时间语义、历史版本与时态数据建模](/database/time-semantics-history-temporal-modeling)
-- [数据库函数、存储过程、触发器与任务调度](/database/functions-procedures-triggers-scheduled-jobs)
-- [ORM、数据库驱动与 Repository 边界](/database/orm-drivers-repository-boundaries)
+- [备份、时间点恢复与灾难演练](/database/backup-pitr-disaster-recovery)
+- [读写分离、复制延迟与一致性](/database/read-write-splitting-replication-consistency)
+
+适合：项目即将上线、引入多租户、只读副本或正式恢复要求时。
+
+### 数据表达和查询能力
+
 - [JSON 与半结构化数据建模](/database/json-semi-structured-data-modeling)
 - [数据库全文检索、相关度与搜索架构](/database/full-text-search-ranking-architecture)
+- [视图、物化视图、汇总表与派生读模型](/database/views-materialized-views-summary-read-models)
 
-从端到端接口延迟出发，使用工作负载聚合、执行计划、等待事件和锁证据定位瓶颈，再逐步进入 SQL、索引、连接、容量、分区、读写分离、分库分表、跨系统数据正确性治理、架构决策、可靠事件传播、在线回填、测试门禁、派生读模型、历史时间线、数据库端逻辑、应用数据访问边界、半结构化数据与搜索治理。
+适合：出现动态属性、搜索接口或昂贵汇总查询时。普通业务不必预先引入。
+
+### 数据传播与治理
+
+- [CDC、Transactional Outbox 与可靠事件传播](/database/cdc-transactional-outbox-reliable-events)
+- [数据质量、跨系统对账与安全修复](/database/data-quality-reconciliation-safe-repair)
+- [大规模数据回填、批处理与断点续跑](/database/large-scale-backfills-batching-checkpoints)
+
+适合：数据库变化需要可靠传播到消息、搜索、缓存或其他系统，或者已有大量存量数据需要修复时。
+
+### Redis 按需进阶
+
+- [Redis 与缓存专题分层导航](/database/redis/)
+- [缓存穿透、击穿、雪崩与热点治理](/database/redis/cache-penetration-breakdown-avalanche)
+- [TTL、内存淘汰、大 key 与热 key 治理](/database/redis/ttl-memory-eviction-big-hot-keys)
+- [客户端连接、超时、重试与优雅停机](/database/redis/client-connections-timeouts-retries-shutdown)
+
+适合：Redis 已进入真实请求链路，并出现热点、容量或客户端稳定性问题时。
+
+## 第三层：架构与运维参考
+
+以下内容是参考手册。除非正在处理对应问题，否则只需知道它们存在：
+
+### 数据规模和分布式架构
+
+- [分区表、数据生命周期与归档](/database/partitioning-data-lifecycle-archiving)
+- [分库分表、路由键与全局一致性](/database/sharding-routing-global-consistency)
+- [数据库容量规划、SLO 与压测](/database/capacity-planning-slo-load-testing)
+- [数据库技术选型、架构评审与演进决策](/database/technology-selection-architecture-review-evolution)
+
+### 生产运维与升级
+
+- [数据库事故响应、故障切换与复盘](/database/incident-response-failover-postmortem)
+- [数据库版本升级、兼容性与回退设计](/database/version-upgrades-compatibility-rollback)
+
+### 专门数据模型与数据库端能力
+
+- [时间语义、历史版本与时态数据建模](/database/time-semantics-history-temporal-modeling)
+- [数据库函数、存储过程、触发器与任务调度](/database/functions-procedures-triggers-scheduled-jobs)
+
+### Redis 架构与运维参考
+
+- [分布式锁、幂等、计数器与限流](/database/redis/distributed-locks-idempotency-counters-rate-limiting)
+- [List、Pub/Sub 与 Streams 消息模型](/database/redis/lists-pubsub-streams-messaging)
+- [RDB、AOF、复制、Sentinel 与故障转移](/database/redis/persistence-replication-sentinel-failover)
+- [Redis Cluster、分片、hash slot 与多 key 限制](/database/redis/cluster-sharding-hash-slots-multi-key)
+- [安全、ACL、TLS、监控与容量规划](/database/redis/security-observability-capacity-planning)
+
+## 推荐的学习节奏
+
+```text
+阶段 1～4   SQL 读写一个接口
+    ↓
+阶段 5～8   多表查询 + 索引 + 执行计划
+    ↓
+阶段 9～11 事务、并发和表结构
+    ↓
+阶段 12～14 接入真实后端项目并建立迁移、测试
+    ↓
+阶段 15    只为一个明确热点加入 Redis 缓存
+    ↓
+停止主线，继续做项目；遇到问题再进入第二、三层
+```
 
 ## 阶段项目
 
-为用户与权限系统设计数据模型，实现分页查询、事务操作、缓存和慢查询分析。
+使用你熟悉的后端框架实现一个用户、角色与权限系统：
+
+- 设计用户、角色、权限和关联表，并建立候选键、外键和必要索引。
+- 实现带筛选、稳定排序和 keyset/受限分页的用户列表。
+- 在一个事务中创建用户并分配初始角色，失败时整体回滚。
+- 使用真实数据库测试唯一约束、权限关系和并发重复创建。
+- 查看列表接口执行计划，解释扫描、索引和排序。
+- 只选择一个适合缓存的读取接口实现 Cache-Aside，并保留数据库回源。
+
+完成上述项目后，不必继续学习参考专题；先把数据库知识用于其他全栈功能，效果比连续阅读更多高级页面更好。

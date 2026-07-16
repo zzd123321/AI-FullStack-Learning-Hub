@@ -5,8 +5,8 @@ prev:
   text: 数据类型、NULL、默认值与约束
   link: /database/data-types-defaults-and-constraints
 next:
-  text: 多表关系与 JOIN
-  link: /database/relationships-and-joins
+  text: 安全写入数据：INSERT、UPDATE、DELETE 与幂等边界
+  link: /database/safe-insert-update-delete
 ---
 
 # 从列表接口到可靠 SELECT：筛选、排序与分页

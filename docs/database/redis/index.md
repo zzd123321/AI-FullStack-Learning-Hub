@@ -1,9 +1,9 @@
 ---
 title: Redis 与缓存
-description: 从 Redis 数据结构走向缓存一致性、并发协调、消息流、持久化、集群和性能治理
+description: 面向全栈工程师的 Redis 两课入门路线，以及按需查阅的并发、消息、高可用与集群专题
 prev:
-  text: 从业务需求到表结构：实体、关系、范式与约束
-  link: /database/database-design-and-normalization
+  text: 数据库测试、测试数据与 CI 发布门禁
+  link: /database/testing-test-data-ci-release-gates
 next:
   text: Redis 基础与核心数据类型
   link: /database/redis/fundamentals-and-data-types
@@ -11,82 +11,125 @@ next:
 
 # Redis 与缓存
 
-Redis 不只是给 SQL 查询加速的键值缓存。它同时提供内存数据结构、原子命令、过期机制、消息流、持久化、复制与集群能力。不同能力解决的问题不同，也带来不同的一致性、容量和故障边界。
+Redis 专题共有多篇生产实践文档，但**全栈主线只要求前两课**。其余页面用于出现缓存热点、分布式协调、消息、高可用或集群需求时查阅。
 
-本专题从后端接口视角出发：先学会选择数据类型和原子命令，再设计数据库与缓存之间的一致性，最后进入分布式协调、消息处理和生产运维。
+::: tip Redis 学习停止点
+掌握核心数据类型和 Cache-Aside 后即可停止 Redis 主线。不要为了“学完 Redis”提前引入分布式锁、Streams、Sentinel 或 Cluster。
+:::
 
-## 为什么独立成专题
-
-关系数据库的核心问题是长期保存事实、约束关系和支持事务查询；Redis 的核心问题则是按键组织内存状态，并在低延迟、容量、过期与故障之间取舍。
-
-把 Redis 只作为数据库章节中的几个命令，会漏掉以下工程问题：
-
-- 缓存与 MySQL/PostgreSQL 谁是真相来源。
-- 更新数据库后，缓存删除或更新失败怎么办。
-- 热点键过期时，如何避免大量请求同时回源。
-- Redis 超时后重试写命令会不会产生重复副作用。
-- 分布式锁怎样验证持有者、续期和释放。
-- Stream 消费确认后，业务数据库写入失败怎么办。
-- 内存淘汰、RDB、AOF、复制、Sentinel 和 Cluster 分别解决什么。
-
-因此，本专题既讲命令，也讲数据生命周期、并发协议和故障恢复。
-
-## 学习路线
-
-1. Redis 基础、键空间与核心数据类型。
-2. Cache-Aside、读写路径与缓存一致性。
-3. 缓存穿透、击穿、雪崩与热点治理。
-4. 分布式锁、幂等、计数器和限流。
-5. List、Pub/Sub 与 Streams 消息模型。
-6. TTL、内存淘汰、大键与热键治理。
-7. RDB、AOF、复制、Sentinel 与故障转移。
-8. Redis Cluster、分片、hash slot 与多键限制。
-9. 安全、ACL、TLS、监控与容量规划。
-10. 客户端连接、超时、重试与优雅停机。
-
-课程会逐步补充；每一课都明确哪些数据可丢失、哪些操作具备原子性，以及 Redis 不可用时接口如何处理。
-
-## 当前课程
-
-- [Redis 基础与核心数据类型](/database/redis/fundamentals-and-data-types)
-- [Cache-Aside 与缓存一致性](/database/redis/cache-aside-and-consistency)
-- [缓存穿透、击穿、雪崩与热点治理](/database/redis/cache-penetration-breakdown-avalanche)
-- [分布式锁、幂等、计数器与限流](/database/redis/distributed-locks-idempotency-counters-rate-limiting)
-- [List、Pub/Sub 与 Streams 消息模型](/database/redis/lists-pubsub-streams-messaging)
-- [TTL、内存淘汰、大 key 与热 key 治理](/database/redis/ttl-memory-eviction-big-hot-keys)
-- [RDB、AOF、复制、Sentinel 与故障转移](/database/redis/persistence-replication-sentinel-failover)
-- [Redis Cluster、分片、hash slot 与多 key 限制](/database/redis/cluster-sharding-hash-slots-multi-key)
-- [安全、ACL、TLS、监控与容量规划](/database/redis/security-observability-capacity-planning)
-- [客户端连接、超时、重试与优雅停机](/database/redis/client-connections-timeouts-retries-shutdown)
-
-前两课从数据结构走到 Cache-Aside 与一致性；第三至五课处理缓存故障、分布式协调和消息交付；第六至九课进入内存治理、持久化、高可用、Cluster、安全与容量规划；第十课回到应用进程，完整串联连接、截止时间、结果不确定性、拓扑刷新和停机。十课共同组成 Redis 生产基础路线，每一课都明确原子性、数据丢失和故障恢复边界。
-
-## 与数据库主线的关系
+## Redis 与关系数据库的分工
 
 ```text
-MySQL / PostgreSQL：业务事实、约束、事务、复杂查询
-             ↓ 读取或变更后派生
-Redis：缓存副本、临时状态、计数、排序、协调与消息流
-             ↓ 失效、过期、淘汰或故障
-应用：回源、降级、重试、幂等与可观测性
+MySQL / PostgreSQL：长期业务事实、关系、约束和事务
+             ↓ 按明确读取需求派生
+Redis：可过期、可淘汰、可重建的缓存或临时状态
+             ↓ 未命中、过期或不可用
+应用：安全回源数据库、限流或受控降级
 ```
 
-最常见架构仍是关系数据库作为真相来源，Redis 保存可过期、可重建的派生数据。Redis 也可以承担主存储角色，但那需要单独证明持久化、复制、备份、恢复与数据约束满足业务目标。
+最常见的全栈项目中，关系数据库仍是真相来源，Redis 只是性能和临时状态工具。如果一个功能不用 Redis 也能满足延迟和容量目标，就不必为了技术栈完整而加入它。
+
+## 第一层：全栈必修，两课结束
+
+### 1. Redis 基础与核心数据类型
+
+- [Redis 基础与核心数据类型](/database/redis/fundamentals-and-data-types)
+
+重点掌握：
+
+- Redis 以 key 组织内存数据，不提供关系数据库同等的关系约束。
+- String、Hash、Set、Sorted Set 的基本选择方法。
+- TTL 表示逻辑过期，不是精确定时任务。
+- 单命令原子性、pipeline 和 MULTI/EXEC 的基本边界。
+- value 大小、无界集合和危险全量命令的风险。
+
+第一次学习可略读 List、Pub/Sub、Stream、模块和复杂并发协议。
+
+### 2. Cache-Aside 与缓存一致性
+
+- [Cache-Aside 与缓存一致性](/database/redis/cache-aside-and-consistency)
+
+重点掌握：
+
+- 读路径：查缓存 → miss 后查数据库 → 回填缓存。
+- 写路径：先提交数据库，再失效缓存。
+- 缓存只保存已脱敏、可重建的数据。
+- Redis 不可用时有界回源，不能无限重试或压垮数据库。
+- TTL、失效和并发竞态意味着缓存通常不是强一致事实。
+
+完成这两课后，能为一个热点读取接口安全加入缓存，就已经满足普通全栈项目需要。
+
+## 第二层：后端按需进阶
+
+### 缓存故障与热点
+
+- [缓存穿透、击穿、雪崩与热点治理](/database/redis/cache-penetration-breakdown-avalanche)
+- [TTL、内存淘汰、大 key 与热 key 治理](/database/redis/ttl-memory-eviction-big-hot-keys)
+
+什么时候学：出现大量无效查询、热点 key 同时过期、内存淘汰、单 key 过大或单分片过热时。
+
+### 客户端稳定性
+
+- [客户端连接、超时、重试与优雅停机](/database/redis/client-connections-timeouts-retries-shutdown)
+
+什么时候学：Redis 已进入生产请求链路，需要处理连接、deadline、拓扑变化、结果不确定性和进程停机时。
+
+## 第三层：架构与运维参考
+
+### 分布式协调
+
+- [分布式锁、幂等、计数器与限流](/database/redis/distributed-locks-idempotency-counters-rate-limiting)
+
+只在确实需要跨进程协调时阅读。普通数据库事务不需要 Redis 锁；能用唯一约束、条件更新或数据库锁解决时优先使用数据库。
+
+### 消息能力
+
+- [List、Pub/Sub 与 Streams 消息模型](/database/redis/lists-pubsub-streams-messaging)
+
+只在评估轻量队列、通知或 Stream 消费时阅读。Redis 消息能力不能自动替代成熟消息系统，也不能让业务数据库写入与消息确认原子提交。
+
+### 持久化与高可用
+
+- [RDB、AOF、复制、Sentinel 与故障转移](/database/redis/persistence-replication-sentinel-failover)
+
+适合自运维 Redis 或 Redis 中存在不可轻易丢失状态的团队。只使用托管缓存的全栈开发者先知道 RPO、故障切换和数据丢失窗口即可。
+
+### Cluster 与分片
+
+- [Redis Cluster、分片、hash slot 与多 key 限制](/database/redis/cluster-sharding-hash-slots-multi-key)
+
+只在单实例/主从容量不够，或项目已经使用 Cluster 时阅读。不要为小型项目提前设计 hash tag 和跨 slot 协议。
+
+### 安全与容量
+
+- [安全、ACL、TLS、监控与容量规划](/database/redis/security-observability-capacity-planning)
+
+适合平台、运维和生产 owner 查阅。应用开发者需要掌握不暴露 Redis、使用 TLS/ACL、最小权限和基本延迟/内存监控，不必一次理解完整容量模型。
+
+## 如何判断要不要用 Redis
+
+先回答：
+
+1. 当前接口的瓶颈是否真的在重复数据库读取？
+2. 正确索引、减少返回字段和消除 N+1 后是否已经达标？
+3. 数据允许陈旧多久，缓存错了能否安全回源？
+4. Redis 不可用时，系统应回源、降级还是拒绝？
+5. 缓存收益是否覆盖连接、序列化、失效、监控和故障复杂度？
+
+无法回答时，先不加缓存。缓存是数据副本，会增加一种需要治理的一致性状态。
 
 ## 学习约定
 
-- 示例只使用 `learning` 前缀，不操作其他业务键。
-- 写入示例设置短 TTL，不使用 FLUSH、全量删除或生产配置修改。
-- 不把 KEYS、无界集合读取和长脚本放进正常请求路径。
-- 不把 Redis 的 MULTI/EXEC 描述成关系数据库式事务。
+- 示例只使用 `learning` 前缀，不操作其他业务 key。
+- 写入示例设置短 TTL，不使用 `FLUSH*`、生产配置修改或无界删除。
+- 不把 `KEYS`、无界集合读取和长脚本放进正常请求路径。
+- 不把 Redis 的 MULTI/EXEC 描述成关系数据库式回滚事务。
 - 涉及并发协议时，明确超时、重试、幂等和部分成功。
 - 涉及运维配置时，以目标 Redis 版本和官方资料为准。
 
 ## 建议环境
 
-使用独立本地学习实例或专用测试实例，不连接共享生产 Redis。客户端使用与服务端版本匹配的 redis-cli；应用代码则使用支持连接池、超时、TLS、ACL 和 Cluster 拓扑的成熟客户端。
-
-不要把认证密码直接写进示例文件、Shell 历史或仓库。需要连接远端测试实例时，通过安全配置和密钥注入提供凭据。
+使用独立本地学习实例或专用测试实例，不连接共享生产 Redis。数据库凭据、Redis 密码和 TLS key 不写入示例、Shell 历史或仓库。
 
 ## 官方入口
 

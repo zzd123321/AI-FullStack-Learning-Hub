@@ -2,11 +2,8 @@
 title: 数据质量、跨系统对账与安全修复
 description: 从业务不变量、可信快照和确定性摘要出发，设计可扩展的跨系统对账，并以版本条件、幂等和审计门禁安全修复差异
 prev:
-  text: 数据库版本升级、兼容性与回退设计
-  link: /database/version-upgrades-compatibility-rollback
-next:
-  text: 数据库技术选型、架构评审与演进决策
-  link: /database/technology-selection-architecture-review-evolution
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # 数据质量、跨系统对账与安全修复

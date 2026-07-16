@@ -2,11 +2,8 @@
 title: 分库分表、路由键与全局一致性
 description: 从单库瓶颈推导分片边界，理解路由键、热点、跨分片查询与事务、全局 ID、扩容迁移、拓扑版本和故障恢复
 prev:
-  text: 分区表、数据生命周期与归档
-  link: /database/partitioning-data-lifecycle-archiving
-next:
-  text: 备份、时间点恢复与灾难演练
-  link: /database/backup-pitr-disaster-recovery
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # 分库分表、路由键与全局一致性

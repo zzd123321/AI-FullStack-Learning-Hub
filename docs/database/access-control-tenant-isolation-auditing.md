@@ -2,11 +2,8 @@
 title: 数据库权限、租户隔离与审计
 description: 从接口身份到数据库角色建立最小权限，理解凭据、TLS、SQL 注入、PostgreSQL RLS、MySQL 行级隔离边界、审计、敏感数据和 break-glass
 prev:
-  text: 数据库变更、在线 DDL 与安全发布
-  link: /database/schema-migrations-online-ddl
-next:
-  text: 数据库容量规划、SLO 与压测
-  link: /database/capacity-planning-slo-load-testing
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # 数据库权限、租户隔离与审计

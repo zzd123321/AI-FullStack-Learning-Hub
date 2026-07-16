@@ -2,8 +2,8 @@
 title: 数据库全文检索、相关度与搜索架构
 description: 从搜索需求分类到分词、倒排索引、相关度、分页、质量评测与外部搜索同步，建立可验证的搜索接口
 prev:
-  text: JSON 与半结构化数据建模
-  link: /database/json-semi-structured-data-modeling
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # 数据库全文检索、相关度与搜索架构

@@ -2,11 +2,8 @@
 title: 数据库技术选型、架构评审与演进决策
 description: 从接口工作负载、数据所有权和非功能约束出发，以硬门槛、实测证据、总拥有成本与退出路径完成数据库选型和架构演进
 prev:
-  text: 数据质量、跨系统对账与安全修复
-  link: /database/data-quality-reconciliation-safe-repair
-next:
-  text: CDC、Transactional Outbox 与可靠事件传播
-  link: /database/cdc-transactional-outbox-reliable-events
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # 数据库技术选型、架构评审与演进决策

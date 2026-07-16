@@ -2,11 +2,8 @@
 title: 数据库性能诊断：从慢接口到根因
 description: 从接口 SLO 和调用链开始，用 MySQL Performance Schema、PostgreSQL 统计视图、执行计划、等待事件与锁证据建立可重复的性能诊断方法
 prev:
-  text: 客户端连接、超时、重试与优雅停机
-  link: /database/redis/client-connections-timeouts-retries-shutdown
-next:
-  text: SQL 与索引优化实战
-  link: /database/sql-and-index-optimization
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # 数据库性能诊断：从慢接口到根因

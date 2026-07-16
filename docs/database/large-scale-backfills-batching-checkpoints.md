@@ -2,11 +2,8 @@
 title: 大规模数据回填、批处理与断点续跑
 description: 为历史数据补列、重算派生值或重建读模型时，使用稳定水位、短事务、条件写、持久断点、自适应限速和不变量验证控制生产风险
 prev:
-  text: CDC、Transactional Outbox 与可靠事件传播
-  link: /database/cdc-transactional-outbox-reliable-events
-next:
-  text: 数据库测试、测试数据与 CI 发布门禁
-  link: /database/testing-test-data-ci-release-gates
+  text: 数据库分层导航
+  link: /database/
 ---
 
 # 大规模数据回填、批处理与断点续跑
