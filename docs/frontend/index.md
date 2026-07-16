@@ -90,3 +90,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [PWA、Service Worker、后台同步与离线应用架构](/frontend/architecture/pwa-service-worker-background-sync-and-offline-application-architecture)
 - [Web Push、通知权限与后台消息架构](/frontend/architecture/web-push-notification-permission-and-background-messaging-architecture)
 - [WebView、Electron 与跨端前端架构](/frontend/architecture/webview-electron-and-cross-platform-frontend-architecture)
+- [前端权限、设备能力与隐私工程架构](/frontend/architecture/frontend-permissions-device-capabilities-and-privacy-engineering)
