@@ -31,6 +31,7 @@ HTTP API 合同
 6. [弹性治理：deadline、重试、熔断、隔离、限流与过载保护](/backend/architecture/resilience-deadline-retry-circuit-breaker-bulkhead-rate-limit-and-overload)
 7. [API Gateway、服务发现、健康检查与配置治理](/backend/architecture/api-gateway-service-discovery-health-and-configuration)
 8. [微服务边界、模块化单体与渐进式演进](/backend/architecture/microservice-boundaries-modular-monolith-and-evolution)
+9. [容量规划、SLO、可用性与灾难恢复](/backend/architecture/capacity-slo-availability-and-disaster-recovery)
 
 后续课程将在本目录继续追加。课程不把某个框架的默认行为冒充 HTTP 标准；关键语义优先依据 IETF RFC、IANA 和 OpenAPI 官方规范，并用 Spring Boot/FastAPI 的实现经验对照。
 
