@@ -1,0 +1,43 @@
+@layer reset, tokens, base, layout, components, utilities, overrides;
+
+@layer reset {
+  *, *::before, *::after { box-sizing: border-box; }
+  body, h1, h2, h3, p, ul { margin: 0; }
+  ul { padding: 0; list-style: none; }
+  img, picture, svg { display: block; max-inline-size: 100%; }
+  button, input, select { font: inherit; }
+}
+
+@layer tokens {
+  :root {
+    color-scheme: light dark;
+    --color-canvas: light-dark(#f7f8fa, #111318);
+    --color-surface: light-dark(#ffffff, #1c2028);
+    --color-text: light-dark(#20242c, #f4f6fa);
+    --color-muted: light-dark(#5d6573, #b9c0cc);
+    --color-border: light-dark(#d7dce4, #3b4350);
+    --color-accent: light-dark(#2457d6, #8cabff);
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-6: 1.5rem;
+    --space-8: 2rem;
+    --radius: 0.75rem;
+    --content-max: 75rem;
+    --focus-ring: 0 0 0 0.2rem color-mix(in srgb, var(--color-accent), transparent 35%);
+  }
+
+  :root[data-theme='light'] { color-scheme: light; }
+  :root[data-theme='dark'] { color-scheme: dark; }
+}
+
+@layer base {
+  html { font-family: system-ui, sans-serif; line-height: 1.5; }
+  body { min-block-size: 100dvb; color: var(--color-text); background: var(--color-canvas); }
+  h1 { font-size: clamp(2rem, 1.5rem + 2vi, 3.5rem); line-height: 1.1; }
+  h2 { font-size: clamp(1.35rem, 1.2rem + 0.7vi, 1.8rem); }
+  a { color: var(--color-accent); text-underline-offset: 0.18em; }
+  button, input, select { min-block-size: 2.75rem; border: 1px solid var(--color-border); border-radius: 0.5rem; }
+  button { padding-inline: var(--space-4); color: white; background: #2457d6; cursor: pointer; }
+}

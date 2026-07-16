@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>课程管理台</title>
+  <link rel="stylesheet" href="./layers-and-tokens.css">
+  <link rel="stylesheet" href="./responsive-dashboard.css">
+  <link rel="stylesheet" href="./accessible-interactions.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="AI 全栈学习站首页">AI 全栈学习站</a>
+    <nav aria-label="主导航">
+      <ul class="nav-list">
+        <li><a href="/courses" aria-current="page">课程</a></li>
+        <li><a href="/progress">学习进度</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main-content" class="page-shell" tabindex="-1">
+    <header class="page-heading">
+      <div>
+        <p class="eyebrow">课程管理</p>
+        <h1>前端课程</h1>
+      </div>
+      <button type="button">新建课程</button>
+    </header>
+
+    <section aria-labelledby="filters-title">
+      <h2 id="filters-title">筛选课程</h2>
+      <form class="filter-form" role="search">
+        <div class="field">
+          <label for="keyword">关键词</label>
+          <input id="keyword" name="keyword" type="search" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="status">状态</label>
+          <select id="status" name="status">
+            <option value="">全部</option>
+            <option value="published">已发布</option>
+            <option value="draft">草稿</option>
+          </select>
+        </div>
+        <button type="submit">查询</button>
+      </form>
+    </section>
+
+    <section aria-labelledby="results-title">
+      <div class="section-heading">
+        <h2 id="results-title">查询结果</h2>
+        <p aria-live="polite"><strong>2</strong> 门课程</p>
+      </div>
+      <ul class="course-grid" aria-label="课程列表">
+        <li class="course-card">
+          <article>
+            <div class="course-card__body">
+              <p class="badge">已发布</p>
+              <h3><a href="/courses/typescript">TypeScript 类型系统</a></h3>
+              <p>从运行时 JavaScript 逐步建立可靠的静态契约。</p>
+            </div>
+            <footer><time datetime="2026-07-16">2026 年 7 月 16 日更新</time></footer>
+          </article>
+        </li>
+        <li class="course-card">
+          <article>
+            <div class="course-card__body">
+              <p class="badge">草稿</p>
+              <h3><a href="/courses/css">现代 UI 工程</a></h3>
+              <p>用语义 HTML、现代 CSS 和可访问性构建自适应界面。</p>
+            </div>
+            <footer><time datetime="2026-07-15">2026 年 7 月 15 日更新</time></footer>
+          </article>
+        </li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
