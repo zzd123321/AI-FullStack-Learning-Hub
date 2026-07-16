@@ -272,7 +272,7 @@ uvicorn observable_api.app:app --reload
 - TestClient 验证 application，不验证 proxy、socket、多 worker 与 production latency。
 - 可观测性的终点是 SLO、告警、runbook 和改进决策，不是收集最多数据。
 
-下一节建议：后台任务、消息队列、幂等、重试、outbox 与 WebSocket/SSE 实时通信。
+下一节：[后台任务、消息队列、幂等、重试、Transactional Outbox 与 SSE](/backend/fastapi/background-tasks-queues-idempotency-retries-outbox-and-sse)。
 
 ## 21. 参考资料
 
