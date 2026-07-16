@@ -82,8 +82,9 @@ description: 从 SQL 基础走向事务、索引、缓存和数据架构
 - [时间语义、历史版本与时态数据建模](/database/time-semantics-history-temporal-modeling)
 - [数据库函数、存储过程、触发器与任务调度](/database/functions-procedures-triggers-scheduled-jobs)
 - [ORM、数据库驱动与 Repository 边界](/database/orm-drivers-repository-boundaries)
+- [JSON 与半结构化数据建模](/database/json-semi-structured-data-modeling)
 
-从端到端接口延迟出发，使用工作负载聚合、执行计划、等待事件和锁证据定位瓶颈，再逐步进入 SQL、索引、连接、容量、分区、读写分离、分库分表、跨系统数据正确性治理、架构决策、可靠事件传播、在线回填、测试门禁、派生读模型、历史时间线、数据库端逻辑与应用数据访问边界。
+从端到端接口延迟出发，使用工作负载聚合、执行计划、等待事件和锁证据定位瓶颈，再逐步进入 SQL、索引、连接、容量、分区、读写分离、分库分表、跨系统数据正确性治理、架构决策、可靠事件传播、在线回填、测试门禁、派生读模型、历史时间线、数据库端逻辑、应用数据访问边界与半结构化数据治理。
 
 ## 阶段项目
 
