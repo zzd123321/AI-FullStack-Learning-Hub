@@ -405,7 +405,7 @@ Promise 没有 Python `CancelledError` 相同的自动注入语义；JavaScript 
 - 背压必须从慢 client 穿过有界 queue 传到模型 scheduler；否则只是把压力藏进 memory。
 - semaphore 是安全阀，不是 token-aware batching scheduler；生产推理运行时仍需专门调度。
 
-下一节建议：FastAPI 部署拓扑、容器、反向代理、多 worker、配置、迁移、健康检查与优雅停机。
+下一节：[FastAPI 部署拓扑、容器、多 Worker、代理、迁移、健康检查与优雅停机](/backend/fastapi/deployment-topology-containers-workers-proxies-migrations-health-and-graceful-shutdown)。
 
 ## 23. 参考资料
 
