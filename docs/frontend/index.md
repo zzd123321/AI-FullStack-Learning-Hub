@@ -93,3 +93,4 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [前端权限、设备能力与隐私工程架构](/frontend/architecture/frontend-permissions-device-capabilities-and-privacy-engineering)
 - [Web Worker、SharedWorker、WebAssembly 与前端计算架构](/frontend/architecture/web-worker-sharedworker-webassembly-and-frontend-compute-architecture)
 - [前端身份认证、会话、Token 与授权架构](/frontend/architecture/frontend-authentication-session-token-and-authorization-architecture)
+- [前端支付、结算与高风险交易交互架构](/frontend/architecture/frontend-payment-checkout-and-high-risk-transaction-architecture)
