@@ -520,7 +520,7 @@ Session object state、SQL emission 和 database effects 不一致。明确 owne
 - ORM cascade 描述 Session 行为，ON DELETE 描述数据库行为；`passive_deletes` 协调两者。
 - 结论应由 statement count、独立 Sessions、constraint 和最终 database state 测试证明。
 
-下一节建议：FastAPI 身份认证、密码存储、JWT/session、授权模型与常见 Web 安全边界。
+下一节：[FastAPI 身份认证、密码存储、JWT、Session、授权与 Web 安全](/backend/fastapi/password-jwt-session-authorization-and-web-security)。
 
 ## 29. 参考资料
 
