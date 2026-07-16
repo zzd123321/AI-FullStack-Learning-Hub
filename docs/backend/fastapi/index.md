@@ -34,6 +34,7 @@ ASGI 与第一个 API
 7. [后台任务、消息队列、幂等、重试、Transactional Outbox 与 SSE](/backend/fastapi/background-tasks-queues-idempotency-retries-outbox-and-sse)
 8. [AI 推理服务、流式响应、模型生命周期、容量、超时、取消与背压](/backend/fastapi/ai-inference-streaming-model-lifecycle-capacity-timeout-cancellation-and-backpressure)
 9. [部署拓扑、容器、多 Worker、代理、迁移、健康检查与优雅停机](/backend/fastapi/deployment-topology-containers-workers-proxies-migrations-health-and-graceful-shutdown)
+10. [后端架构、分层、模块边界、领域模型、Repository、事件、缓存与演进](/backend/fastapi/backend-architecture-layers-modules-domain-repository-events-cache-and-evolution)
 
 后续课程将在本目录继续追加。配套源码统一放在 `examples/python/fastapi-*`，课程页面使用 VitePress 源文件导入展示完整代码。
 
