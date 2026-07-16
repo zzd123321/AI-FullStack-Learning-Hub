@@ -14,8 +14,7 @@ FastAPI 专题建立在 Python 对象模型、异常、类型提示、测试与 
 
 ```text
 ASGI 与第一个 API
-  → 参数绑定、Pydantic 与统一错误响应
-  → 依赖注入、配置和模块化路由
+  → 参数绑定、Pydantic、依赖注入、配置和模块化路由
   → SQL 数据访问、事务和迁移
   → 认证、授权与 Web 安全
   → 测试、日志、指标和追踪
@@ -27,6 +26,7 @@ ASGI 与第一个 API
 ## 课程目录
 
 1. [ASGI、应用生命周期、路由、请求验证与第一个 API](/backend/fastapi/asgi-lifespan-routing-validation-and-first-api)
+2. [参数绑定、Annotated、Pydantic、依赖注入、配置与模块化路由](/backend/fastapi/annotated-pydantic-dependencies-settings-and-modular-routing)
 
 后续课程将在本目录继续追加。配套源码统一放在 `examples/python/fastapi-*`，课程页面使用 VitePress 源文件导入展示完整代码。
 
