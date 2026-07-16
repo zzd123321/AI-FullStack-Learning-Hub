@@ -322,7 +322,7 @@ curl -N http://127.0.0.1:8000/api/v1/events \
 - 重试必须建立在错误分类、幂等、退避、jitter、上限与终止态之上。
 - SSE 是实时交付协议；`id` 与 `Last-Event-ID` 支持续传，但持久历史、授权和过期策略仍由应用负责。
 
-下一节建议：AI 推理服务、流式响应、模型生命周期、并发容量、取消、超时与背压。
+下一节：[AI 推理服务、流式响应、模型生命周期、容量、超时、取消与背压](/backend/fastapi/ai-inference-streaming-model-lifecycle-capacity-timeout-cancellation-and-backpressure)。
 
 ## 16. 参考资料
 

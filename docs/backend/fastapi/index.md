@@ -32,6 +32,7 @@ ASGI 与第一个 API
 5. [身份认证、密码存储、JWT、Session、授权与 Web 安全](/backend/fastapi/password-jwt-session-authorization-and-web-security)
 6. [测试、结构化日志、Metrics、Tracing 与生产可观测性](/backend/fastapi/testing-structured-logging-metrics-tracing-and-observability)
 7. [后台任务、消息队列、幂等、重试、Transactional Outbox 与 SSE](/backend/fastapi/background-tasks-queues-idempotency-retries-outbox-and-sse)
+8. [AI 推理服务、流式响应、模型生命周期、容量、超时、取消与背压](/backend/fastapi/ai-inference-streaming-model-lifecycle-capacity-timeout-cancellation-and-backpressure)
 
 后续课程将在本目录继续追加。配套源码统一放在 `examples/python/fastapi-*`，课程页面使用 VitePress 源文件导入展示完整代码。
 
