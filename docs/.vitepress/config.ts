@@ -162,7 +162,9 @@ export default defineConfig({
             { text: 'Vite 开发服务器、模块图、插件与生产构建', link: '/frontend/engineering/vite-dev-server-module-graph-plugins-and-production-build' },
             { text: '代码质量与 CI 门禁', link: '/frontend/engineering/code-quality-eslint-prettier-typescript-git-hooks-and-ci-gates' },
             { text: '前端测试工程化', link: '/frontend/engineering/frontend-testing-unit-component-e2e-and-reliability' },
-            { text: '前端性能工程：Core Web Vitals、RUM 与预算', link: '/frontend/engineering/frontend-performance-core-web-vitals-rum-and-budgets' }
+            { text: '前端性能工程：Core Web Vitals、RUM 与预算', link: '/frontend/engineering/frontend-performance-core-web-vitals-rum-and-budgets' },
+            { text: '现代 HTML、CSS、响应式与无障碍 UI 工程', link: '/frontend/engineering/modern-html-css-responsive-and-accessible-ui-engineering' },
+            { text: '包管理、模块发布、Monorepo 与依赖治理', link: '/frontend/engineering/package-management-module-publishing-monorepo-and-dependency-governance' }
           ]
         }, {
           text: '前端架构', collapsed: false, items: [
@@ -177,7 +179,16 @@ export default defineConfig({
             { text: '文件上传、媒体资源与大文件传输架构', link: '/frontend/architecture/frontend-file-upload-media-assets-and-large-file-transfer-architecture' },
             { text: 'PWA、Service Worker、后台同步与离线应用架构', link: '/frontend/architecture/pwa-service-worker-background-sync-and-offline-application-architecture' },
             { text: 'Web Push、通知权限与后台消息架构', link: '/frontend/architecture/web-push-notification-permission-and-background-messaging-architecture' },
-            { text: 'WebView、Electron 与跨端前端架构', link: '/frontend/architecture/webview-electron-and-cross-platform-frontend-architecture' }
+            { text: 'WebView、Electron 与跨端前端架构', link: '/frontend/architecture/webview-electron-and-cross-platform-frontend-architecture' },
+            { text: '权限、设备能力与隐私工程', link: '/frontend/architecture/frontend-permissions-device-capabilities-and-privacy-engineering' },
+            { text: 'Web Worker、SharedWorker、WebAssembly 与前端计算架构', link: '/frontend/architecture/web-worker-sharedworker-webassembly-and-frontend-compute-architecture' },
+            { text: '认证、会话、令牌与授权架构', link: '/frontend/architecture/frontend-authentication-session-token-and-authorization-architecture' },
+            { text: '支付、结算与高风险交易架构', link: '/frontend/architecture/frontend-payment-checkout-and-high-risk-transaction-architecture' },
+            { text: '多租户、权限与企业后台架构', link: '/frontend/architecture/frontend-multi-tenant-permission-and-enterprise-admin-architecture' },
+            { text: '复杂表单、审批工作流与低代码架构', link: '/frontend/architecture/frontend-complex-forms-approval-workflow-and-low-code-architecture' },
+            { text: '搜索、筛选、排序与数据查询体验架构', link: '/frontend/architecture/frontend-search-filter-sort-and-data-query-experience-architecture' },
+            { text: '数据导入导出、报表与大型异步任务架构', link: '/frontend/architecture/frontend-data-import-export-reporting-and-large-async-job-architecture' },
+            { text: '富文本编辑器、内容模型与安全发布架构', link: '/frontend/architecture/frontend-rich-text-editor-content-model-and-secure-publishing-architecture' }
           ]
         }
       ],
@@ -262,7 +273,22 @@ export default defineConfig({
         {
           text: 'FastAPI', collapsed: false, items: [
             { text: '专题首页', link: '/backend/fastapi/' },
-            { text: 'ASGI、Lifespan、路由、校验与第一个 API', link: '/backend/fastapi/asgi-lifespan-routing-validation-and-first-api' }
+            { text: 'ASGI、Lifespan、路由、校验与第一个 API', link: '/backend/fastapi/asgi-lifespan-routing-validation-and-first-api' },
+            { text: 'Annotated、Pydantic、依赖、配置与模块化路由', link: '/backend/fastapi/annotated-pydantic-dependencies-settings-and-modular-routing' },
+            { text: 'SQLAlchemy Session、事务、Repository 与 Alembic', link: '/backend/fastapi/sqlalchemy-session-transactions-repository-and-alembic' },
+            { text: 'SQLAlchemy 关联、加载、并发更新与隔离', link: '/backend/fastapi/sqlalchemy-relationships-loading-updates-concurrency-and-isolation' },
+            { text: '密码、JWT、Session、授权与 Web 安全', link: '/backend/fastapi/password-jwt-session-authorization-and-web-security' },
+            { text: '测试、结构化日志、指标、追踪与可观测性', link: '/backend/fastapi/testing-structured-logging-metrics-tracing-and-observability' },
+            { text: '后台任务、队列、幂等、重试、Outbox 与 SSE', link: '/backend/fastapi/background-tasks-queues-idempotency-retries-outbox-and-sse' },
+            { text: 'AI 推理流式输出、模型生命周期、容量与背压', link: '/backend/fastapi/ai-inference-streaming-model-lifecycle-capacity-timeout-cancellation-and-backpressure' },
+            { text: '部署拓扑、容器、Worker、代理、迁移与优雅停机', link: '/backend/fastapi/deployment-topology-containers-workers-proxies-migrations-health-and-graceful-shutdown' },
+            { text: '分层、模块、领域、Repository、事件、缓存与演进', link: '/backend/fastapi/backend-architecture-layers-modules-domain-repository-events-cache-and-evolution' }
+          ]
+        },
+        {
+          text: '后端架构', collapsed: false, items: [
+            { text: '专题首页', link: '/backend/architecture/' },
+            { text: 'HTTP API：资源建模、语义、错误、分页、并发与版本', link: '/backend/architecture/http-api-resource-modeling-semantics-errors-pagination-concurrency-and-versioning' }
           ]
         }
       ],
@@ -315,6 +341,14 @@ export default defineConfig({
             ,{ text: '技术选型、架构评审与演进', link: '/database/technology-selection-architecture-review-evolution' }
             ,{ text: 'CDC、Transactional Outbox 与可靠事件传播', link: '/database/cdc-transactional-outbox-reliable-events' }
             ,{ text: '大规模数据回填、分批与检查点', link: '/database/large-scale-backfills-batching-checkpoints' }
+            ,{ text: '数据库测试、测试数据、CI 与发布门禁', link: '/database/testing-test-data-ci-release-gates' }
+            ,{ text: '视图、物化视图、汇总表与派生读模型', link: '/database/views-materialized-views-summary-read-models' }
+            ,{ text: '时间语义、历史数据与时态建模', link: '/database/time-semantics-history-temporal-modeling' }
+            ,{ text: '函数、存储过程、触发器与定时任务的边界', link: '/database/functions-procedures-triggers-scheduled-jobs' }
+            ,{ text: 'ORM、驱动与 Repository 边界', link: '/database/orm-drivers-repository-boundaries' }
+            ,{ text: 'JSON 与半结构化数据建模', link: '/database/json-semi-structured-data-modeling' }
+            ,{ text: '全文检索、排序与搜索架构', link: '/database/full-text-search-ranking-architecture' }
+            ,{ text: '数据库全栈综合项目', link: '/database/full-stack-capstone' }
           ]
         }
       ],
