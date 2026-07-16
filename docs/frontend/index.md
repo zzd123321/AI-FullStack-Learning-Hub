@@ -5,7 +5,7 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 
 # 前端开发
 
-这条路线不会重复铺陈已经熟悉的 HTML、CSS 和 JavaScript 入门内容，而是优先补齐现代前端所需的类型系统、Vue 3、React、浏览器原理、测试和架构能力。
+这条路线不会重复铺陈已经熟悉的 HTML、CSS 和 JavaScript 入门语法，而是优先补齐现代 UI 工程、类型系统、Vue 3、React、浏览器原理、测试和架构能力。主线课程建议顺序完成；架构模块中的垂直业务专题按实际工作需要选择，不要求为了“学完”逐篇通读。
 
 ## 学习顺序
 
@@ -13,8 +13,8 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 2. **Vue 3**：Composition API、响应式原理、组件与状态管理。
 3. **React**：渲染模型、Hooks、状态管理和应用架构。
 4. **浏览器与网络**：事件循环、渲染流程、HTTP、缓存与安全。
-5. **工程化**：Vite、代码质量、测试、构建与发布。
-6. **性能与架构**：性能指标、模块设计、微前端和可维护性。
+5. **工程化**：现代 HTML/CSS、包管理、Vite、代码质量、测试、性能、构建与发布。
+6. **架构**：先掌握模块边界、可观测性、设计系统与国际化，再按业务选择专项架构。
 
 ## 当前模块
 
@@ -69,6 +69,8 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [浏览器存储、IndexedDB 与离线一致性](/frontend/browser/browser-storage-indexeddb-cache-and-offline-consistency)
 - [浏览器安全模型：XSS、CSRF、CSP 与跨源隔离](/frontend/browser/browser-security-xss-csrf-csp-and-cross-origin-isolation)
 
+完成本模块后，你应该能从浏览器调度、渲染、网络、存储和安全模型解释前端行为，而不是只依赖框架现象排障。
+
 ### 前端工程化
 
 - [现代 HTML/CSS、响应式布局与可访问 UI 工程](/frontend/engineering/modern-html-css-responsive-and-accessible-ui-engineering)
@@ -78,12 +80,23 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [前端测试工程化：单元、组件、集成与端到端测试](/frontend/engineering/frontend-testing-unit-component-e2e-and-reliability)
 - [前端性能工程：Core Web Vitals、RUM 与持续性能预算](/frontend/engineering/frontend-performance-core-web-vitals-rum-and-budgets)
 
+完成本模块后，你应该能建立可复现、可测试、可发布、可观测并具有持续质量门禁的前端交付体系。
+
 ### 前端架构
+
+#### 核心架构（建议按顺序完成）
 
 - [大型前端架构：模块边界、领域分层与微前端](/frontend/architecture/large-scale-frontend-modules-boundaries-and-micro-frontends)
 - [前端可观测性与生产治理：从错误采集到灰度和事故响应](/frontend/architecture/frontend-observability-release-governance-and-incident-response)
 - [前端设计系统与跨框架组件平台](/frontend/architecture/design-system-tokens-accessibility-and-cross-framework-components)
 - [前端国际化与本地化工程](/frontend/architecture/frontend-internationalization-localization-and-rtl-engineering)
+
+完成这四节后，你已经具备大型前端系统的核心架构与生产治理能力。
+
+#### 按需业务专题
+
+下面的课程用于特定产品或平台场景。根据当前业务选择即可；没有相应场景时，了解问题边界和选型原则即可，不必把每个专题都当作主线前置条件。
+
 - [前端数据可视化与复杂交互架构](/frontend/architecture/frontend-data-visualization-rendering-interaction-and-accessibility)
 - [前端实时同步与多人协作架构](/frontend/architecture/frontend-realtime-sync-and-collaboration-architecture)
 - [前端 AI 应用的流式交互、任务状态与生成式 UI 架构](/frontend/architecture/frontend-ai-streaming-task-state-and-generative-ui-architecture)
@@ -101,3 +114,5 @@ description: 从 Vue 2 与 JavaScript 基础走向现代前端工程
 - [前端搜索、筛选、排序与数据查询体验架构](/frontend/architecture/frontend-search-filter-sort-and-data-query-experience-architecture)
 - [前端数据导入、导出、报表与大规模异步任务架构](/frontend/architecture/frontend-data-import-export-reporting-and-large-async-job-architecture)
 - [前端富文本编辑器、内容模型与安全发布架构](/frontend/architecture/frontend-rich-text-editor-content-model-and-secure-publishing-architecture)
+
+至此，前端主线覆盖了从类型系统、框架迁移和浏览器原理，到工程化、性能与大型应用治理的完整链路。后续学习应以真实项目中的薄弱环节和业务场景为驱动，而不是继续无边界增加专题数量。
