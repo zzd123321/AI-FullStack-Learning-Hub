@@ -3,10 +3,10 @@ title: 并发异常与事务隔离级别
 description: 从快照、时间线和业务不变量理解脏读、不可重复读、幻读、丢失更新、写偏差及两库隔离实现
 prev:
   text: 事务与 ACID：从转账接口到原子提交
-  link: /database/transactions-and-acid
+  link: /database/core/transactions-and-acid
 next:
   text: 锁、MVCC 与并发等待
-  link: /database/locks-and-mvcc
+  link: /database/core/locks-and-mvcc
 ---
 
 # 并发异常与事务隔离级别

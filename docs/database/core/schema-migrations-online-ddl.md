@@ -3,10 +3,10 @@ title: 数据库变更、在线 DDL 与安全发布
 description: 使用 expand–migrate–contract 管理应用与 schema 兼容窗口，理解 MySQL online DDL、PostgreSQL concurrent index、锁、回填、约束验证、失败恢复和分片迁移
 prev:
   text: ORM、数据库驱动与 Repository 边界
-  link: /database/orm-drivers-repository-boundaries
+  link: /database/core/orm-drivers-repository-boundaries
 next:
   text: 数据库测试、测试数据与 CI 发布门禁
-  link: /database/testing-test-data-ci-release-gates
+  link: /database/core/testing-test-data-ci-release-gates
 ---
 
 # 数据库变更、在线 DDL 与安全发布

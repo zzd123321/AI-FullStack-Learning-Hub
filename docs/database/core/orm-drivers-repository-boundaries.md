@@ -3,10 +3,10 @@ title: ORM、数据库驱动与 Repository 边界
 description: 从接口到 SQL 建立安全的数据访问层，理解类型映射、参数绑定、prepared statement、事务上下文、加载策略、流式读取和错误契约
 prev:
   text: 从业务需求到表结构：实体、关系、范式与约束
-  link: /database/database-design-and-normalization
+  link: /database/core/database-design-and-normalization
 next:
   text: 数据库变更、在线 DDL 与安全发布
-  link: /database/schema-migrations-online-ddl
+  link: /database/core/schema-migrations-online-ddl
 ---
 
 # ORM、数据库驱动与 Repository 边界

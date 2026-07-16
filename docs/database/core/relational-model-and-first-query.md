@@ -6,7 +6,7 @@ prev:
   link: /database/
 next:
   text: 连接并认识 MySQL 与 PostgreSQL
-  link: /database/mysql-postgresql-basics
+  link: /database/core/mysql-postgresql-basics
 ---
 
 # 关系型数据库、表、行、列、主键与第一个 SQL 查询

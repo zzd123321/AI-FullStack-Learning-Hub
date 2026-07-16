@@ -3,10 +3,10 @@ title: 数据类型、NULL、默认值与约束
 description: 从接口字段设计 MySQL 与 PostgreSQL 表结构，掌握类型选择、缺失值、默认值和完整性约束
 prev:
   text: 连接并认识 MySQL 与 PostgreSQL
-  link: /database/mysql-postgresql-basics
+  link: /database/core/mysql-postgresql-basics
 next:
   text: 从列表接口到可靠 SELECT
-  link: /database/select-filter-sort-pagination
+  link: /database/core/select-filter-sort-pagination
 ---
 
 # 数据类型、NULL、默认值与约束

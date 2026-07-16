@@ -3,10 +3,10 @@ title: 从业务需求到表结构：实体、关系、范式与约束
 description: 学会从接口与业务规则识别实体、主外键和关系，并用 1NF、2NF、3NF 设计可演进的数据模型
 prev:
   text: 锁、MVCC 与并发等待
-  link: /database/locks-and-mvcc
+  link: /database/core/locks-and-mvcc
 next:
   text: ORM、数据库驱动与 Repository 边界
-  link: /database/orm-drivers-repository-boundaries
+  link: /database/core/orm-drivers-repository-boundaries
 ---
 
 # 从业务需求到表结构：实体、关系、范式与约束

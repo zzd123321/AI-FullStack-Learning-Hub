@@ -3,10 +3,10 @@ title: 事务与 ACID：从转账接口到原子提交
 description: 从多步转账写入出发，理解原子性、一致性、隔离性、持久性、自动提交、保存点和外部副作用
 prev:
   text: 读懂执行计划：扫描、连接、排序与实际执行
-  link: /database/reading-query-plans
+  link: /database/core/reading-query-plans
 next:
   text: 并发异常与事务隔离级别
-  link: /database/transaction-isolation-levels
+  link: /database/core/transaction-isolation-levels
 ---
 
 # 事务与 ACID：从转账接口到原子提交

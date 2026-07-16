@@ -3,10 +3,10 @@ title: 锁、MVCC 与并发等待
 description: 从快照读、当前读和行锁理解 MySQL 与 PostgreSQL 的并发控制、死锁及长事务治理
 prev:
   text: 并发异常与事务隔离级别
-  link: /database/transaction-isolation-levels
+  link: /database/core/transaction-isolation-levels
 next:
   text: 从业务需求到表结构：实体、关系、范式与约束
-  link: /database/database-design-and-normalization
+  link: /database/core/database-design-and-normalization
 ---
 
 # 锁、MVCC 与并发等待

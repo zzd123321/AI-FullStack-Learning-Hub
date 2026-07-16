@@ -3,10 +3,10 @@ title: 子查询与 CTE：拆解复杂查询
 description: 从订单筛选与统计接口出发，掌握标量子查询、EXISTS、派生表、相关子查询和递归 CTE
 prev:
   text: 聚合查询：COUNT、SUM、GROUP BY 与 HAVING
-  link: /database/aggregates-group-by-having
+  link: /database/core/aggregates-group-by-having
 next:
   text: 索引如何加速查询：B-Tree、选择性与联合索引
-  link: /database/indexes-and-query-shapes
+  link: /database/core/indexes-and-query-shapes
 ---
 
 # 子查询与 CTE：拆解复杂查询

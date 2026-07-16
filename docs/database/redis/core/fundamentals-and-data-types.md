@@ -6,7 +6,7 @@ prev:
   link: /database/redis/
 next:
   text: Cache-Aside 与缓存一致性
-  link: /database/redis/cache-aside-and-consistency
+  link: /database/redis/core/cache-aside-and-consistency
 ---
 
 # Redis 基础与核心数据类型

@@ -3,10 +3,10 @@ title: 安全写入数据：INSERT、UPDATE、DELETE 与幂等边界
 description: 从创建和修改账号接口出发，掌握受约束写入、影响行数、乐观并发控制、软删除与 UPSERT
 prev:
   text: 从列表接口到可靠 SELECT
-  link: /database/select-filter-sort-pagination
+  link: /database/core/select-filter-sort-pagination
 next:
   text: 多表关系与 JOIN
-  link: /database/relationships-and-joins
+  link: /database/core/relationships-and-joins
 ---
 
 # 安全写入数据：INSERT、UPDATE、DELETE 与幂等边界

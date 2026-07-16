@@ -3,10 +3,10 @@ title: 连接并认识 MySQL 与 PostgreSQL
 description: 从后端连接出发，理解客户端、服务器、会话、数据库与 PostgreSQL schema
 prev:
   text: 关系模型与第一个 SQL 查询
-  link: /database/relational-model-and-first-query
+  link: /database/core/relational-model-and-first-query
 next:
   text: 数据类型、NULL、默认值与约束
-  link: /database/data-types-defaults-and-constraints
+  link: /database/core/data-types-defaults-and-constraints
 ---
 
 # 连接并认识 MySQL 与 PostgreSQL

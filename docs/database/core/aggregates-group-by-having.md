@@ -3,10 +3,10 @@ title: 聚合查询：COUNT、SUM、GROUP BY 与 HAVING
 description: 从订单统计接口出发，掌握聚合函数、分组、条件统计和多表汇总的正确边界
 prev:
   text: 多表关系与 JOIN
-  link: /database/relationships-and-joins
+  link: /database/core/relationships-and-joins
 next:
   text: 子查询与 CTE：拆解复杂查询
-  link: /database/subqueries-and-cte
+  link: /database/core/subqueries-and-cte
 ---
 
 # 聚合查询：COUNT、SUM、GROUP BY 与 HAVING

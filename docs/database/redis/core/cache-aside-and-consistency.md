@@ -3,7 +3,7 @@ title: Cache-Aside 与缓存一致性
 description: 掌握缓存旁路的读写流程、并发回填竞态、提交后失效、TTL、Outbox、CDC、版本控制与降级策略
 prev:
   text: Redis 基础与核心数据类型
-  link: /database/redis/fundamentals-and-data-types
+  link: /database/redis/core/fundamentals-and-data-types
 next:
   text: 返回数据库分层导航（全栈必修主线已完成）
   link: /database/

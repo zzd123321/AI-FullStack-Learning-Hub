@@ -3,10 +3,10 @@ title: 从列表接口到可靠 SELECT：筛选、排序与分页
 description: 把列表接口的查询参数转成安全、稳定、可分页的 MySQL 与 PostgreSQL 查询
 prev:
   text: 数据类型、NULL、默认值与约束
-  link: /database/data-types-defaults-and-constraints
+  link: /database/core/data-types-defaults-and-constraints
 next:
   text: 安全写入数据：INSERT、UPDATE、DELETE 与幂等边界
-  link: /database/safe-insert-update-delete
+  link: /database/core/safe-insert-update-delete
 ---
 
 # 从列表接口到可靠 SELECT：筛选、排序与分页

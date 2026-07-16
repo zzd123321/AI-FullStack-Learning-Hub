@@ -3,7 +3,7 @@ title: 数据库测试、测试数据与 CI 发布门禁
 description: 使用真实数据库引擎、确定性测试数据、迁移矩阵、并发调度、幂等与恢复验证，建立从接口契约到生产发布的数据库 CI 门禁
 prev:
   text: 数据库变更、在线 DDL 与安全发布
-  link: /database/schema-migrations-online-ddl
+  link: /database/core/schema-migrations-online-ddl
 next:
   text: Redis 与缓存分层导航
   link: /database/redis/

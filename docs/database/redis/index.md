@@ -3,15 +3,22 @@ title: Redis 与缓存
 description: 面向全栈工程师的 Redis 两课入门路线，以及按需查阅的并发、消息、高可用与集群专题
 prev:
   text: 数据库测试、测试数据与 CI 发布门禁
-  link: /database/testing-test-data-ci-release-gates
+  link: /database/core/testing-test-data-ci-release-gates
 next:
   text: Redis 基础与核心数据类型
-  link: /database/redis/fundamentals-and-data-types
+  link: /database/redis/core/fundamentals-and-data-types
 ---
 
 # Redis 与缓存
 
 Redis 专题共有多篇生产实践文档，但**全栈主线只要求前两课**。其余页面用于出现缓存热点、分布式协调、消息、高可用或集群需求时查阅。
+
+```text
+redis/
+├── core/          全栈必修
+├── advanced/      后端工程进阶
+└── reference/     架构与运维参考
+```
 
 ::: tip Redis 学习停止点
 掌握核心数据类型和 Cache-Aside 后即可停止 Redis 主线。不要为了“学完 Redis”提前引入分布式锁、Streams、Sentinel 或 Cluster。
@@ -31,9 +38,11 @@ Redis：可过期、可淘汰、可重建的缓存或临时状态
 
 ## 第一层：全栈必修，两课结束
 
+[进入 Redis 全栈必修目录](/database/redis/core/)
+
 ### 1. Redis 基础与核心数据类型
 
-- [Redis 基础与核心数据类型](/database/redis/fundamentals-and-data-types)
+- [Redis 基础与核心数据类型](/database/redis/core/fundamentals-and-data-types)
 
 重点掌握：
 
@@ -47,7 +56,7 @@ Redis：可过期、可淘汰、可重建的缓存或临时状态
 
 ### 2. Cache-Aside 与缓存一致性
 
-- [Cache-Aside 与缓存一致性](/database/redis/cache-aside-and-consistency)
+- [Cache-Aside 与缓存一致性](/database/redis/core/cache-aside-and-consistency)
 
 重点掌握：
 
@@ -61,48 +70,52 @@ Redis：可过期、可淘汰、可重建的缓存或临时状态
 
 ## 第二层：后端按需进阶
 
+[进入 Redis 后端工程进阶目录](/database/redis/advanced/)
+
 ### 缓存故障与热点
 
-- [缓存穿透、击穿、雪崩与热点治理](/database/redis/cache-penetration-breakdown-avalanche)
-- [TTL、内存淘汰、大 key 与热 key 治理](/database/redis/ttl-memory-eviction-big-hot-keys)
+- [缓存穿透、击穿、雪崩与热点治理](/database/redis/advanced/cache-penetration-breakdown-avalanche)
+- [TTL、内存淘汰、大 key 与热 key 治理](/database/redis/advanced/ttl-memory-eviction-big-hot-keys)
 
 什么时候学：出现大量无效查询、热点 key 同时过期、内存淘汰、单 key 过大或单分片过热时。
 
 ### 客户端稳定性
 
-- [客户端连接、超时、重试与优雅停机](/database/redis/client-connections-timeouts-retries-shutdown)
+- [客户端连接、超时、重试与优雅停机](/database/redis/advanced/client-connections-timeouts-retries-shutdown)
 
 什么时候学：Redis 已进入生产请求链路，需要处理连接、deadline、拓扑变化、结果不确定性和进程停机时。
 
 ## 第三层：架构与运维参考
 
+[进入 Redis 架构与运维参考目录](/database/redis/reference/)
+
 ### 分布式协调
 
-- [分布式锁、幂等、计数器与限流](/database/redis/distributed-locks-idempotency-counters-rate-limiting)
+- [分布式锁、幂等、计数器与限流](/database/redis/reference/distributed-locks-idempotency-counters-rate-limiting)
 
 只在确实需要跨进程协调时阅读。普通数据库事务不需要 Redis 锁；能用唯一约束、条件更新或数据库锁解决时优先使用数据库。
 
 ### 消息能力
 
-- [List、Pub/Sub 与 Streams 消息模型](/database/redis/lists-pubsub-streams-messaging)
+- [List、Pub/Sub 与 Streams 消息模型](/database/redis/reference/lists-pubsub-streams-messaging)
 
 只在评估轻量队列、通知或 Stream 消费时阅读。Redis 消息能力不能自动替代成熟消息系统，也不能让业务数据库写入与消息确认原子提交。
 
 ### 持久化与高可用
 
-- [RDB、AOF、复制、Sentinel 与故障转移](/database/redis/persistence-replication-sentinel-failover)
+- [RDB、AOF、复制、Sentinel 与故障转移](/database/redis/reference/persistence-replication-sentinel-failover)
 
 适合自运维 Redis 或 Redis 中存在不可轻易丢失状态的团队。只使用托管缓存的全栈开发者先知道 RPO、故障切换和数据丢失窗口即可。
 
 ### Cluster 与分片
 
-- [Redis Cluster、分片、hash slot 与多 key 限制](/database/redis/cluster-sharding-hash-slots-multi-key)
+- [Redis Cluster、分片、hash slot 与多 key 限制](/database/redis/reference/cluster-sharding-hash-slots-multi-key)
 
 只在单实例/主从容量不够，或项目已经使用 Cluster 时阅读。不要为小型项目提前设计 hash tag 和跨 slot 协议。
 
 ### 安全与容量
 
-- [安全、ACL、TLS、监控与容量规划](/database/redis/security-observability-capacity-planning)
+- [安全、ACL、TLS、监控与容量规划](/database/redis/reference/security-observability-capacity-planning)
 
 适合平台、运维和生产 owner 查阅。应用开发者需要掌握不暴露 Redis、使用 TLS/ACL、最小权限和基本延迟/内存监控，不必一次理解完整容量模型。
 
