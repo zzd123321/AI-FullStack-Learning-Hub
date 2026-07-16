@@ -29,6 +29,7 @@ HTTP API 合同
 4. [消息与事件驱动：broker、确认、重投、幂等消费与 Outbox](/backend/architecture/messaging-event-driven-broker-ack-retry-idempotency-and-outbox)
 5. [分布式事务、Saga、补偿与一致性边界](/backend/architecture/distributed-transactions-saga-compensation-and-consistency)
 6. [弹性治理：deadline、重试、熔断、隔离、限流与过载保护](/backend/architecture/resilience-deadline-retry-circuit-breaker-bulkhead-rate-limit-and-overload)
+7. [API Gateway、服务发现、健康检查与配置治理](/backend/architecture/api-gateway-service-discovery-health-and-configuration)
 
 后续课程将在本目录继续追加。课程不把某个框架的默认行为冒充 HTTP 标准；关键语义优先依据 IETF RFC、IANA 和 OpenAPI 官方规范，并用 Spring Boot/FastAPI 的实现经验对照。
 
