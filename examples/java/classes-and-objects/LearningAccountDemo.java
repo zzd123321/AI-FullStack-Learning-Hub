@@ -10,11 +10,14 @@ public final class LearningAccountDemo {
         }
 
         try {
+            // Demo 负责把外部字符串转换为构造对象所需的值。
             String learnerName = args[0];
             int dailyTargetMinutes = parseInteger(args[1], "每日目标分钟数");
+            // new 会执行构造方法；若参数非法，异常会直接进入下面的 catch。
             LearningAccount account = new LearningAccount(learnerName, dailyTargetMinutes);
 
             for (int index = 2; index < args.length; index++) {
+                // 每次循环都通过公开行为修改对象，不直接接触内部字段。
                 int sessionMinutes = parseInteger(
                         args[index],
                         "第 " + (index - 1) + " 次学习分钟数"
