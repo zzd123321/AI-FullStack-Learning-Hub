@@ -1,177 +1,156 @@
 ---
 title: TypeScript 联合类型、交叉类型与类型收窄
-description: 使用组合类型、控制流分析和可辨识联合准确表达业务状态
+description: 从请求状态建模出发，理解联合类型、运行时收窄、可辨识联合、穷尽检查与交叉类型
+outline: deep
 ---
 
-# TypeScript 联合类型、交叉类型与类型收窄进阶
+# TypeScript 联合类型、交叉类型与类型收窄
 
-> 适用环境：TypeScript 7.x、Node.js 22+、`strict` 模式。本文讨论的核心规则长期稳定；示例以本站当前 TypeScript 配置为准。
+[上一课](/frontend/typescript/object-and-function-types)学习了怎样描述一份确定的对象和一个确定的函数签名。但真实业务中的值经常存在多种可能：
 
-## 1. 学习目标
+- 路由参数可能是数字，也可能是字符串；
+- 查询结果可能找到课程，也可能得到 `undefined`；
+- 请求可能正在加载、成功或失败；
+- 捕获到的异常可能是 `Error`，也可能是任意 JavaScript 值。
 
-完成本节后，你应该能够：
+联合类型负责表达这些可能性，类型收窄负责用真实的运行时证据排除可能性。
 
-- 准确区分联合类型（Union Type）和交叉类型（Intersection Type）。
-- 理解为什么联合类型在收窄前只能使用所有成员共同支持的操作。
-- 使用 `typeof`、相等性判断、`in`、`instanceof` 和 `Array.isArray` 收窄类型。
-- 理解 TypeScript 的控制流分析（Control Flow Analysis）如何跟踪变量类型。
-- 编写用户自定义类型谓词（Type Predicate）和断言函数（Assertion Function）。
-- 使用可辨识联合（Discriminated Union）表达互斥、完整的业务状态。
-- 使用 `never` 完成穷尽性检查，防止新增状态后遗漏处理分支。
-- 识别交叉类型冲突、真值判断误伤、错误类型断言等常见问题。
+```text
+联合类型：现在可能是什么
+      ↓ 条件判断提供证据
+类型收窄：在当前代码路径中已经确定是什么
+```
 
-## 2. 前置知识
+这一课最终要解决的不是“会写 `string | number`”，而是怎样让非法业务状态更难进入代码。
 
-建议先掌握：
+## 从一个容易矛盾的请求状态开始
 
-- JavaScript 基本类型、对象、函数与条件分支。
-- TypeScript 类型标注和类型推断。
-- 对象类型、可选属性、只读属性和函数类型。
-- `strictNullChecks` 的基本作用。
-
-上一节：[TypeScript 对象类型与函数类型](/frontend/typescript/object-and-function-types)
-
-## 3. 为什么需要组合类型
-
-真实业务中的值经常不只有一种形态：
-
-- 路由参数可能是数字 ID，也可能是字符串别名。
-- 接口请求可能处于空闲、加载、成功或失败状态。
-- 搜索条件可能是普通文本，也可能是结构化筛选对象。
-- 登录结果可能包含用户，也可能包含明确的错误信息。
-
-如果用一个充满可选属性的对象表示这些情况，很容易制造不可能或矛盾的状态：
+很多页面会这样保存请求状态：
 
 ```ts
-interface RequestStateBad {
+interface RequestState {
   loading: boolean
   data?: Lesson[]
   error?: string
 }
 ```
 
-这个类型允许下面的对象通过检查：
+它允许构造出：
 
 ```ts
-const impossible: RequestStateBad = {
+const impossible: RequestState = {
   loading: true,
   data: [],
   error: '请求失败'
 }
 ```
 
-它同时表示“正在加载”“已经有数据”和“请求失败”。编译器无法知道这是否符合业务规则，因为类型本身没有表达这些状态互斥。
+类型无法判断这是否矛盾，因为我们告诉它三个字段可以自由组合。
 
-更合理的模型是：一个请求在某个时刻只能处于某一种状态。
+业务事实其实是：请求在某一刻只能处于一种状态，而且每种状态拥有不同数据。
 
 ```ts
 type RequestState =
   | { status: 'idle' }
-  | { status: 'loading'; startedAt: number }
-  | { status: 'success'; data: Lesson[] }
+  | { status: 'loading' }
+  | { status: 'success'; data: readonly Lesson[] }
   | { status: 'error'; message: string }
 ```
 
-联合类型不仅描述“可能有哪些值”，还可以把业务规则交给编译器检查。
+这个模型会贯穿整课。先从最小的联合类型开始，再一步步推导到请求状态。
 
-## 4. 联合类型：值是多个候选类型之一
+## 联合类型表示“候选类型之一”
 
-联合类型使用竖线 `|` 连接成员：
+使用 `|` 连接候选类型：
 
 ```ts
 type LessonId = string | number
-
-function openLesson(id: LessonId): void {
-  console.log(id)
-}
-
-openLesson('typescript-narrowing')
-openLesson(3)
 ```
 
-`LessonId` 表示一个值在运行时可能是 `string`，也可能是 `number`。它不表示该值同时具备字符串和数字的全部能力。
+运行时的值仍然只有一个：
 
-### 联合类型不是“所有成员能力的并集”
+```ts
+const first: LessonId = 'ts-03'
+const second: LessonId = 3
+```
 
-在尚未确定具体成员前，TypeScript 只允许使用每个成员都安全支持的操作：
+`string | number` 不是一个同时拥有字符串和数字能力的新对象。它表示当前代码还不知道具体是哪一种。
+
+### 收窄前只能使用共同能力
 
 ```ts
 function normalizeId(id: string | number): string {
-  return id.toString() // string 和 number 都支持
+  return id.toString()
 }
 ```
 
-下面的调用不安全：
+字符串和数字都能调用 `toString()`，所以安全。
 
 ```ts
-function broken(id: string | number): string {
+function normalizeId(id: string | number): string {
   return id.toUpperCase()
-  //     ~~ number 没有 toUpperCase
+  // number 没有 toUpperCase()。
 }
 ```
 
-从集合角度看，值的候选范围变大了，但未经收窄时可直接使用的成员能力反而是各成员的公共部分。
+虽然候选值变多了，未经判断时能直接使用的能力反而更少，因为每个操作必须对所有候选成员都安全。
 
-## 5. 字面量联合：让字符串成为有限状态
-
-字面量类型（Literal Type）表示某个确定的值：
+### 字面量联合把宽泛字符串变成有限集合
 
 ```ts
 type LessonStatus = 'draft' | 'published' | 'archived'
 ```
 
-这比普通 `string` 更准确：
+相比 `string`，它能够发现拼写错误：
 
 ```ts
 function changeStatus(status: LessonStatus): void {
   console.log(status)
 }
 
-changeStatus('published') // 正确
-changeStatus('publised')  // 错误：拼写不在联合成员中
+changeStatus('published')
+changeStatus('publised')
+// 错误：publised 不在允许集合中。
 ```
 
-字面量联合适合表示：
+字面量联合适合状态、角色、组件尺寸和有限协议值，但不要用它伪装无限集合。例如用户名不是有限枚举，仍应是普通 `string`。
 
-- 页面或请求状态。
-- 权限角色。
-- HTTP 方法。
-- 组件尺寸和主题。
-- 后端返回的有限状态码。
-
-### 字面量推断可能被扩大
+### 注意字面量类型可能被扩大
 
 ```ts
 let status = 'loading'
+// 推断为 string，因为以后可以赋成其他字符串。
+
+const fixedStatus = 'loading'
+// 推断为字面量 "loading"。
 ```
 
-因为 `let` 变量之后可以被重新赋值，`status` 通常会被推断为 `string`，而不是字面量 `'loading'`。
+对象即使用 `const` 声明，属性仍可能被修改：
 
 ```ts
-const status = 'loading' // 类型是 "loading"
+const state = { status: 'loading' }
+// state.status 通常被扩大为 string。
 ```
 
-对象属性即使放在 `const` 对象中，仍可能被修改，所以也可能被扩大：
+提供目标类型通常最清楚：
 
 ```ts
-const response = { status: 'success' }
-// response.status 通常是 string
+const state: RequestState = { status: 'loading' }
 ```
 
-需要保留字面量时，可以提供目标类型或谨慎使用 `as const`：
+也可以使用 `as const` 保留字面量并把属性推断为只读：
 
 ```ts
-const response: { status: 'success' } = { status: 'success' }
-
-const frozenResponse = { status: 'success' } as const
-// status 是 "success"，同时属性变为 readonly
+const state = { status: 'loading' } as const
 ```
 
-`as const` 不会在运行时冻结对象；它只影响 TypeScript 的推断结果。
+`as const` 只影响类型推断，不会在运行时冻结对象。
 
-## 6. 类型收窄：用运行时证据排除候选类型
+---
 
-类型收窄（Narrowing）是指：代码通过条件判断提供运行时证据，TypeScript 据此把宽泛类型缩小为更具体的类型。
+## 收窄就是用运行时证据排除候选项
+
+### `typeof` 适合区分基本类型和函数
 
 ```ts
 function formatId(id: string | number): string {
@@ -183,66 +162,24 @@ function formatId(id: string | number): string {
 }
 ```
 
-执行到 `if` 内部时，`typeof id === 'string'` 证明 `id` 是字符串。剩余分支中，字符串可能性已经被排除，因此 `id` 是数字。
+在 `if` 分支中，运行时判断证明 `id` 是字符串。字符串分支已经返回，后面的路径只剩数字。
 
-```mermaid
-flowchart TD
-  A["id: string | number"] --> B{"typeof id === 'string'?"}
-  B -->|是| C["id: string"]
-  B -->|否| D["id: number"]
+```text
+id: string | number
+        ↓ typeof id === 'string'
+    是 /                 \ 否
+string                   number
 ```
 
-类型收窄不是运行时转换。判断前后仍然是同一个值，只是编译器对它的认识更具体了。
+TypeScript 能识别 JavaScript `typeof` 的常见结果，如 `string`、`number`、`boolean`、`undefined`、`function` 和 `object`。
 
-## 7. `typeof` 类型守卫
-
-JavaScript 的 `typeof` 可以返回这些常见字符串：
-
-- `"string"`
-- `"number"`
-- `"bigint"`
-- `"boolean"`
-- `"symbol"`
-- `"undefined"`
-- `"object"`
-- `"function"`
-
-TypeScript 能识别相应判断：
+要记住 JavaScript 的历史行为：
 
 ```ts
-function describe(value: string | number | (() => void)): string {
-  if (typeof value === 'function') {
-    value()
-    return '执行了函数'
-  }
-
-  if (typeof value === 'number') {
-    return `数字：${value.toFixed(2)}`
-  }
-
-  return `文本：${value.trim()}`
-}
+typeof null === 'object' // true
 ```
 
-### `typeof null === 'object'` 的历史行为
-
-JavaScript 中：
-
-```ts
-console.log(typeof null) // "object"
-```
-
-因此下面的判断不能排除 `null`：
-
-```ts
-function printKeys(value: object | null): void {
-  if (typeof value === 'object') {
-    // value 仍可能是 null
-  }
-}
-```
-
-应增加显式判断：
+所以判断对象时要同时排除 `null`：
 
 ```ts
 function printKeys(value: object | null): void {
@@ -252,56 +189,29 @@ function printKeys(value: object | null): void {
 }
 ```
 
-## 8. 真值收窄及其陷阱
+### 明确判断空值，避免真值判断改变业务含义
 
-JavaScript 条件会把值转换为布尔值。以下值是假值（falsy）：
-
-- `false`
-- `0`、`-0`、`0n`
-- 空字符串 `''`
-- `null`
-- `undefined`
-- `NaN`
-
-因此可以用真值判断排除 `null` 和 `undefined`：
-
-```ts
-function printTitle(title: string | null | undefined): void {
-  if (title) {
-    console.log(title.toUpperCase())
-  }
-}
-```
-
-但它也会排除空字符串。如果空字符串是合法输入，这种写法会改变业务含义：
+下面的判断会同时排除 `null`、空字符串等假值：
 
 ```ts
 function getLabel(value: string | null): string {
-  if (value) {
-    return value
-  }
-
-  return '未填写' // 空字符串也会走到这里
-}
-```
-
-如果只想排除空值，应明确判断：
-
-```ts
-function getLabel(value: string | null): string {
-  if (value !== null) {
-    return value
-  }
-
+  if (value) return value
   return '未填写'
 }
 ```
 
-同理，不能用 `if (count)` 判断一个可能合法为 `0` 的数量是否存在。
+如果空字符串是合法值，这就错误地把它当作缺失。只想排除 `null` 时应明确写：
 
-## 9. 相等性收窄
+```ts
+function getLabel(value: string | null): string {
+  if (value !== null) return value
+  return '未填写'
+}
+```
 
-TypeScript 会理解 `===`、`!==`、`==` 和 `!=` 带来的类型信息。
+同理，`if (count)` 会排除合法的 `0`。只有当所有假值都代表同一种业务情况时，真值判断才合适。
+
+### 相等判断可以关联多个变量
 
 ```ts
 function compare(
@@ -309,38 +219,22 @@ function compare(
   right: string | boolean
 ): void {
   if (left === right) {
-    // 两边唯一可能共同拥有的类型是 string
+    // 两个联合中唯一共同的类型是 string。
     console.log(left.toUpperCase(), right.toUpperCase())
   }
 }
 ```
 
-最推荐使用严格相等 `===` 和严格不等 `!==`，因为它们不执行隐式类型转换。
+通常优先使用 `===` 和 `!==`，避免隐式转换。`value != null` 可以同时排除 `null` 和 `undefined`，但团队若禁止宽松相等，写成两个显式判断更容易统一理解。
 
-有一个常见但需要理解语义的例外：`value != null` 会同时排除 `null` 和 `undefined`，这是 JavaScript 宽松相等规则的结果。
-
-```ts
-function print(value: string | null | undefined): void {
-  if (value != null) {
-    console.log(value.toUpperCase())
-  }
-}
-```
-
-团队如果统一禁止宽松相等，可以改为 `value !== null && value !== undefined`，含义更显式。
-
-## 10. `in` 操作符收窄对象联合
-
-`'property' in object` 在运行时检查属性是否存在于对象自身或原型链上。TypeScript 可以利用它收窄对象类型：
+### `in` 适合按对象属性区分
 
 ```ts
 interface VideoLesson {
-  kind: 'video'
   videoUrl: string
 }
 
 interface ArticleLesson {
-  kind: 'article'
   content: string
 }
 
@@ -353,27 +247,11 @@ function getResource(lesson: VideoLesson | ArticleLesson): string {
 }
 ```
 
-需要注意，可选属性可能出现在判断的两个分支中：
+如果属性是可选的，它可能出现在两个分支里，收窄结果就不会像必填独有属性一样明确。因此业务变体更推荐使用稍后介绍的共同状态字段。
 
-```ts
-type Human = { swim?: () => void }
-type Fish = { swim: () => void }
-type Bird = { fly: () => void }
+对外部 `unknown` 使用 `in` 前，还要先证明它是非空对象，否则运行时会报错。
 
-function move(value: Fish | Bird | Human): void {
-  if ('swim' in value) {
-    // value 可能是 Fish，也可能是 Human
-  }
-}
-```
-
-如果对象本身来自外部 `unknown` 数据，还要先确认它不是 `null` 且确实是对象，否则直接使用 `in` 会在运行时报错。
-
-## 11. `instanceof` 和 `Array.isArray`
-
-### `instanceof`
-
-`instanceof` 检查对象的原型链是否包含构造函数的 `prototype`：
+### `instanceof` 适合类实例和内置对象
 
 ```ts
 function formatDate(value: Date | string): string {
@@ -385,137 +263,199 @@ function formatDate(value: Date | string): string {
 }
 ```
 
-它适合类实例和 JavaScript 内置对象，但不适合接口：
+`instanceof` 检查原型链。接口和类型别名在运行时已经不存在，不能写 `value instanceof Lesson`。
+
+普通 JSON 数据通常没有自定义类实例原型，更适合检查结构或可辨识字段。数组应使用 `Array.isArray()`：
 
 ```ts
-interface Lesson {
-  title: string
-}
-
-// value instanceof Lesson // 错误：接口在运行时不存在
-```
-
-跨 iframe、跨 JavaScript Realm 或存在多份库副本时，原型链身份可能不同，`instanceof` 也可能不符合预期。对普通 JSON 数据更适合检查结构或可辨识字段。
-
-### `Array.isArray`
-
-数组在 JavaScript 中也是对象：
-
-```ts
-typeof [] // "object"
-```
-
-判断数组应使用 `Array.isArray`：
-
-```ts
-function count(value: string | string[]): number {
-  if (Array.isArray(value)) {
-    return value.length
-  }
-
+function getCount(value: string | string[]): number {
+  if (Array.isArray(value)) return value.length
   return value.trim().length
 }
 ```
 
-## 12. 控制流分析：类型会沿执行路径变化
+## 控制流分析会沿代码路径更新类型
 
-TypeScript 不只看单个 `if`，还会分析赋值、提前返回和代码可达性。
+TypeScript 不只看某一个判断，还会分析返回、赋值和代码可达性。
 
-### 提前返回后的收窄
+### 提前返回让剩余路径更简单
 
 ```ts
-function pad(value: string | number): string {
-  if (typeof value === 'number') {
-    return ' '.repeat(value)
-  }
+function normalize(value: string | null): string {
+  if (value === null) return ''
 
-  // number 分支已经返回，走到这里时 value 只能是 string
+  // null 路径已经结束，这里只剩 string。
   return value.trim()
 }
 ```
 
-### 重新赋值后的类型
+相比多层嵌套，先处理无效或特殊情况并提前返回，往往同时改善运行逻辑和类型推断。
+
+### 重新赋值会改变当前位置的观察类型
 
 ```ts
 let value: string | number = Math.random() > 0.5 ? '42' : 42
 
 if (typeof value === 'string') {
   value = value.trim()
-  // 这里仍是 string
+  // 当前仍是 string。
 }
 
-value = 100 // 合法，因为声明类型允许 number
+value = 100
+// 合法：变量声明类型仍然允许 number。
 ```
 
-变量的声明类型仍然是 `string | number`。控制流只决定某个程序点上的观察类型，不会永久改写声明类型。
+收窄只影响某个控制流位置，不会永久改写变量声明类型。
 
-### 闭包和异步回调中的收窄可能失效
+### 异步回调前可以保存已收窄快照
 
-如果变量可能在回调执行前被修改，TypeScript 不能安全地保留之前的收窄结论：
+可变变量在回调执行前可能被其他代码修改，编译器不能总是假设之前的判断仍成立：
 
 ```ts
 let title: string | undefined = 'TypeScript'
 
 if (title !== undefined) {
+  const currentTitle = title
+
   setTimeout(() => {
-    // 某些可变变量场景中，编译器不能假设 title 仍是 string
+    console.log(currentTitle.toUpperCase())
   }, 0)
 }
 
 title = undefined
 ```
 
-常见做法是在已经收窄的作用域中创建不可变快照：
+`currentTitle` 是判断后创建的不可变快照，闭包中的含义明确。这个思路以后也会出现在 React State 快照和异步竞态处理中。
+
+---
+
+## 可辨识联合把状态和对应数据绑定起来
+
+请求状态的每个成员都包含 `status`，且值是不同字面量：
 
 ```ts
-if (title !== undefined) {
-  const currentTitle = title
-  setTimeout(() => console.log(currentTitle.toUpperCase()), 0)
+type LessonRequestState =
+  | { status: 'idle' }
+  | { status: 'loading'; startedAt: number }
+  | { status: 'success'; data: readonly Lesson[] }
+  | { status: 'error'; message: string }
+```
+
+`status` 是可辨识字段。判断它时，整个对象一起收窄：
+
+```ts
+function renderState(state: LessonRequestState): string {
+  switch (state.status) {
+    case 'idle':
+      return '尚未请求'
+    case 'loading':
+      return `开始时间：${state.startedAt}`
+    case 'success':
+      return `共 ${state.data.length} 节课程`
+    case 'error':
+      return state.message
+  }
 }
 ```
 
-## 13. 用户自定义类型谓词
+成功分支一定有 `data`，错误分支一定有 `message`。其他状态根本不存在这些字段。
 
-当普通条件较复杂或需要复用时，可以编写类型守卫函数。返回类型 `value is Lesson` 称为类型谓词：
+这比一个包含多个可选字段的对象更准确：
 
 ```ts
-interface Lesson {
-  id: string
+interface LooseState {
+  status: 'idle' | 'loading' | 'success' | 'error'
+  data?: readonly Lesson[]
+  message?: string
+}
+```
+
+`LooseState` 只让每个字段各自合法，没有表达字段之间的关联。它仍允许成功但没有数据，或者加载时携带错误。
+
+### 可选属性和状态联合解决不同问题
+
+可选属性适合独立信息：
+
+```ts
+interface LessonCard {
   title: string
-  durationMinutes: number
+  summary?: string
+}
+```
+
+可辨识联合适合互斥分支：
+
+```ts
+type Action =
+  | { kind: 'link'; href: string }
+  | { kind: 'button'; onClick: () => void }
+```
+
+如果某个字段是否必填取决于另一个字段，通常应该考虑对象联合，而不是继续增加 `?`。
+
+### 用 `never` 让状态处理保持完整
+
+```ts
+function assertNever(value: never): never {
+  throw new Error(`未处理的状态：${JSON.stringify(value)}`)
 }
 
+function renderState(state: LessonRequestState): string {
+  switch (state.status) {
+    case 'idle':
+      return '尚未请求'
+    case 'loading':
+      return '正在加载'
+    case 'success':
+      return `共 ${state.data.length} 节课程`
+    case 'error':
+      return state.message
+    default:
+      return assertNever(state)
+  }
+}
+```
+
+所有成员处理完后，`default` 中的 `state` 应该是 `never`，表示不可能出现值。
+
+如果以后向联合增加 `refreshing`，却忘记增加分支，`state` 不再是 `never`，编译器会在 `assertNever` 处提示。这让“新增状态后哪些地方必须同步修改”更容易被发现。
+
+---
+
+## 自定义守卫把复杂判断变成可复用证据
+
+外部接口数据通常从 `unknown` 开始。先建立一个通用对象判断：
+
+```ts
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
-
-function isLesson(value: unknown): value is Lesson {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    typeof value.title === 'string' &&
-    typeof value.durationMinutes === 'number' &&
-    Number.isFinite(value.durationMinutes) &&
-    value.durationMinutes > 0
-  )
-}
 ```
 
-调用后，TypeScript 会在成功分支中把值视为 `Lesson`：
+返回类型 `value is Record<string, unknown>` 叫类型谓词。它告诉 TypeScript：返回 `true` 时，调用方可以把 `value` 当作该类型。
+
+继续验证课程：
 
 ```ts
-function handlePayload(payload: unknown): string {
-  if (isLesson(payload)) {
-    return payload.title.toUpperCase()
-  }
-
-  return '无效课程数据'
+function isLesson(value: unknown): value is Lesson {
+  return isRecord(value)
+    && typeof value.id === 'string'
+    && typeof value.title === 'string'
+    && typeof value.durationMinutes === 'number'
+    && Number.isFinite(value.durationMinutes)
+    && value.durationMinutes > 0
 }
 ```
 
-### 类型谓词是一份需要你负责的承诺
+使用：
 
-编译器不会证明函数实现真的足以判断目标类型：
+```ts
+if (isLesson(payload)) {
+  console.log(payload.title.toUpperCase())
+}
+```
+
+类型谓词是一份开发者承诺。编译器不会证明实现真的足够：
 
 ```ts
 function isLessonUnsafe(value: unknown): value is Lesson {
@@ -523,11 +463,9 @@ function isLessonUnsafe(value: unknown): value is Lesson {
 }
 ```
 
-这段代码能够通过类型检查，却会让任意值伪装成 `Lesson`。类型谓词必须覆盖后续代码依赖的全部结构约束；复杂生产项目可使用经过维护的 Schema 校验库，避免手写验证逻辑分散在各处。
+这能通过类型检查，却会把任何值伪装成课程。谓词必须验证后续代码依赖的全部字段。复杂接口应使用集中维护的 Schema，而不是在各组件里复制不完整守卫。
 
-## 14. 断言函数
-
-类型谓词返回布尔值；断言函数在条件不满足时抛出错误，正常返回则告诉编译器条件成立。
+### 断言函数适合“失败就不能继续”的边界
 
 ```ts
 function assertLesson(value: unknown): asserts value is Lesson {
@@ -538,146 +476,19 @@ function assertLesson(value: unknown): asserts value is Lesson {
 
 function parseLesson(value: unknown): Lesson {
   assertLesson(value)
-  return value // 此处 value 已收窄为 Lesson
+  return value
 }
 ```
 
-也可以断言普通条件：
+类型谓词返回布尔值，调用方可以决定失败分支；断言函数失败时抛出，正常返回就证明条件成立。
 
-```ts
-function assert(condition: unknown, message: string): asserts condition {
-  if (!condition) {
-    throw new Error(message)
-  }
-}
-```
+它与 `as Lesson` 不同：断言函数必须执行真实运行时检查，类型断言只要求编译器相信开发者。
 
-断言函数适合“失败就不能继续”的系统边界，例如读取配置、解析接口响应或建立领域对象。不要把它当成跳过校验的类型断言 `as`；它必须真正执行运行时检查。
+---
 
-## 15. 可辨识联合：用共同字段表示互斥状态
+## 交叉类型表示“同时满足多个契约”
 
-可辨识联合由三部分组成：
-
-1. 多个对象类型组成的联合。
-2. 所有成员共享一个属性。
-3. 该属性在每个成员中是不同的字面量类型。
-
-```ts
-interface IdleState {
-  status: 'idle'
-}
-
-interface LoadingState {
-  status: 'loading'
-  startedAt: number
-}
-
-interface SuccessState {
-  status: 'success'
-  data: readonly Lesson[]
-  receivedAt: number
-}
-
-interface ErrorState {
-  status: 'error'
-  error: {
-    code: string
-    message: string
-    retryable: boolean
-  }
-}
-
-type LessonRequestState =
-  | IdleState
-  | LoadingState
-  | SuccessState
-  | ErrorState
-```
-
-`status` 就是可辨识字段（Discriminant）。判断它后，整个对象会一起收窄：
-
-```ts
-function renderState(state: LessonRequestState): string {
-  switch (state.status) {
-    case 'idle':
-      return '尚未请求课程'
-    case 'loading':
-      return `正在加载，开始时间：${state.startedAt}`
-    case 'success':
-      return `已加载 ${state.data.length} 节课程`
-    case 'error':
-      return `${state.error.code}：${state.error.message}`
-  }
-}
-```
-
-在 `success` 分支里可以安全访问 `data`，在 `error` 分支里可以安全访问 `error`。其他状态根本没有这些属性。
-
-```mermaid
-stateDiagram-v2
-  [*] --> idle
-  idle --> loading: 发起请求
-  loading --> success: 返回合法数据
-  loading --> error: 请求或校验失败
-  error --> loading: 重试
-  success --> loading: 刷新
-```
-
-### 为什么优于多个可选属性
-
-可辨识联合使非法状态难以表示：
-
-```ts
-const invalid: LessonRequestState = {
-  status: 'success',
-  error: { code: 'E500', message: '失败', retryable: true }
-  // 错误：success 状态需要 data，不接受 error
-}
-```
-
-这比依赖注释说明“成功时 error 必须为空”更可靠。
-
-## 16. 使用 `never` 做穷尽性检查
-
-当联合中的所有成员都被排除后，剩余值的类型是 `never`，表示该位置不可能出现值。
-
-```ts
-function assertNever(value: never): never {
-  throw new Error(`未处理的状态：${JSON.stringify(value)}`)
-}
-
-function renderState(state: LessonRequestState): string {
-  switch (state.status) {
-    case 'idle':
-      return '尚未请求课程'
-    case 'loading':
-      return '正在加载'
-    case 'success':
-      return `共 ${state.data.length} 节课程`
-    case 'error':
-      return state.error.message
-    default:
-      return assertNever(state)
-  }
-}
-```
-
-如果以后新增状态：
-
-```ts
-interface RefreshingState {
-  status: 'refreshing'
-  previousData: readonly Lesson[]
-}
-```
-
-并加入联合，却忘记修改 `switch`，那么 `default` 分支中的 `state` 不再是 `never`，编译器会报错。这样新增业务状态时，所有需要同步更新的处理位置更容易被发现。
-
-如果函数返回类型明确，也可以借助 `strictNullChecks` 和缺失返回路径发现部分遗漏，但 `assertNever` 通常能提供更直接的错误位置和意图。
-
-## 17. 交叉类型：一个值同时满足多个类型
-
-交叉类型使用 `&` 连接成员：
+联合使用 `|` 表示候选之一，交叉使用 `&` 表示同时满足：
 
 ```ts
 interface HasRequestId {
@@ -689,52 +500,26 @@ interface HasTimestamp {
 }
 
 type RequestMetadata = HasRequestId & HasTimestamp
+```
 
+合法值必须拥有两边字段：
+
+```ts
 const metadata: RequestMetadata = {
   requestId: 'req-001',
   timestamp: Date.now()
 }
 ```
 
-`A & B` 表示值必须同时满足 `A` 和 `B`。它适合组合相互独立的能力或横切信息：
-
-- 业务数据 + 审计字段。
-- 请求状态 + 跟踪 ID。
-- 基础模型 + 分页信息。
-- 组件 Props + 通用可访问性属性。
+请求跟踪信息也可以附加到每一种状态：
 
 ```ts
-type TrackedState = LessonRequestState & HasRequestId
-
-const tracked: TrackedState = {
-  requestId: 'req-002',
-  status: 'loading',
-  startedAt: Date.now()
-}
+type TrackedRequestState = LessonRequestState & HasRequestId
 ```
 
-交叉会分配到联合的各成员上进行理解，因此这里相当于每一种请求状态都额外带有 `requestId`。
+它适合组合彼此独立、没有冲突的能力。类型表达式本身不会在运行时合并对象，真实值仍需通过对象字面量、展开运算符或其他逻辑创建。
 
-### 交叉类型不会在运行时合并对象
-
-类型表达式只描述结构，不会产生 JavaScript 合并操作：
-
-```ts
-type Combined = HasRequestId & HasTimestamp
-```
-
-这行代码不会创建任何对象。真正组合运行时值仍需要对象展开、`Object.assign` 或其他逻辑：
-
-```ts
-const combined: Combined = {
-  ...requestIdPart,
-  ...timestampPart
-}
-```
-
-## 18. 交叉类型的属性冲突
-
-交叉类型要求同一属性同时满足两边的约束：
+### 同名属性必须同时满足两边
 
 ```ts
 type StringId = { id: string }
@@ -742,311 +527,137 @@ type NumberId = { id: number }
 type Impossible = StringId & NumberId
 ```
 
-`Impossible['id']` 必须同时是 `string` 和 `number`，结果通常是 `never`。正常值无法满足：
+`id` 必须同时是字符串和数字，结果是 `never`，正常值无法满足。
+
+这不是对象展开的“后者覆盖前者”。出现冲突通常说明：
+
+- 两个业务概念本来就不应组合；
+- 属性命名太宽泛；
+- 实际需要的是二选一的联合类型；
+- 应先明确删除旧字段，再定义新契约。
+
+不要使用双重类型断言强行制造无法满足的交叉类型。
+
+## 联合参数还是函数重载
+
+[上一课](/frontend/typescript/object-and-function-types)暂缓了重载，因为先理解联合后更容易做选择。
+
+如果多个输入走相同逻辑并返回同一种类型，优先联合参数：
 
 ```ts
-const value: Impossible = { id: '1' }
-//                            ~~ string 不能赋给 never
-```
-
-这不是 TypeScript 自动选择其中一方，也不是运行时覆盖规则。出现冲突通常说明：
-
-- 组合的领域概念不兼容。
-- 属性命名过于宽泛。
-- 应该先用 `Omit` 移除旧属性再定义新属性。
-- 实际需要的是联合类型，而不是交叉类型。
-
-```ts
-type NumericEntity = Omit<StringId, 'id'> & { id: number }
-```
-
-不要用双重类型断言强行制造无法满足的交叉类型，那只会把问题推迟到运行时。
-
-## 19. “对象的联合”与“联合属性的对象”
-
-这两个类型看起来相似，表达能力却不同。
-
-### 对象的联合
-
-```ts
-type Result =
-  | { ok: true; data: Lesson[] }
-  | { ok: false; error: string }
-```
-
-当 `ok` 为 `true` 时一定有 `data`；为 `false` 时一定有 `error`。字段之间存在关联。
-
-### 联合属性的对象
-
-```ts
-interface LooseResult {
-  ok: boolean
-  data: Lesson[] | undefined
-  error: string | undefined
+function getLength(value: string | readonly unknown[]): number {
+  return value.length
 }
 ```
 
-每个属性各自拥有联合类型，但它们之间没有关联。下面这些矛盾组合仍然合法：
+当调用形式不同，而且输入和返回存在明确对应关系时，重载才有价值：
 
 ```ts
-const loose: LooseResult = {
-  ok: true,
-  data: undefined,
-  error: '失败'
+function normalize(input: string): string
+function normalize(input: readonly string[]): string[]
+function normalize(
+  input: string | readonly string[]
+): string | string[] {
+  return typeof input === 'string'
+    ? input.trim()
+    : input.map((item) => item.trim())
 }
 ```
 
-只要字段的可用性依赖另一个字段，就优先考虑可辨识联合。
+重载签名是调用方看到的契约，实现签名必须能够处理全部重载。重载数量不断增加时，通常应检查 API 是否承担了太多职责。
 
-## 20. 可选属性不等于状态联合
+---
 
-可选属性表达“这个属性可能不存在”，适合独立、确实可选的信息：
+## 完整示例：从未知 JSON 到可信请求状态
 
-```ts
-interface LessonCard {
-  title: string
-  summary?: string
-}
-```
-
-它不适合表达互斥分支：
-
-```ts
-interface PaymentBad {
-  method: 'card' | 'bank'
-  cardNumber?: string
-  bankAccount?: string
-}
-```
-
-这个类型允许银行卡支付没有卡号，也允许同时出现两种账号。更准确的模型是：
-
-```ts
-type Payment =
-  | { method: 'card'; cardNumber: string }
-  | { method: 'bank'; bankAccount: string }
-```
-
-判断 `method` 后，相关字段会自动收窄。这种设计同样适用于 Vue 组件 Props：当某个 Prop 决定其他 Props 是否必需时，可辨识联合通常比多个可选 Prop 更安全。
-
-## 21. 完整项目示例：课程请求状态
-
-本站提供可运行源码：
+这篇保留完整示例，因为它需要把运行时校验、状态联合、穷尽检查和跟踪信息组合成一条真实边界：
 
 ```text
-examples/typescript/unions-intersections-and-narrowing.ts
+JSON 字符串
+    ↓ JSON.parse
+unknown
+    ↓ 类型守卫与断言函数
+readonly Lesson[]
+    ↓ 构造状态
+TrackedLessonRequestState
+    ↓ status 收窄
+可展示文本
 ```
 
 <<< ../../../examples/typescript/unions-intersections-and-narrowing.ts
 
-示例组合了本节关键知识：
+运行：
 
-1. 外部输入先以 `unknown` 接收。
-2. `isRecord` 和 `isLesson` 执行运行时结构检查。
-3. 断言函数确保数组中每一项都是合法课程。
-4. 可辨识联合描述四种互斥请求状态。
-5. 交叉类型为所有状态附加请求跟踪信息。
-6. `switch` 和 `assertNever` 保证状态处理完整。
-
-核心数据流如下：
-
-```mermaid
-flowchart LR
-  A["外部 JSON: unknown"] --> B["解析为未知值"]
-  B --> C{"结构校验"}
-  C -->|通过| D["Lesson[]"]
-  C -->|失败| E["抛出 TypeError"]
-  D --> F["success 状态"]
-  E --> G["error 状态"]
-  F --> H["switch 渲染"]
-  G --> H
+```bash
+node --experimental-strip-types examples/typescript/unions-intersections-and-narrowing.ts
 ```
 
-### 为什么边界使用 `unknown`
+预期输出包含一次成功和一次校验失败：
 
-网络响应、浏览器存储和用户输入都是运行时数据，TypeScript 无法在编译阶段保证其结构。使用 `unknown` 会迫使代码先验证再使用：
-
-```ts
-const payload: unknown = JSON.parse(text)
+```text
+[req-001] 已加载 1 节课程
+[req-002] INVALID_LESSON_PAYLOAD：接口返回的课程列表格式不正确
 ```
 
-直接写成下面这样只是告诉编译器相信开发者，不会验证数据：
+示例中成功状态只保存已经校验的 `Lesson[]`。这样业务层不需要在每次读取标题时重复验证，边界外保持未知，边界内保持可信。
 
-```ts
-const payload = JSON.parse(text) as Lesson[]
-```
+## 常见问题：先检查证据是否真实
 
-### 为什么成功状态直接保存可信类型
+### 联合值不能调用某个方法
 
-一旦边界校验完成，内部业务代码就不应该反复检查同一结构。成功状态只接收 `readonly Lesson[]`，形成“外部未知、边界验证、内部可信”的清晰分层。
+检查该方法是否对联合中的每个成员都安全。如果只属于某个成员，先通过 `typeof`、可辨识字段或其他真实判断收窄。
 
-## 22. 常见错误
+### `typeof value === 'object'` 后仍提示可能为 null
 
-### 在收窄前调用成员专属方法
+这是 JavaScript 的历史行为。增加 `value !== null`，并继续检查真正需要的字段。
 
-```ts
-function format(value: string | number): string {
-  return value.toUpperCase()
-}
-```
+### `if (value)` 把 0 或空字符串过滤掉
 
-数字没有该方法。先使用 `typeof` 判断，或改用两者共同支持的操作。
+真值判断排除所有假值。只想排除 `null` 或 `undefined` 时，使用明确相等判断。
 
-### 把 `typeof value === 'object'` 当成完整对象校验
+### 使用 `as` 后不再报错，但运行时崩溃
 
-它没有排除 `null`，也没有验证对象属性。外部数据至少需要检查非空对象和真正依赖的字段。
+`as` 没有提供运行时证据，也不转换数据。外部值应通过守卫、断言函数或 Schema 验证。
 
-### 用真值判断误伤 `0` 和空字符串
+### `isLesson` 返回 true 后仍然读到坏数据
 
-只有当所有假值都代表“缺失”时才使用 `if (value)`；否则显式判断 `null` 或 `undefined`。
+类型谓词实现可能没有验证完整契约。检查它是否验证了后续依赖的每个字段、数组元素和业务范围。
 
-### 用类型断言代替收窄
+### 交叉类型中的属性变成 `never`
 
-```ts
-function getTitle(value: unknown): string {
-  return (value as Lesson).title
-}
-```
+两边给同名字段施加了无法同时满足的约束。重新检查模型，不要用断言压掉冲突。
 
-这不会验证 `value`。应使用守卫或断言函数提供运行时证据。
+### 新增状态后旧代码没有提示
 
-### 类型谓词实现不完整
+关键状态处理使用 `switch` 配合 `assertNever`。没有穷尽性检查时，新增成员可能落入宽泛默认分支。
 
-如果 `isLesson` 只检查 `title`，却承诺完整 `Lesson`，后续访问其他字段仍可能崩溃。谓词签名越强，实现责任越大。
+## 本课的核心判断顺序
 
-### 用交叉类型表示互斥选择
+面对一份存在多种形态的数据，可以按以下顺序思考：
 
-`CardPayment & BankPayment` 要求同时满足两种支付方式，不表示二选一。互斥选择应该使用 `|`。
+1. 这些情况是可以同时存在，还是互斥选择？
+2. 互斥时使用联合；同时满足时才考虑交叉。
+3. 对象成员之间是否存在“某字段决定其他字段”的关联？
+4. 有关联时使用共同字面量字段建立可辨识联合。
+5. 使用这份数据前，运行时能提供什么证据？
+6. 简单证据直接判断，复杂边界封装守卫或 Schema。
+7. 关键状态是否需要 `never` 保证处理完整？
 
-### 忘记交叉属性可能冲突
+## 下一课
 
-同名属性不会按对象展开的先后顺序覆盖。它们必须同时兼容，否则可能得到 `never`。
+下一节是[泛型基础与约束](/frontend/typescript/generics-and-constraints)。联合类型能表达“输入属于哪些候选”，泛型则解决另一类问题：
 
-### `switch` 没有穷尽检查
+- 输入是什么类型，输出就保持同一种类型；
+- 数组元素、接口数据和回调参数之间怎样建立关联；
+- 为什么 `any` 会丢失关联，而泛型可以保留；
+- 怎样使用约束说明泛型至少需要哪些能力。
 
-没有 `assertNever` 时，新增联合成员可能在旧代码中静默落入默认逻辑。关键领域状态应显式处理每个分支。
-
-## 23. 工程最佳实践
-
-- 用字面量联合代替含义有限的宽泛 `string`。
-- 用可辨识联合表达互斥状态，让非法状态难以表示。
-- 可辨识字段使用稳定、明确的名称，如 `status`、`kind`、`type` 或 `ok`。
-- 外部数据使用 `unknown`，在系统边界集中完成运行时验证。
-- 简单判断直接使用内置守卫；复杂且复用的结构检查封装为类型谓词或 Schema。
-- 关键联合状态使用 `never` 做穷尽性检查。
-- 交叉类型用于组合兼容能力，不用于掩盖模型冲突。
-- 避免不必要的 `as`；断言没有运行时证据，也不会转换数据。
-- 在回调和异步边界前保存已收窄值的 `const` 快照，减少可变状态导致的类型回退。
-- 类型不仅描述数据形状，还应表达字段之间的业务关系。
-
-## 24. 与 Vue、Java 和后端接口的联系
-
-### Vue 异步页面状态
-
-Vue 组件中常见的三个独立变量：
-
-```ts
-const loading = ref(false)
-const data = ref<Lesson[]>()
-const error = ref<string>()
-```
-
-可能组合出矛盾状态。可以改成：
-
-```ts
-const state = ref<LessonRequestState>({ status: 'idle' })
-```
-
-模板或计算属性通过 `state.value.status` 判断后，就能安全使用相应字段。
-
-### Vue 组件 Props
-
-如果组件支持链接和按钮两种模式：
-
-```ts
-type ActionProps =
-  | { kind: 'link'; href: string }
-  | { kind: 'button'; onClick: () => void }
-```
-
-这能避免链接缺少 `href`，也避免按钮意外携带无意义的链接属性。
-
-### Java 的密封类型
-
-可辨识联合在设计目的上类似 Java 的密封接口（sealed interface）配合记录类或实现类：都希望把允许的变体限制在一个已知集合内，并对不同变体分别处理。
-
-主要区别是 TypeScript 使用结构化类型系统，联合成员通常不需要显式声明“实现”某个共同接口；Java 则依赖名义类型和明确的继承关系。
-
-### 后端 API 结果
-
-前端可以把后端响应建模为：
-
-```ts
-type ApiResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: { code: string; message: string } }
-```
-
-但类型不能替代协议校验。后端真实 JSON 仍需在运行时验证，尤其当接口版本、网关或第三方服务可能产生不符合约定的数据时。
-
-## 25. 概念辨析与因果回顾
-
-### 联合类型和交叉类型的区别是什么？
-
-`A | B` 表示值属于候选类型中的至少一种，未经收窄只能安全使用所有成员共同支持的操作。`A & B` 表示值必须同时满足所有成员，常用于组合兼容的对象能力。
-
-### 什么是类型收窄？
-
-类型收窄是 TypeScript 根据 `typeof`、相等性判断、`in`、`instanceof`、可辨识字段或自定义谓词等运行时证据，在特定控制流位置排除不可能类型的过程。
-
-### 类型谓词和类型断言有什么区别？
-
-类型谓词通常由函数执行运行时判断，并通过 `value is Type` 把判断结果告诉编译器。`value as Type` 只是编译期声明，不验证或转换运行时值。谓词实现仍需由开发者保证正确。
-
-### 为什么可辨识联合适合表达业务状态？
-
-它把不同状态所拥有的字段绑定在一起，使互斥关系进入类型系统。判断共同的字面量字段后，相关数据自动收窄，非法字段组合也更难构造。
-
-### `never` 如何帮助穷尽检查？
-
-当所有联合成员都已处理，剩余类型应为 `never`。把剩余值传给只接受 `never` 的函数后，新增但未处理的联合成员会触发编译错误。
-
-### 为什么 `typeof null` 需要特别注意？
-
-由于 JavaScript 的历史行为，`typeof null` 返回 `"object"`。只判断对象类型不能排除 `null`，需要额外执行非空判断。
-
-## 26. 本节总结
-
-- 联合类型 `A | B` 描述多个候选类型中的一种。
-- 联合值在收窄前只能使用所有成员都支持的安全操作。
-- 字面量联合可以把宽泛字符串变成有限、可检查的业务状态。
-- 类型收窄依赖真实的运行时判断，不会转换数据。
-- TypeScript 会结合分支、赋值、提前返回和可达性进行控制流分析。
-- 类型谓词适合复用复杂判断，断言函数适合不满足条件就终止的边界。
-- 可辨识联合通过共同的字面量字段表达互斥状态和字段关联。
-- `never` 能让关键状态处理保持穷尽。
-- 交叉类型 `A & B` 要求同时满足多个类型，不等于运行时对象合并。
-- 冲突属性可能在交叉后变成 `never`，这通常暴露了模型设计问题。
-- 对外部数据应先用 `unknown` 接收并做运行时校验，再进入可信业务区域。
-
-## 27. 下一步学习
-
-下一节建议学习：[**TypeScript 泛型基础与约束**](/frontend/typescript/generics-and-constraints)。
-
-届时会重点解决：
-
-- 如何让输入类型与输出类型保持关联。
-- 为什么 `any` 无法替代泛型。
-- 泛型函数、泛型接口和泛型类型别名。
-- `extends` 约束、`keyof` 与安全属性访问。
-- 在 Vue 组合式函数和接口响应模型中使用泛型。
-
-## 28. 参考资料
+## 参考资料
 
 - [TypeScript Handbook：Narrowing](https://www.typescriptlang.org/docs/handbook/2/narrowing.html)
 - [TypeScript Handbook：Everyday Types - Union Types](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#union-types)
 - [TypeScript Handbook：Object Types - Intersection Types](https://www.typescriptlang.org/docs/handbook/2/objects.html#intersection-types)
-- [TypeScript Handbook：Creating Types from Types](https://www.typescriptlang.org/docs/handbook/2/types-from-types.html)
+- [TypeScript Handbook：Function Overloads](https://www.typescriptlang.org/docs/handbook/2/functions.html#function-overloads)
 - [MDN：typeof](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/typeof)
 - [MDN：in operator](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/in)
 - [MDN：instanceof](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Operators/instanceof)
