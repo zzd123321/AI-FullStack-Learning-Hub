@@ -132,6 +132,7 @@ class CohortRouter:
         self.remote_percent = remote_percent
 
     def use_remote(self, stable_subject: str) -> bool:
+        # 用稳定身份哈希分桶，同一用户不会在本地与远程实现之间来回跳动。
         digest = hashlib.sha256(stable_subject.encode("utf-8")).digest()
         bucket = int.from_bytes(digest[:4], "big") % 100
         return bucket < self.remote_percent
@@ -153,6 +154,7 @@ class MigratingInventoryAdapter:
         self, sku: str, *, subject: str, shadow: bool = False
     ) -> Availability:
         if shadow:
+            # 影子读同时比较新旧实现，但仍返回旧实现结果，因此可先观察而不影响用户。
             primary = self._local.availability(sku)
             candidate = self._remote.availability(sku)
             if candidate != primary:
@@ -165,5 +167,5 @@ class MigratingInventoryAdapter:
         self, command: ReservationCommand, *, subject: str
     ) -> ReservationResult:
         target = self._remote if self._router.use_remote(subject) else self._local
-        # Never fall back a write after an unknown remote outcome: it could apply twice.
+        # 远程写结果未知时绝不能回退再写本地：第一次可能已成功，回退会造成双写。
         return target.reserve(command)

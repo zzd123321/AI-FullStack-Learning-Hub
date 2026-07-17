@@ -51,6 +51,7 @@ class OrderDatabase:
         with self._lock:
             if order_id in self._orders:
                 raise ValueError("order already exists")
+            # 业务记录与待发送事件一起落库：不会出现“订单成功但事件永久丢失”。
             self._orders[order_id] = Order(order_id, customer_id, total)
             self._outbox[event.event_id] = OutboxRecord(event)
         return copy.deepcopy(event)
@@ -122,6 +123,7 @@ class InMemoryBroker:
             queue = self._queues[(topic, group)]
             if not queue:
                 return None
+            # 取出不代表处理成功；消费者必须在业务提交后显式 ack。
             message = queue.popleft()
             message.attempts += 1
         return Delivery(self, topic, group, message)
@@ -153,6 +155,7 @@ class OutboxRelay:
 
     def publish_pending(self, *, crash_after_publish: bool = False) -> None:
         for row in self._database.pending_outbox():
+            # 发布成功与“标记已发布”之间仍可能崩溃，所以消费者必须接受重复事件。
             self._broker.publish("orders", row.event)
             if crash_after_publish:
                 raise RuntimeError("relay crashed before marking the outbox row")
@@ -169,6 +172,7 @@ class FulfillmentProjection:
 
     def apply_once(self, event: Event) -> bool:
         with self._lock:
+            # inbox 标记和业务副作用在同一临界区；重复投递不会创建第二次发货。
             if event.event_id in self._processed_event_ids:
                 return False
             if event.event_type != "com.example.order.created.v1":

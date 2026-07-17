@@ -12,6 +12,8 @@ outline: deep
 
 本课沿 data plane 的真实路径解释每层作用，再讨论 control plane 如何向它们发布 route、endpoint 和 policy。主线是：**稳定名称如何找到不断变化的健康实例，边界组件如何把不可信外部请求转换成受约束的内部请求。**
 
+第一次先画出自己系统真实存在的层，不要照图购买全部组件。明确谁终止 TLS、谁认证、谁选择 ready 实例、谁设置 timeout，以及哪些 header 只有可信代理可以写；职责已经由一个入口完成时，不要再叠加第二套不一致规则。
+
 > Kubernetes 部分依据当前官方 Service、EndpointSlice 与 probe 文档。EndpointSlice 自 Kubernetes 1.21 为 stable；文中不假设某个云负载均衡或 gateway 厂商的默认行为。
 
 ## 1. 一次外部请求可能经过哪些层

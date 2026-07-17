@@ -7,6 +7,7 @@ from dataclasses import dataclass
 def expected_concurrency(arrival_per_second: float, mean_service_seconds: float) -> float:
     if arrival_per_second < 0 or mean_service_seconds < 0:
         raise ValueError("rates and durations cannot be negative")
+    # Little 定律的直觉：到达越快、每个请求停留越久，系统内同时存在的请求越多。
     return arrival_per_second * mean_service_seconds
 
 
@@ -40,6 +41,7 @@ class ErrorBudget:
 
     @property
     def remaining(self) -> float:
+        # 可为负数；负数表示这个统计窗口已经透支错误预算。
         return self.allowed_bad - self.bad_events
 
     @property
@@ -57,6 +59,7 @@ def monthly_unavailability_minutes(slo: float, days: int = 30) -> float:
 
 def independent_series_availability(*components: float) -> float:
     _validate_availabilities(components)
+    # 串联链路要求每个组件同时成功，因此端到端可用性是各项乘积。
     return math.prod(components)
 
 
@@ -107,6 +110,7 @@ class BackupCatalog:
         ]
         if not candidates:
             raise RecoveryPointUnavailable("no validated recovery point is available")
+        # 不是选“最新文件”，而是选事故前、校验通过且实际演练恢复成功的最新恢复点。
         point = max(candidates, key=lambda item: item.timestamp_minutes)
         loss = incident_timestamp_minutes - point.timestamp_minutes
         return RecoverySelection(point, loss, loss <= required_rpo_minutes)
@@ -137,6 +141,7 @@ class RecoveryRun:
 
     @property
     def total_minutes(self) -> int:
+        # RTO 从故障发生后开始计算，不只是存储工具显示的 restore 阶段。
         return sum(
             (
                 self.detect_minutes,

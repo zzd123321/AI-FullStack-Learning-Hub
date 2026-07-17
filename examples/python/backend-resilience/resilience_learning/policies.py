@@ -77,6 +77,7 @@ class RetryPolicy:
     ) -> RetryTrace:
         sleeps: list[float] = []
         for attempt in range(1, self.max_attempts + 1):
+            # 所有尝试共享一个总截止时间，重试不能偷偷把用户等待时间无限拉长。
             remaining = deadline - clock.now
             if remaining <= 0:
                 raise DeadlineExceeded("no request budget remains")
@@ -88,6 +89,7 @@ class RetryPolicy:
             if result.outcome == Outcome.SUCCESS:
                 return RetryTrace(result.value or "", attempt, tuple(sleeps))
             if result.outcome == Outcome.PERMANENT_FAILURE:
+                # 参数错误、权限错误等永久失败重试也不会变好，只会增加下游压力。
                 raise PermanentFailure("operation is not retryable")
             if attempt == self.max_attempts:
                 break
@@ -130,6 +132,7 @@ class CircuitBreaker:
             else:
                 raise CircuitOpen("dependency circuit is open")
         if self.state == BreakerState.HALF_OPEN:
+            # 半开时只放一个探测请求，避免故障下游刚恢复就再次被流量压垮。
             if self._probe_in_flight:
                 raise CircuitOpen("half-open probe is already running")
             self._probe_in_flight = True
@@ -157,6 +160,7 @@ class Bulkhead:
         self._slots = BoundedSemaphore(capacity)
 
     def acquire(self) -> None:
+        # 舱壁限制某个依赖占用的并发量，保护其他依赖仍有资源可用。
         if not self._slots.acquire(blocking=False):
             raise BulkheadFull("dependency concurrency budget is full")
 
@@ -176,6 +180,7 @@ class TokenBucket:
 
     def allow(self, now: float, cost: float = 1.0) -> bool:
         with self._lock:
+            # 时间流逝补充令牌，请求消耗令牌：容量允许短突发，补充速率限制长期流量。
             effective_now = max(now, self.updated_at)
             elapsed = effective_now - self.updated_at
             self.tokens = min(

@@ -20,6 +20,8 @@ outline: deep
 - rate limit 管理一段时间内的请求配额与公平性；
 - load shedding 在容量不足时主动拒绝，保护系统继续处理可承受流量。
 
+第一次只做三件事：给整个请求预算 deadline，给每次下游调用更短 timeout，并限制同时占用的资源。Retry 会增加流量，只用于可重试且幂等的暂时失败；熔断、隔离和限流是在明确故障模式与容量之后继续加的保护层。
+
 > 示例环境为 Python 3.11+，使用手动时钟稳定验证时间边界。协议语义依据 RFC 9110/6585 与 gRPC 官方 deadline/retry 指南；框架实现需按实际 Resilience4j、Spring、gRPC 或 proxy 版本核对。
 
 ## 1. 慢为什么会变成级联故障

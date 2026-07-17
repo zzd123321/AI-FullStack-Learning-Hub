@@ -134,6 +134,7 @@ class ProductService:
 
     def get(self, product_id: str) -> Product | None:
         key = self.cache_key(product_id)
+        # cache-aside：先看缓存；命中时不访问权威数据源。
         cached = self._cache.get(key)
         if cached.hit:
             return cached.value
@@ -146,6 +147,7 @@ class ProductService:
 
             product = self._repository.get(product_id)
             if product is None:
+                # 短暂缓存“不存在”，避免热点不存在 ID 持续击穿数据源。
                 self._cache.set_if_newer(
                     key, None, revision=0, ttl_seconds=self._missing_ttl
                 )
@@ -157,9 +159,9 @@ class ProductService:
             return product
 
     def rename(self, product_id: str, name: str) -> Product:
-        # Commit the source of truth first. A cache failure must not roll back the DB here.
+        # 先提交权威数据源；缓存只是副本，缓存失败不能把业务事实“撤销”。
         updated = self._repository.rename(product_id, name)
-        # Publishing the new revision prevents a late old fill from overwriting it.
+        # 带版本写缓存，防止并发中的旧查询结果晚到后覆盖新值。
         self._cache.set_if_newer(
             self.cache_key(product_id),
             updated,

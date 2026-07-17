@@ -10,6 +10,8 @@ API 一旦被浏览器、移动端、合作方、CLI 或另一个服务使用，
 
 设计 API 的关键不是把 controller URL 改成复数名词，而是让 client、proxy、cache 和 server 对同一个请求形成一致理解：这个方法是否安全重试、成功创建了什么、更新基于哪个版本、错误能否机器处理、翻页期间数据变化会发生什么。
 
+第一次只设计一个资源的创建、读取和失败合同：method、URI、status、必要 header 与稳定错误 body。分页、ETag 并发控制、幂等键和版本演进是在调用方与并发复杂度出现后逐步加入的，不要把所有机制塞进第一个 CRUD。
+
 > 规范基准：HTTP Semantics RFC 9110、HTTP Caching RFC 9111、PATCH RFC 5789、额外状态码 RFC 6585、Problem Details RFC 9457。当前 OpenAPI 最新发布版为 3.2.0；FastAPI 0.139.x 生成 OpenAPI 3.1.0，选择规范版本时还要核对目标生成器和 gateway 的支持范围。
 
 ## 1. API 合同包含整个 HTTP message

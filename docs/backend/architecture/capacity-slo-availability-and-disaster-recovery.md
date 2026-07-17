@@ -12,6 +12,8 @@ outline: deep
 
 主线是：**先定义用户结果与业务不变量，再根据 workload、故障域和恢复目标设计容量、冗余与备份，并通过演练证明。**
 
+第一次只选择一个用户旅程，写出 SLI、目标 SLO、峰值负载和单实例安全容量，再计算需要的实例与余量。RTO/RPO、跨区域和 PITR 属于业务影响分析后的恢复设计；“有备份”必须通过实际恢复演练才能成为证据。
+
 > 示例环境为 Python 3.11+。SLO/error budget 依据 Google SRE 公开资料；Kubernetes 行为依据 topology spread/PDB 官方文档；数据库恢复依据 PostgreSQL 17/18 的 WAL/PITR 文档。云服务 SLA、复制与备份能力需按实际地区和版本核对。
 
 ## 1. workload 不是一个 QPS 数字

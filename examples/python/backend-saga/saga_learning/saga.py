@@ -149,6 +149,7 @@ class OrderSagaOrchestrator:
     def run(self, saga_id: str, *, crash_after: str | None = None) -> OrderSaga:
         saga = self.store.get(saga_id)
 
+        # 每个 if 都从已保存状态继续，因此进程重启后不必从头盲目重做全部步骤。
         if saga.status == SagaStatus.NEW:
             accepted = self.inventory.reserve(
                 self.operation_id(saga, "reserve"), saga.quantity
@@ -184,11 +185,13 @@ class OrderSagaOrchestrator:
                 saga.status = SagaStatus.COMPLETED
 
         if saga.status == SagaStatus.COMPENSATING:
+            # 补偿不是数据库回滚，而是一组新的业务操作，并且它们自己也可能失败。
             capture_id = self.operation_id(saga, "capture")
             if saga.payment_captured and not self.payment.refund(
                 self.operation_id(saga, "refund"), capture_id
             ):
                 saga.status = SagaStatus.MANUAL_INTERVENTION
+                # 不把失败伪装成成功：保留显式状态，让告警和人工处理能够接手。
                 saga.failure = f"{saga.failure}; refund failed"
                 return saga
             if saga.inventory_reserved:

@@ -41,6 +41,7 @@ class ItemStore:
         )
 
     def create(self, key: str, name: str, price: Decimal) -> tuple[Item, bool]:
+        # 幂等键不能只记“处理过”：还要记住原请求内容，防止同一个键被误用于另一笔创建。
         request_fingerprint = self.fingerprint(name, price)
         with self._lock:
             cached = self._idempotency.get(key)
@@ -52,6 +53,7 @@ class ItemStore:
                 return cached[1], True
             self._sequence += 1
             item = Item(str(uuid4()), name, price, 1, self._sequence)
+            # 真实系统应让业务数据和幂等记录在同一个数据库事务中提交。
             self._items[item.item_id] = item
             self._idempotency[key] = (request_fingerprint, item)
             return item, False
@@ -67,6 +69,7 @@ class ItemStore:
             if current is None:
                 return None
             if current.version != expected_version:
+                # 客户端编辑的是旧版本；若继续覆盖，就会悄悄丢掉别人刚完成的修改。
                 raise ValueError("etag does not match current representation")
             updated = replace(
                 current,
@@ -101,6 +104,7 @@ class ItemStore:
             raise ValueError("invalid cursor") from error
 
     def page(self, limit: int, cursor: str | None) -> Page:
+        # 游标记录“上次读到的稳定排序位置”，而不是容易因插入数据而漂移的页码。
         after = self.decode_cursor(cursor)
         ordered = sorted(
             (item for item in self._items.values() if item.sequence > after),

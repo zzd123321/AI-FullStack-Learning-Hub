@@ -171,6 +171,7 @@ class Gateway:
         candidates = [route for route in config.routes if self._matches(route, request)]
         if not candidates:
             raise RouteNotFound(f"no route for {request.host}{request.path}")
+        # /api/orders 比 /api 更具体，应优先匹配，避免规则顺序偶然改变路由结果。
         return max(candidates, key=lambda route: len(route.path_prefix))
 
     @staticmethod
@@ -186,6 +187,7 @@ class Gateway:
         )
 
     def _client_ip(self, request: IncomingRequest, config: GatewayConfig) -> str:
+        # 只有已知代理写入的转发链才可信；公网客户端传来的同名头必须忽略。
         if not self._is_trusted(request.peer_ip, config.trusted_proxy_cidrs):
             return request.peer_ip
         forwarded = self._header(request.headers, "X-Forwarded-For") or ""
@@ -200,6 +202,7 @@ class Gateway:
         config = self._configs.snapshot()
         route = self._select_route(request, config)
         authorization = self._header(request.headers, "Authorization")
+        # 先删除客户端伪造的身份头，再由网关根据已验证令牌重新生成。
         headers = {
             key: value
             for key, value in request.headers.items()
@@ -210,6 +213,7 @@ class Gateway:
             user_id, tenant_id = self._verifier.verify(authorization)
             headers["X-User-Id"] = user_id
             headers["X-Tenant-Id"] = tenant_id
+        # 服务发现只选择 readiness 为真的实例；活着但尚未就绪的实例不会接流量。
         endpoint = self._registry.choose(route.service)
         client_ip = self._client_ip(request, config)
         headers["X-Forwarded-For"] = client_ip

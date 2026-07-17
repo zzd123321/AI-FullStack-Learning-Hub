@@ -14,6 +14,8 @@ outline: deep
 
 本课不从 Kafka/RabbitMQ 配置项开始，而是先回答：一条消息在 producer、broker、consumer 和数据库之间如何移动，哪一步失败会留下什么状态。
 
+第一次只画出消息所有权：生产者尚未确认时负责重试，Broker 接管后负责保存与投递，消费者业务提交后才能确认。先按 at-least-once 设计重复安全，再谈吞吐、partition 和 exactly-once；不允许延后完成的操作仍应保持同步。
+
 > 规范与产品基准：RabbitMQ 官方 reliability/acknowledgement 文档、Apache Kafka 4.3 文档与 CloudEvents 1.0.2 规范。教学模型使用 Python 3.11+，不冒充任何具体 broker 的完整实现。
 
 ## 1. 同步与异步改变的是依赖时间

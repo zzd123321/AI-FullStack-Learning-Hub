@@ -85,10 +85,12 @@ def conditional_json(
     cache_control: str,
     vary: str | None = None,
 ) -> Response:
+    # ETag 必须由最终表示生成；同一份内容才能稳定得到同一个验证标识。
     body = canonical_json(value)
     etag = strong_etag(value)
     headers = cache_headers(etag=etag, cache_control=cache_control, vary=vary)
     if if_none_match == etag:
+        # 内容未变，只返回元数据。浏览器/CDN 可以继续复用原响应体。
         return Response(status_code=304, headers=headers)
     return Response(content=body, media_type="application/json", headers=headers)
 
@@ -153,12 +155,14 @@ def create_app() -> FastAPI:
         return conditional_json(
             value,
             if_none_match=if_none_match,
+            # private 禁止共享缓存复用；no-cache 要求每次使用前向源站确认。
             cache_control="private, no-cache",
             vary="Authorization",
         )
 
     @app.get("/api/payment-secret")
     def get_payment_secret() -> Response:
+        # 一次性敏感数据连私有缓存也不应保存，所以使用 no-store。
         return Response(
             content=canonical_json({"one_time_secret": "demo-only"}),
             media_type="application/json",

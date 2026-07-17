@@ -134,6 +134,7 @@ def create_app() -> FastAPI:
             str, Header(alias="Idempotency-Key", min_length=8, max_length=64)
         ],
     ) -> ItemResponse:
+        # 网络超时后客户端可以原样重试；相同幂等键只会产生一份资源。
         try:
             item, replayed = store.create(idempotency_key, payload.name, payload.price)
         except IdempotencyConflictError as error:
@@ -179,6 +180,7 @@ def create_app() -> FastAPI:
             raise ApiProblem(404, "item-not-found", "Item not found", "No item exists.")
         current_etag = etag(item)
         if if_none_match == current_etag:
+            # 表示客户端缓存仍然有效，因此 304 不再重复传输响应体。
             return Response(status_code=304, headers={"ETag": current_etag})
         response.headers["ETag"] = current_etag
         return present(item)
@@ -201,6 +203,7 @@ def create_app() -> FastAPI:
         if_match: Annotated[str | None, Header(alias="If-Match")] = None,
     ) -> ItemResponse:
         if if_match is None:
+            # 强制客户端说明自己基于哪个版本修改，避免“最后写入者静默获胜”。
             raise ApiProblem(
                 428, "precondition-required", "Precondition required", "Send If-Match."
             )
