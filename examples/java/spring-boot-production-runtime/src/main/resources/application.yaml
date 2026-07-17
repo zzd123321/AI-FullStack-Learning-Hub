@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: production-runtime
+  lifecycle:
+    # 关闭阶段最多等待 20 秒。平台的强制终止时间必须比它更长。
+    timeout-per-shutdown-phase: 20s
+
+server:
+  # Spring Boot 4 默认已启用 graceful；显式写出是为了展示运行合同。
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      # Actuator 默认不会把所有端点暴露到 HTTP；这里只开放健康和 info。
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+        # 在主服务端口增加 /livez 与 /readyz，探针会经过同一套 Web Server。
+        add-additional-paths: true
+      show-details: never
+
+app:
+  runtime:
+    # 环境变量覆盖部署实例名；本地没有配置时使用可运行的默认值。
+    instance-name: ${APP_INSTANCE_NAME:local-development}
+    public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:${server.port:8080}}

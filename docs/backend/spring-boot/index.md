@@ -59,6 +59,7 @@ Spring Boot 最容易学错的方式，是先背 `@Component`、`@Service`、`@A
 10. [消息驱动、RabbitMQ、Kafka、可靠投递与 Transactional Outbox](/backend/spring-boot/messaging-rabbitmq-kafka-reliability-and-outbox)
 11. [Spring Security：认证、授权、过滤器链、密码、Session、JWT、CSRF 与 CORS](/backend/spring-boot/security-authentication-authorization-session-jwt-and-csrf)
 12. [测试体系：JUnit、Mockito、MVC 切片与完整应用集成测试](/backend/spring-boot/testing-strategy-junit-mockito-slices-and-integration-tests)
+13. [生产运行：可执行 JAR、外部配置、健康检查、代理与优雅停机](/backend/spring-boot/production-packaging-configuration-health-proxy-and-graceful-shutdown)
 
 配套源码统一放在 `examples/java/spring-boot-*`，课程页面使用 VitePress 源文件导入展示完整代码。源码注释重点解释对象由谁创建、代码在哪个线程和生命周期阶段执行，以及失败如何向外传播。
 
