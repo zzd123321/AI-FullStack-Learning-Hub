@@ -7,7 +7,10 @@ import { createAppRouter } from './router'
 
 export const lessonServiceKey: InjectionKey<LessonService> = Symbol('lesson-service')
 
-export function createUniversalApp(history: RouterHistory, lessonService: LessonService) {
+export function createUniversalApp(
+  history: RouterHistory,
+  lessonService: LessonService
+) {
   // 每次调用都创建全新的 App、Router 和 Pinia，服务端必须每个请求调用一次。
   const app = createSSRApp(App)
   const pinia = createPinia()

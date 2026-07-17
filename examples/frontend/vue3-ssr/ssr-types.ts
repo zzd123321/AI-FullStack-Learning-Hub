@@ -7,8 +7,14 @@ export interface Lesson {
 
 export interface RequestContext {
   requestId: string
-  origin: string
-  cookie?: string
+  apiOrigin: string
+  sessionCookie: string | undefined
+}
+
+export interface ServerRuntimeConfig {
+  /** 由部署配置提供，不能从用户可控的 Host 头推导。 */
+  apiOrigin: string
+  clientEntryUrl: string
 }
 
 export interface PageMetadata {

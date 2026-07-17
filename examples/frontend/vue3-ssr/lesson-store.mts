@@ -8,23 +8,37 @@ export const useLessonStore = defineStore('lesson', () => {
   const loadedId = ref<string | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  let latestRequestId = 0
+  let activeController: AbortController | null = null
 
   const found = computed(() => current.value !== null)
 
   async function load(id: string, service: LessonService): Promise<void> {
     if (loadedId.value === id) return
 
+    const requestId = ++latestRequestId
+    activeController?.abort()
+    const controller = new AbortController()
+    activeController = controller
+    current.value = null
     loading.value = true
     error.value = null
 
     try {
-      current.value = await service.findById(id)
+      const lesson = await service.findById(id, controller.signal)
+      if (requestId !== latestRequestId) return
+      current.value = lesson
       loadedId.value = id
     } catch (cause: unknown) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
+      if (requestId !== latestRequestId) return
       error.value = cause instanceof Error ? cause.message : '加载课程失败'
       throw cause
     } finally {
-      loading.value = false
+      if (requestId === latestRequestId) {
+        activeController = null
+        loading.value = false
+      }
     }
   }
 

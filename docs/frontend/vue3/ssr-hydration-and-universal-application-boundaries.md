@@ -1,564 +1,615 @@
 ---
 title: Vue 3 SSR、Hydration 与同构应用边界
-description: 从请求级应用工厂、路由与数据预取，到安全状态序列化、Hydration 一致性、缓存及生产架构
+description: 从一次请求的两端执行出发，理解请求隔离、数据预取、安全状态传输与 Hydration 一致性
 ---
 
 # Vue 3 SSR、Hydration 与同构应用边界
 
-> 适用环境：Vue 3、Vue Router 4、Pinia、Vite SSR，以及采用相同原理的 Nuxt 应用。SSR、Vite 与框架 API 会持续演进；工程配置应以项目锁定版本和官方文档为准。
+> 适用环境：Vue 3、Vue Router 4、Pinia、Vite SSR，以及采用相同原理的 Nuxt。生产 SSR 涉及构建、缓存、安全和运行平台，优先采用成熟框架；本课用底层示例解释它们替你解决的问题。
 
-## 1. 学习目标
-
-完成本节后，你应该能够：
-
-- 区分 CSR、SSR、SSG、流式 SSR、混合渲染与边缘渲染。
-- 解释服务端渲染和客户端 Hydration 的完整时间线。
-- 为每个请求创建独立的 App、Router、Pinia 和服务上下文。
-- 使用服务端 memory history 与客户端 web history 建立统一路由。
-- 在渲染前解析路由数据，并通过状态载荷避免浏览器重复请求。
-- 安全地把 Pinia 状态嵌入 HTML，避免 `</script>` 注入和用户数据泄漏。
-- 识别随机数、时区、非法 HTML、浏览器 API 等 Hydration 不一致来源。
-- 正确处理生命周期、副作用、Teleport、指令和只支持浏览器的库。
-- 设计状态码、重定向、Head、缓存、超时、日志和降级策略。
-- 判断何时手写 Vite SSR，何时使用 Nuxt 等上层框架。
-
-## 2. SSR 到底解决什么问题
-
-传统客户端渲染（CSR）返回近乎空的 HTML。浏览器下载、解析和执行 JavaScript 后，Vue 才请求数据并生成内容：
+CSR 应用的组件只在浏览器运行。SSR 应用中，同一页面至少执行两次：
 
 ```text
-请求 HTML → 下载 JS → 执行 Vue → 请求数据 → 生成 DOM → 页面可读
+第一次：服务器根据本次 HTTP 请求生成 HTML
+第二次：浏览器用同一份初始状态 Hydrate 这段 HTML
 ```
 
-服务端渲染（SSR）先在服务器执行组件，直接返回包含内容的 HTML：
+几乎所有 SSR 难点都来自这句话：
+
+- 两次执行怎样得到可对应的首帧？
+- 服务器怎样保证不同用户的状态不混在一起？
+- 第一次取到的数据怎样安全交给第二次，而不重复请求？
+- 只存在于浏览器或服务器的副作用放在哪里？
+
+## SSR 先解决“内容何时到达”，不保证一切更快
+
+纯客户端渲染通常是：
 
 ```text
-请求 → 路由匹配 → 数据加载 → Vue 渲染 HTML → 浏览器展示
-                                      ↓
-                         下载 JS → Hydration → 可交互
+请求 HTML
+  ↓
+下载并执行应用 JavaScript
+  ↓
+创建 Vue 应用
+  ↓
+请求首屏数据
+  ↓
+生成内容 DOM
 ```
 
-它主要改善：
-
-- **首屏内容到达时间**：浏览器无需等待应用 JavaScript 执行才看到正文。
-- **搜索与分享抓取**：爬虫、预览机器人能直接读取标题、描述和主体内容。
-- **弱设备体验**：把一部分首屏计算转移到服务器。
-
-SSR 不自动等于“更快”。它会增加服务器计算、TTFB、HTML 大小、状态载荷和 Hydration 工作量。页面可能很早“看见”，但在 JavaScript 下载和 Hydration 完成前仍不能交互。应同时观察 TTFB、FCP/LCP、INP、客户端长任务和服务器资源，而不是只看 HTML 是否提前出现。
-
-## 3. 渲染模式不是二选一
-
-| 模式 | HTML 何时生成 | 适合场景 | 主要代价 |
-| --- | --- | --- | --- |
-| CSR | 浏览器运行时 | 后台系统、强交互且 SEO 不重要 | 首屏依赖 JS，抓取能力较弱 |
-| SSR | 每次请求 | 个性化或高时效公开页面 | 服务器成本、缓存和同构复杂度 |
-| SSG/预渲染 | 构建时 | 文档、营销页、更新不频繁内容 | 内容更新需要重建或增量机制 |
-| ISR/SWR | 构建或首次请求后缓存 | 内容站、商品详情 | 新旧版本窗口和缓存失效复杂度 |
-| 混合渲染 | 按路由决定 | 大型产品同时包含官网与后台 | 规则和部署链路更多 |
-| 流式 SSR | 请求中分段输出 | 数据延迟不同的大页面 | 状态码、错误和脚本协调更复杂 |
-
-如果所有用户看到相同内容，SSG 通常比每次 SSR 更便宜、更稳定。登录后的管理后台通常保留 CSR 即可。成熟项目常按路由混合选择，而不是用一种模式覆盖全部页面。
-
-“边缘渲染”描述运行位置，不是新的 Vue 渲染语义。它能缩短网络距离，但运行时可能没有完整 Node.js API，冷启动、数据库连接、包体和区域一致性也要重新评估。
-
-## 4. Hydration 不是重新渲染
-
-浏览器拿到 SSR HTML 后，Vue 不应清空 DOM 再创建一遍。`createSSRApp()` 会遍历现有 DOM 与客户端虚拟 DOM，把事件监听器、组件实例和响应式副作用连接到已有节点，这个过程叫 Hydration。
-
-正确的首次渲染必须满足：
+SSR 把首屏组件和数据请求提前到服务器：
 
 ```text
-服务端根据 URL + 初始状态得到的 VNode
-                     ≈
-客户端在 Hydration 第一帧根据同一状态得到的 VNode
+HTTP 请求
+  ↓
+匹配路由并加载数据
+  ↓
+服务器生成带内容 HTML
+  ↓
+浏览器先展示内容
+  ↓
+下载 JavaScript 并 Hydrate
+  ↓
+页面可交互
 ```
 
-等 Hydration 完成后，客户端可以读取本地时区、窗口尺寸、存储和实时数据，再触发正常更新。关键不是服务端与客户端永远相同，而是**第一次客户端渲染要能解释服务端留下的 DOM**。
+它可能改善：
 
-Vue 能从部分不一致中恢复，但恢复意味着丢弃或重建 DOM，可能导致布局抖动、事件绑定异常和额外计算。开发期的 mismatch 警告应当作为缺陷处理。
+- 慢网络和弱设备上的首屏内容到达；
+- 搜索引擎和分享机器人读取正文、标题与描述；
+- 首屏数据请求与后端之间的网络距离。
 
-## 5. 一次请求的完整时间线
+它也增加：
 
-1. HTTP 适配层解析 URL，并创建 request ID、可信 origin 和允许转发的凭据。
-2. 应用工厂创建全新的 App、Pinia、Router 与请求级服务。
-3. 服务端 Router 使用 `createMemoryHistory()`，执行 `push(url)` 并等待 `isReady()`。
-4. 根据已匹配路由加载数据，写入当前请求的 Pinia。
-5. `renderToString()` 执行组件的 SSR 渲染，并收集 Teleport 等上下文。
-6. 读取最终 Pinia 状态、安全序列化，组合 Head、HTML、资源链接和状态码。
-7. 浏览器立刻解析并展示 HTML，同时加载客户端入口。
-8. 客户端创建结构相同但全新的应用，使用 `createWebHistory()`。
-9. 在任何组件读取 Store 之前恢复状态，等待 Router 就绪，再 `mount('#app')`。
-10. Vue Hydration 现有 DOM；后续导航转入普通 SPA 流程。
+- 服务器 CPU 和内存；
+- TTFB；
+- HTML 与状态载荷；
+- 两套构建产物；
+- Hydration 主线程成本；
+- 请求隔离、缓存和同构代码复杂度。
 
-顺序错误会形成真实 Bug。例如先挂载再恢复 Store，会让客户端第一帧渲染空状态；未等待 Router，则可能用错误页面 Hydration；在 `renderToString()` 前读取状态，会漏掉 `onServerPrefetch()` 写入的数据。
+页面可能很早可见，却在 Hydration 完成前不能响应点击。因此不能只看“view source 有内容”，还要同时测 TTFB、LCP、INP、Hydration 长任务和服务器资源。
 
-## 6. 最重要的安全规则：每个请求独立实例
+## 先选择渲染模式，再写 SSR 代码
 
-下面的模块级单例在 SPA 中很常见，但在 SSR 服务进程中会被所有用户共享：
+| 模式 | 内容何时生成 | 常见场景 |
+| --- | --- | --- |
+| CSR | 浏览器运行时 | 登录后台、强交互工具 |
+| SSR | 每次请求 | 个性化或高时效公开页 |
+| SSG / 预渲染 | 构建时 | 文档、博客、营销页 |
+| 缓存再生 / SWR | 请求结果缓存并更新 | 商品、内容详情 |
+| 混合渲染 | 每条路由独立选择 | 官网、内容与后台共存 |
+| 流式 SSR | 请求中分段输出 | 数据到达时间差异大的页面 |
+
+所有用户看到相同内容时，SSG 通常更便宜、更稳定。本学习站本身就是 VitePress 生成的静态站点，不需要为每次访问运行 Vue SSR。
+
+“边缘渲染”描述运行位置，不是另一套 Hydration 语义。边缘运行时可能没有完整 Node API，还要考虑包体、冷启动、数据库连接与区域一致性。
+
+## Hydration 不是把页面重新画一遍
+
+服务器返回的 DOM 已经存在。浏览器端使用 `createSSRApp()` 挂载时，Vue 会把组件实例、事件监听器和响应式更新能力连接到这些节点，这一步是 Hydration。
+
+首帧必须大致满足：
+
+```text
+服务器：URL + 请求状态 + 数据快照 → VNode / HTML
+客户端：URL + 传输状态 + 同一代码 → 首次 VNode
+
+两边结果能够一一对应
+```
+
+Hydration 后，浏览器当然可以读取 localStorage、窗口尺寸、本地时区或实时数据并正常更新。要求相同的是**客户端第一次用于认领服务端 DOM 的渲染**，不是之后永远相同。
+
+Vue 遇到 mismatch 会尝试恢复，但可能丢弃或重建节点，带来布局变化、状态丢失和额外成本。开发环境的 mismatch 警告应该先调查，而不是习惯性忽略。
+
+## 一次 SSR 请求的时间线
+
+1. HTTP 适配层生成 request ID，并读取可信运行配置。
+2. 为本次请求创建新的 App、Router、Pinia 和服务上下文。
+3. Memory Router 主动 `push(url)`，再等待 `router.isReady()`。
+4. 根据最终匹配路由加载首屏数据。
+5. `renderToString()` 执行组件，生成应用 HTML 并收集 Teleport。
+6. 渲染结束后读取 Pinia 状态，安全序列化。
+7. 组合 title、meta、资源链接、状态码、HTML 和状态载荷。
+8. 浏览器解析 HTML，并加载客户端入口。
+9. 客户端创建结构相同但全新的 App、Router 和 Pinia。
+10. 在任何 Store 被组件读取前恢复状态，等待 Router，再 mount。
+11. Vue Hydrate 已有 DOM；后续导航转成普通 SPA 更新。
+
+这个顺序包含多个正确性条件：
+
+- 未等 Router 就渲染，可能生成错误页面；
+- render 前读取 Store，会漏掉 `onServerPrefetch()` 写入；
+- 客户端先 mount 再恢复状态，首帧会按空 Store 渲染；
+- 不传输服务器数据，客户端二次请求可能拿到不同快照。
+
+## 最重要的隔离：每个请求创建一套可变实例
+
+SPA 中常见的模块单例：
 
 ```ts
-// 错误：整个服务进程只有一份可变状态
 export const pinia = createPinia()
 export const router = createRouter(/* ... */)
 ```
 
-请求 A 写入的用户资料可能被请求 B 读取，路由也会互相覆盖。这不只是偶发 UI 错误，而是跨用户数据泄漏。
+放到常驻 SSR 进程里会被所有请求共享。请求 A 写入用户资料后，请求 B 可能读取到它；两个 Router 的当前地址也会互相覆盖。这是跨用户数据泄漏，不只是偶发 UI 问题。
 
-正确结构是无状态模块导出工厂，每个请求调用一次：
+正确做法是工厂：
 
 <<< ../../../examples/frontend/vue3-ssr/app.mts
 
-以下对象通常必须是请求级的：
+服务端每个请求调用一次。通常属于请求级：
 
-- Vue App、Pinia、Router。
-- 包含用户认证或租户信息的 API 客户端。
-- 本次请求的数据加载缓存、错误收集、Head 管理器。
-- request ID、AbortSignal、Locale 等上下文。
+- Vue App、Router、Pinia；
+- 用户或租户相关 API Client；
+- 本次数据加载缓存与 AbortSignal；
+- Head、错误与状态码收集；
+- request ID、Locale、认证视图。
 
-数据库连接池、编译产物和只读配置可以进程级复用。判断标准不是“是不是对象”，而是它是否包含请求可变状态。
+可以进程级共享的通常是：
 
-## 7. 服务端和客户端路由必须同构
+- 数据库连接池；
+- 编译产物；
+- 不变配置；
+- 不含用户状态的只读缓存。
 
-服务端没有地址栏和浏览器历史，因此使用 memory history；浏览器使用 web history。路由表必须一致：
+判断标准不是“它是不是对象”，而是它是否保存了请求可变状态。
+
+## 服务端和浏览器共享路由表，不共享 History 实例
+
+路由工厂：
 
 <<< ../../../examples/frontend/vue3-ssr/router.mts
 
-服务端必须主动导航并等待异步路由解析：
+服务器没有地址栏和前进后退，使用 `createMemoryHistory()`；浏览器使用 `createWebHistory()`。
+
+服务端必须主动导航：
 
 ```ts
 await router.push(url)
 await router.isReady()
 ```
 
-应用服务器还必须把所有前端路由交给 SSR handler，静态资源和 API 除外。直接访问 `/lessons/vue3-ssr` 若被 Web Server 当作磁盘文件查找，Vue Router 根本没有机会执行。
+Web Server 也要把应用路由交给 SSR Handler，静态资源和 API 例外。若 `/lessons/vue3-ssr` 被当成磁盘文件查找，Vue Router 根本没有运行机会。
 
-路由渲染不是 HTTP 语义。匹配 NotFound 组件后仍需把响应状态设为 404；权限守卫重定向也应转换为 3xx 与 `Location`，而不是返回一个状态为 200 的登录页。避免在流式响应已经发送头部后才发现重定向或致命错误。
+路由组件不自动决定 HTTP 语义：
 
-## 8. 路由数据加载是一等边界
+- NotFound 页面应返回 404；
+- 真正重定向应返回 3xx 和 Location；
+- 服务端故障应返回合适 5xx；
+- 流式响应一旦发出响应头，再发现重定向就太迟了。
 
-组件各自在 `onMounted()` 请求数据会让服务端没有内容，也会形成瀑布请求。更稳妥的首屏方案是在路由确定后、渲染开始前统一加载关键数据：
+## 首屏数据要在渲染前准备，并交给浏览器复用
+
+如果页面只在 `onMounted()` 请求，服务器渲染时不会执行该钩子，HTML 只能得到 loading。
+
+示例先根据路由决定数据：
 
 <<< ../../../examples/frontend/vue3-ssr/route-data.mts
 
-Store 的 `loadedId` 同时承担去重契约：
+Store 保存数据和 loadedId：
 
 <<< ../../../examples/frontend/vue3-ssr/lesson-store.mts
 
-完整服务端入口：
+服务端入口：
 
 <<< ../../../examples/frontend/vue3-ssr/entry-server.mts
 
-实际项目可以选择：
+可选组织方式包括：
 
-- 路由 `meta` 对应加载器。
-- 页面组件导出约定的 loader。
-- `onServerPrefetch()` 让数据与组件共置。
-- Nuxt 的 `useFetch()` / `useAsyncData()` 等框架级机制。
+- 路由 meta 对应 loader；
+- 页面模块导出 loader；
+- `onServerPrefetch()`；
+- Nuxt `useFetch()`、`useAsyncData()`。
 
-集中路由 loader 更容易设置超时、并行加载和状态码；`onServerPrefetch()` 更接近组件但全局协调较弱。无论哪种方式，都要解决载荷传输和浏览器去重。
+集中 loader 便于并行、超时、状态码和重定向；组件级预取更靠近消费位置。无论选哪种，都必须解决：
 
-在 Nuxt 中，直接于 `setup()` 使用 `$fetch()` 可能在服务端和客户端各执行一次；框架的数据 Composable 会把服务端结果放入 payload，Hydration 时复用。不要绕开框架已有的去重通道。
+```text
+服务端取数
+  ↓ 写入请求级 Store
+render 得到 HTML
+  ↓ 安全序列化同一快照
+浏览器恢复 Store
+  ↓ loadedId 去重
+Hydration 不再重复首屏请求
+```
 
-## 9. 服务上下文与请求头转发
+在 Nuxt 中，`useFetch/useAsyncData` 会把服务端结果放入 payload，Hydration 时复用。直接在 setup 中随意使用 `$fetch` 可能让同一读取在两端各执行一次；浏览器事件触发的写操作则适合 `$fetch`。
 
-SSR 数据请求常需要当前用户 Cookie，但绝不能把原始请求的所有头部无差别转发到任意 URL。否则可能产生：
-
-- Cookie、Authorization 泄漏到第三方。
-- Host、Forwarded 等头部污染。
-- 用户输入 URL 导致 SSRF。
-- 缓存错误地混合不同用户响应。
-
-示例只对固定同源 API 转发 Cookie 和 request ID，并校验课程 ID：
-
-<<< ../../../examples/frontend/vue3-ssr/lesson-service.ts
-
-生产中还应：
-
-- 由服务端配置 API origin，不信任客户端传入的 Host。
-- 使用允许列表转发 Header，区分服务端与浏览器 API Client。
-- 为上游请求设置超时、取消、重试上限和请求体大小限制。
-- 不在日志中记录 Cookie、Token 或完整个人数据。
-- 让 request ID 贯穿 SSR、内部 API 和日志。
-
-## 10. 初始状态必须先恢复，再 Hydration
-
-浏览器入口如下：
+## 客户端恢复必须发生在 Store 第一次消费之前
 
 <<< ../../../examples/frontend/vue3-ssr/entry-client.mts
 
-恢复状态的三个要点：
+顺序是：
 
-1. 使用本次 SSR 返回的状态，而不是重新请求同一数据。
-2. 在组件和守卫读取 Store 之前赋给当前 Pinia。
-3. 恢复后删除临时全局变量，缩小误用范围。
+1. 创建 Pinia；
+2. 赋入服务端初始状态；
+3. 等 Router 初始导航；
+4. 注册后续客户端导航的数据加载；
+5. mount 并 Hydrate。
 
-示例把后续导航的 loader 注册为 `beforeResolve`。首屏时服务端状态已经含 `loadedId`，重复调用会立即返回；浏览器导航到新 ID 时则会真正请求。
+后续从课程 A 快速导航到 B、C 时仍会出现普通异步竞态。示例 Store 同时使用：
 
-真实系统还要为并发导航增加 AbortController 或序列号，避免慢的旧请求覆盖快的新请求。该问题与 CSR 相同，只是 SSR 又多了一次初始状态交接。
+- AbortController 尽早停止旧请求；
+- 递增序号禁止旧结果提交；
+- 只有最新请求可以关闭 loading。
 
-## 11. 状态序列化是安全边界
+SSR 只多了首屏交接，并没有让 CSR 的异步所有权问题消失。
 
-危险做法：
+## SSR 服务调用是安全边界
+
+服务端往往要带当前会话访问内部 API。危险做法是：
+
+```ts
+const apiOrigin = new URL(request.url).origin
+fetch(new URL(path, apiOrigin), {
+  headers: request.headers
+})
+```
+
+在某些部署中 Host 可被外部控制，这会把 Cookie 或 Authorization 转发到攻击者 Origin，也可能形成 SSRF。复制全部请求头还会传播 Host、Forwarded 等不适合的值。
+
+示例服务：
+
+<<< ../../../examples/frontend/vue3-ssr/lesson-service.ts
+
+HTTP Handler：
+
+<<< ../../../examples/frontend/vue3-ssr/server-handler.mts
+
+它们建立了几条明确规则：
+
+- API Origin 由可信部署配置传入，不从请求 Host 推导；
+- 课程 ID 先按允许格式验证；
+- 只转发指定的 `__Host-session` Cookie 和 request ID；
+- 上游 JSON 作为 unknown 做运行时结构校验；
+- 用户可控 URL 不能决定请求目标；
+- 含 Cookie 的页面不进入共享缓存。
+
+生产环境还要设置上游超时、取消、有限重试、响应体大小和日志脱敏。request ID 应贯穿 SSR、内部 API 和错误日志。
+
+## TypeScript 类型不能替代上游响应校验
+
+```ts
+return (await response.json()) as Lesson
+```
+
+只是告诉编译器“相信我”，不会检查网络返回。上游部署错误、网关 HTML、旧 API 字段或攻击输入都可能破坏假设。
+
+完整服务使用 `parseLesson(unknown)` 验证必需字符串字段，再返回 Lesson。大型项目可以用 schema 库，但原则相同：
+
+```text
+网络数据 unknown
+  ↓ 运行时验证
+可信领域类型
+```
+
+SSR 在服务端访问内部 API，也不能因为“都是我们自己的服务”就省略边界检查。
+
+## 初始状态序列化同时面对数据语义和 XSS
+
+危险模板：
 
 ```ts
 `<script>window.__STATE__ = ${JSON.stringify(state)}</script>`
 ```
 
-如果用户内容含 `</script><script>...`，HTML 解析器会提前结束原脚本。JSON 本身合法并不代表嵌入 HTML 安全。
+若用户内容包含 `</script><script>...`，HTML 解析器会提前结束脚本。JSON 合法不代表把它嵌入 HTML 就安全。
 
-本课对纯 JSON 状态转义 `<`、`>`、`&`、U+2028 和 U+2029：
+本课限定状态只能是 JSON 值，并转义会破坏脚本上下文的字符：
 
 <<< ../../../examples/frontend/vue3-ssr/safe-serialize.ts
 
-HTML 模板还分别处理文本属性和状态脚本两个上下文：
+文档模板：
 
 <<< ../../../examples/frontend/vue3-ssr/html-template.ts
 
-`escapeHtml()` 与状态序列化器不可互换。前者用于 HTML 文本/属性，后者必须生成仍能被 JavaScript 解析的表达式。
+注意不同输出上下文不能共用一个转义函数：
 
-生产 Pinia 状态可能含 `Date`、`Map`、`Set`、`BigInt`、`undefined` 或循环引用，单纯 JSON 会丢失语义。Pinia 官方指南建议采用 `devalue` 等安全序列化方案。无论选哪个库，都要确认当前版本的安全公告，并限制载荷只包含客户端确实需要的数据。
+- title、meta 属性使用 HTML 转义；
+-内联状态使用脚本安全序列化；
+- `appHtml` 来自 Vue SSR Renderer；
+- headTags、Teleport 和资源 URL 必须来自可信框架/Manifest，不能直接拼用户输入。
 
-绝不要把以下内容序列化给浏览器：
+真实 Pinia 状态可能含 Date、Map、Set、BigInt、undefined 或循环引用。JSON 会丢失语义。Pinia 官方建议考虑 `devalue` 等安全序列化方案；选择库时要检查当前安全公告，并让服务端与客户端使用匹配解析协议。
 
-- 密码哈希、访问令牌、刷新令牌。
-- 内部权限判断细节与服务端密钥。
-- 用户无权查看的完整数据库记录。
-- 仅用于服务端渲染的中间数据。
+更重要的是控制载荷内容。绝不能把以下状态发给浏览器：
 
-## 12. 常见 Hydration 不一致来源
+- Token、密码哈希和服务端密钥；
+- 用户无权查看的完整记录；
+- 内部权限判断依据；
+- 只为服务器计算使用的中间数据。
 
-### 非法 HTML 被浏览器纠正
+序列化做得安全，不代表不该公开的数据可以公开。
 
-服务端字符串看起来相同，但浏览器解析时会修改 DOM，例如把 `<div>` 放进 `<p>`。Vue Hydration 看到的已不是服务端 VNode 对应结构。应使用 HTML 校验和真实浏览器测试。
+## Hydration mismatch 的原因不是“Vue 随机出错”
 
-### 随机数和递增 ID
+### 浏览器修正了非法 HTML
 
-`Math.random()`、进程级计数器和随机 UUID 在两端结果不同。可在服务端生成种子或值并随状态传输，客户端首帧复用。表单控件的 `id` 与 `for` 尤其需要确定性。
+```html
+<p><div>错误嵌套</div></p>
+```
 
-### 时间、时区和 Locale
+服务器字符串可以生成，浏览器解析时却会自动关闭 p，实际 DOM 结构已改变。应使用 HTML 校验并在真实浏览器测试。
 
-服务器可能是 UTC，用户浏览器是 Asia/Shanghai；同一 `Date` 会格式化成不同文本。首帧使用固定时区或原始 ISO 字符串，挂载后再转换成本地显示：
+### 两边生成了不同随机值
+
+`Math.random()`、无种子 UUID、进程级递增 ID 在服务器和客户端不会自然相同。可以：
+
+- 服务端生成值并随状态传输；
+- 使用同一随机种子；
+- 挂载后才显示纯客户端内容。
+
+### 时区和 Locale 不同
+
+服务器可能运行在 UTC，用户位于上海。两边对同一 Date 格式化会得到不同文本。
 
 <<< ../../../examples/frontend/vue3-ssr/ClientClock.vue
 
-### 只存在于浏览器的状态
+示例首帧渲染确定性占位，挂载后才读取用户本地时区。
 
-`window.innerWidth`、`localStorage`、媒体查询、扩展注入 DOM 都可能改变首帧。用 SSR 安全默认值，放到 `onMounted()` 后更新；对纯装饰内容可用 CSS 响应式能力。
+### 首帧读取浏览器状态
 
-### 数据在两端分别请求
+`window.innerWidth`、localStorage、媒体查询只存在于客户端。使用 SSR 安全初值，在 `onMounted()` 后更新；纯响应式布局优先交给 CSS。
 
-服务端请求结果与客户端第二次请求之间可能发生更新。传输初始状态并去重，才能保证同一快照。
+### 两端各自请求了一次
 
-### 权限和 Cookie 读取方式不同
+两次请求可能返回不同版本。应传输服务端快照并在 Hydration 去重。
 
-服务端从请求 Cookie 识别用户，客户端若初始 Store 仍是访客，会渲染不同分支。把最小、非敏感的会话视图状态放入 payload。
+### 会话初值不一致
 
-Vue 3.5 提供 `data-allow-mismatch`，可对已知且不可避免的差异选择性压制警告。它不是通用修复：业务内容、表单结构或权限分支不一致仍应修正数据流。
+服务器从 Cookie 得到已登录用户，客户端 Store 却从访客开始，会渲染不同权限分支。传输最小、非敏感的会话视图状态。
 
-## 13. 生命周期与副作用
+Vue 3.5+ 的 `data-allow-mismatch` 可以选择性压制确实不可避免的差异。它只隐藏警告和特定恢复噪声，不会修复错误的数据流；权限、表单和业务内容不应靠它掩盖。
 
-SSR 会执行组件创建和 `setup()`，但不会挂载真实 DOM：
+## Universal Code 不能假设自己运行在哪里
 
-| 位置 | 服务端 | 客户端 Hydration | 适合内容 |
-| --- | --- | --- | --- |
-| 模块顶层 | 会，且可能跨请求复用 | 会 | 只读定义，禁止请求状态 |
-| `setup()` | 会 | 会 | 确定性状态和纯计算 |
-| `onServerPrefetch()` | 会并等待 | 不用于客户端首帧 | SSR 数据预取 |
-| `onMounted()` | 不会 | Hydration 后会 | DOM、Storage、浏览器库 |
-| 事件处理器 | 不触发 | 用户交互时触发 | 客户端行为 |
-| `onUnmounted()` | SSR 不会执行 | 卸载时执行 | 客户端资源清理 |
+服务端会执行 setup 和用于 SSR 的创建逻辑，但没有真实 DOM。`onMounted/onUpdated/onUnmounted` 不在 SSR 阶段执行。
 
-不要在 `setup()` 直接启动永久 Timer、订阅或监听器，再指望 `onUnmounted()` 清理；SSR 组件不会挂载，也不会按浏览器组件生命周期卸载。服务端副作用应由请求 handler 管理，并在请求完成或中止时清理。
+因此不要在 setup 顶层启动需要 unmount 清理的计时器：
 
-Vue 为性能会在 SSR 阶段关闭不必要的响应式追踪。SSR 不是长期运行的响应式界面，而是给定状态的一次性 HTML 计算。
+```ts
+// SSR 中可能创建后永远没有 onUnmounted 清理
+const timer = setInterval(refresh, 1000)
+```
 
-## 14. 浏览器专用库的隔离
+浏览器副作用放到 `onMounted()`：
 
-有些编辑器、图表或旧库在模块加载时就访问 `window`。仅把调用放入 `onMounted()` 仍可能太晚，因为静态 `import` 已在服务端求值。
+```ts
+onMounted(() => {
+  const timer = window.setInterval(refresh, 1000)
+  onUnmounted(() => window.clearInterval(timer))
+})
+```
+
+模块顶层同样会在服务进程加载时执行，不能读取 window/document，也不能创建用户相关状态。
+
+### 浏览器专用库
+
+有些编辑器、图表库在 import 时就访问 document。仅在 mounted 中调用仍不够，因为静态 import 已经在服务器求值。
+
+可在客户端生命周期中动态 import：
 
 ```ts
 onMounted(async () => {
   const { createEditor } = await import('./browser-only-editor')
-  createEditor(container.value!)
+  editor = createEditor(element.value)
 })
 ```
 
-更完整的策略包括：
+同时处理卸载前 import 尚未完成的竞态，并在 unmount 销毁实例。成熟框架通常提供 ClientOnly 边界。
 
-- 选择明确支持 SSR 的依赖。
-- 在挂载后动态导入。
-- 把组件标记为 client-only，并提供尺寸稳定的 fallback。
-- 在 Vite SSR 配置中正确处理 external/noExternal，但不要把配置当作运行时兼容性的替代品。
+## Teleport、指令和流式输出需要专门协议
 
-避免在共享业务模块中到处写 `typeof window !== 'undefined'`。把环境差异集中到适配器、入口和少数组件边界，代码更容易测试。
+SSR Teleport 不在主 appHtml 中，Renderer 把结果放入 SSRContext。示例读取 `ssrContext.teleports`，再注入专用 `#teleports` 容器。
 
-## 15. Teleport、自定义指令与 Suspense
+不要把 SSR Teleport 直接指向 body。body 中混有其他服务端节点，Hydration 很难确定目标范围。
 
-### Teleport
+自定义指令通常操作 DOM，SSR 会忽略这部分。若服务端必须输出对应属性，指令需实现 `getSSRProps()`，并保证客户端结果一致。
 
-SSR 无法直接把 Teleport 插入浏览器目标节点。Vue 会把内容收集到 SSR context 的 `teleports`，模板层再放入对应容器。示例读取 `#teleports`：
+流式 SSR 能更早发送部分 HTML，但响应头一旦发送，后续才发现的 404、重定向和致命错误无法再正常修改状态。关键权限和状态码判断应尽量在开始流之前完成。
 
-```ts
-const teleportHtml = page.teleports['#teleports'] ?? ''
-```
+## Head、状态码和缓存都属于渲染结果
 
-使用独立空容器，避免以 `<body>` 作为目标；body 内其他 SSR 节点会让 Hydration 起点难以确定。
+组件树只生成主体 HTML，不自动完成：
 
-### 自定义指令
+- title、description、canonical；
+- Open Graph；
+- html lang；
+- HTTP status；
+- redirect；
+- preload/modulepreload；
+- CSP nonce。
 
-多数指令是 DOM 行为，SSR 会忽略。若指令必须输出服务端属性，可实现 `getSSRProps()`。纯展示属性通常更适合直接用模板绑定，减少双环境隐式逻辑。
+这些信息应由路由与数据结果汇总，再由可信 Head 管理器和服务器适配层输出。用户内容必须按对应 HTML 上下文转义。
 
-### Suspense 与流
-
-异步组件和 Suspense 能与服务端渲染协作。流式 API 可以先发送外壳，再发送较慢内容，但需要明确：
-
-- 何时确定状态码和响应头。
-- 中途失败返回 fallback 还是终止流。
-- CDN 是否缓冲响应，导致流式优势消失。
-- 客户端何时拥有对应状态与脚本。
-- 首块更快是否换来了更多布局变化。
-
-先建立正确的字符串 SSR，再根据真实测量引入流式复杂度。
-
-## 16. Head、SEO、状态码和重定向
-
-SSR 页面至少应按路由生成：
-
-- 唯一且转义后的 `<title>` 与 description。
-- canonical、robots、Open Graph 等必要标签。
-- 正确的 HTML `lang`。
-- 200、404、401/403、5xx 等真实状态码。
-- 服务端可执行的 301/302/307/308 重定向。
-
-组件直接拼接 Head 字符串会造成重复标签、转义和优先级问题。生产项目应使用框架内置 Head 管理或支持 SSR 的专用库，并从 SSR context 收集结果。
-
-Head 内容仍是不可信输出。课程标题来自用户时，必须像正文一样转义，不能因为它位于 `<head>` 就放松安全要求。
-
-## 17. HTTP Handler：最后一道系统边界
-
-完整 Web Standard handler：
-
-<<< ../../../examples/frontend/vue3-ssr/server-handler.mts
-
-它展示了四个容易遗漏的职责：
-
-- URL 与请求上下文进入渲染函数。
-- 页面元数据决定响应状态码。
-- request ID 同时写入日志和响应头。
-- 有 Cookie 的响应使用私有、不可共享缓存策略。
-
-示例的 `clientEntryUrl` 是开发形态。Vite 生产构建后文件名通常带 Hash，应从 manifest 解析客户端入口、CSS 和 module preload，而不是硬编码源文件 URL。
-
-## 18. 缓存：性能工具，也是数据泄漏风险
-
-SSR 缓存至少分三层：
-
-| 层 | 可缓存内容 | 关键风险 |
-| --- | --- | --- |
-| 数据层 | API/数据库查询结果 | 权限与租户键遗漏 |
-| 页面层 | 完整 SSR HTML | 个性化内容被共享 |
-| CDN/边缘层 | 公共响应和静态资源 | `Vary` 与 Cache-Control 配置错误 |
-
-页面缓存键必须包含所有影响输出的维度，例如 pathname、query、locale、发布版本；但把完整 Cookie 加入键会造成高基数并泄漏信息。通常选择：
-
-- 公共匿名页允许 CDN/SWR。
-- 登录或个性化页 `private, no-store`，或只缓存不含个人数据的片段。
-- 静态 Hash 资源长期 immutable。
-
-不要仅凭“当前页面看起来没有用户名”就共享缓存。权限按钮、实验分组、地区价格、CSRF Token 都可能让 HTML 个性化。缓存决策应由明确的页面契约决定。
-
-## 19. 错误、超时和取消
-
-SSR 位于多个系统之间：浏览器、渲染服务器、API 和数据库。没有截止时间，一个慢接口会占住渲染资源并拖垮整个实例。
-
-生产策略通常包括：
-
-- 整体渲染 deadline 与单个上游请求 timeout。
-- 客户端断开后传播 AbortSignal，取消无用工作。
-- 关键数据失败返回正确 4xx/5xx；非关键区域提供稳定 fallback。
-- 重试只用于幂等操作，并限制次数与总时间。
-- 错误页本身不依赖同一个失败服务。
-- 日志记录 route、request ID、阶段和耗时，不记录秘密。
-
-错误分类应至少区分：未找到、未授权、上游超时、程序缺陷。把所有错误都变成 200 + “暂无数据”会污染 SEO、缓存和监控。
-
-## 20. 性能与可观测性
-
-建议拆分测量：
+缓存前先回答：
 
 ```text
-路由解析 → 数据等待 → Vue renderToString → 模板与序列化 → 网络发送
+这份 HTML 是否因 Cookie、Authorization、语言、地区、
+实验分组、设备或权限不同？
 ```
 
-服务端关注：
+若答案是“会”，共享缓存键必须包含这些维度，或者直接标记 private/no-store。最危险的错误是把用户 A 的个性化 SSR HTML 缓存后交给用户 B。
 
-- p50/p95/p99 TTFB 与各阶段耗时。
-- 每秒请求、CPU、内存、事件循环延迟。
-- 上游调用次数、超时率和缓存命中率。
-- HTML、状态载荷与 Teleport 大小。
+匿名公开页面可以 CDN 缓存或 SWR，但 HTML、状态载荷和 Head 必须来自同一个快照。接口数据缓存也不能跨越租户或权限边界。
 
-浏览器关注：
+## 错误、取消和超时必须在请求范围内结束
 
-- LCP 是否真正提前。
-- Hydration 的主线程长任务。
-- INP 和 Hydration 前点击是否延迟。
-- JavaScript 数量是否因 SSR 反而增加。
-- mismatch、客户端异常和布局变化。
+浏览器断开连接后，SSR 和上游请求若继续运行会浪费资源。生产 Handler 应把请求取消信号向下传递到：
 
-SSR 仍会把组件 JavaScript 发到浏览器。若主要瓶颈是巨大的交互包，仅增加服务端 HTML 不会解决 Hydration 成本；还需要路由拆包、延迟 Hydration/岛屿架构或减少客户端功能。
+- 路由数据 loader；
+- fetch；
+- 数据库或内部 RPC；
+- 可中止的渲染任务。
 
-## 21. Vite SSR 的开发与生产边界
+上游请求必须有超时。重试仅针对明确可恢复且幂等的读取，并设置次数和退避；盲目重试会放大故障。
 
-Vite SSR 是底层 API，不是完整服务器框架。典型开发流程由服务器以 middleware mode 使用 Vite：
+错误输出不能包含 stack、Token、Cookie 或内部地址。客户端看到稳定错误页，日志通过 request ID 保留诊断上下文。
 
-- 转换 HTML 模板。
-- 通过 `ssrLoadModule` 加载最新服务端入口。
-- 提供 HMR 和源码映射。
+## Vite SSR 是底层能力，生产通常需要上层框架
 
-生产通常构建两份产物：
+Vite 开发期可用 `ssrLoadModule()` 转换并加载服务端入口。生产需要两份构建：
 
-- 客户端构建：浏览器入口、CSS、静态资源和 manifest。
-- SSR 构建：服务器可执行的入口与依赖边界。
+1. 客户端资源和 Manifest；
+2. 可由服务器运行的 SSR Bundle。
 
-生产服务器加载 SSR 产物，通过 manifest 注入带 Hash 的 JS/CSS/preload。还要自行实现安全头、压缩、静态资源、日志、健康检查和部署适配。Vite 官方明确把示例定位为低层级用法，生产应用通常优先采用上层 SSR 框架。
+服务器使用生产 Manifest 注入带哈希资源、modulepreload 和样式，不能把示例中的 `/src/entry-client.mts` 当成生产 URL。
 
-## 22. 手写 Vite SSR 还是使用 Nuxt
+完整系统还需要：
 
-适合手写：
+- 开发与生产模块加载；
+- Head 与资源提示；
+- 路由数据协议；
+- 安全状态传输；
+- 404/redirect/error；
+- 流式与缓存；
+- 部署适配；
+- 可观测性。
 
-- 学习底层机制或迁移现有特殊服务。
-- 已有成熟服务器平台，需要精准接入。
-- 页面少、团队愿意长期维护双构建和运行时。
+Vue 官方建议真实 SSR 项目优先使用 Nuxt 等上层方案。手写 Vite SSR 适合学习原理、框架研发或确有特殊运行环境的团队，不代表业务项目应重复建设这些基础设施。
 
-适合 Nuxt：
+## 测试应覆盖“两次执行的交接”
 
-- 需要文件路由、数据载荷去重、Head、错误页、预渲染和混合 route rules。
-- 需要 Node、Serverless、Edge 等部署适配。
-- 希望把精力放在业务与性能，而非重复搭建 SSR 基础设施。
+纯函数：
 
-使用框架不会消除本课原则。模块单例污染、Hydration 不一致、状态泄漏和错误缓存，在 Nuxt 中仍然成立；框架只是提供更成熟的默认通道。
+- safe serializer 能否阻断 `</script>`；
+- HTML 文本转义；
+- 上游 JSON 解析；
+- 状态码和缓存策略；
+- Cookie allowlist。
 
-## 23. 测试策略
+SSR 集成：
 
-### 纯函数测试
+- 两个并发请求得到独立 Pinia 与 Router；
+- URL 匹配正确页面；
+- 首屏数据进入 HTML 和 payload；
+- NotFound 返回 404；
+- 用户 A 状态不出现在用户 B HTML；
+- Teleport 注入正确容器。
 
-- 状态序列化能否安全处理 `</script>`、`&`、U+2028。
-- HTML 标题和描述是否转义。
-- URL 与路由到状态码、缓存策略的映射。
+浏览器：
 
-### SSR 集成测试
+- 控制台没有意外 Hydration warning；
+- 首屏数据不重复请求；
+- SSR HTML 能成功 Hydrate 并交互；
+- 客户端导航加载新数据；
+- 本地时区内容只在挂载后更新；
+- 慢旧导航不能覆盖新页面。
 
-对 `renderPage(url, context)` 断言：
+还应对 SSR 响应做 XSS 用例，把 `</script>`、HTML 字符和 Unicode 分隔符放进标题、描述与状态中。
 
-- HTML 包含目标课程正文。
-- Pinia 状态和 HTML 来自同一数据快照。
-- 未找到路由返回 404 metadata。
-- Teleport 被收集到正确目标。
-- 两个并发请求不会读取彼此状态。
+## 完整示例阅读路线
 
-“并发请求隔离测试”非常重要：为 A/B 返回不同用户或课程，交错完成请求，再确认 HTML 和 state 都没有串线。
-
-### 浏览器测试
-
-- 记录控制台，任何 Hydration mismatch 都使测试失败。
-- 禁用 JavaScript时关键公开内容仍可读。
-- 启用 JavaScript后按钮和路由可交互。
-- 首屏同一 API 没有重复请求。
-- 直接访问深层 URL 返回正确正文和状态码。
-- 模拟慢 API、404、500 与断线。
-
-仅用 jsdom 无法完整验证浏览器 HTML 修正与 Hydration，关键路径应在 Playwright 等真实浏览器中执行。
-
-## 24. 生产检查清单
-
-### 正确性
-
-- 每个请求创建 App、Router、Pinia 和请求级服务。
-- 服务端 `push(url)` 后等待 Router，再加载数据和渲染。
-- 客户端先恢复状态，再等待 Router 和 mount。
-- 首屏没有重复数据请求。
-- 404、重定向与错误使用真实 HTTP 语义。
-
-### Hydration
-
-- 首帧不依赖随机数、本地时区、窗口和 Storage。
-- HTML 结构合法，列表 Key 和 ID 确定。
-- 浏览器专用库延迟导入且有稳定 fallback。
-- CI 捕获控制台 mismatch。
-
-### 安全与缓存
-
-- 状态使用适合脚本上下文的安全序列化器。
-- Payload 不含 Token、秘密和越权字段。
-- Header 只向可信上游按允许列表转发。
-- 个性化 HTML 不进入共享缓存。
-- Head、属性和正文都按各自上下文转义。
-
-### 运行
-
-- 有超时、取消、错误降级和请求关联日志。
-- 分阶段测量数据等待与 Vue 渲染耗时。
-- 生产资源通过 manifest 注入。
-- 容量规划包含 CPU、内存、冷启动和缓存命中率。
-
-## 25. 完整示例结构
-
-```text
-examples/frontend/vue3-ssr/
-├── App.vue
-├── ClientClock.vue
-├── HomeView.vue
-├── LessonView.vue
-├── NotFoundView.vue
-├── app.mts
-├── entry-client.mts
-├── entry-server.mts
-├── html-template.ts
-├── lesson-service.ts
-├── lesson-store.mts
-├── route-data.mts
-├── router.mts
-├── safe-serialize.ts
-├── server-handler.mts
-└── ssr-types.ts
-```
-
-前文已展示核心文件。下面补齐其余文件，保证不用离开页面也能看到全部源码。
-
-### 类型契约
+类型契约：
 
 <<< ../../../examples/frontend/vue3-ssr/ssr-types.ts
 
-### 根组件
+应用和路由工厂：
+
+<<< ../../../examples/frontend/vue3-ssr/app.mts
+
+<<< ../../../examples/frontend/vue3-ssr/router.mts
+
+请求级数据：
+
+<<< ../../../examples/frontend/vue3-ssr/lesson-service.ts
+
+<<< ../../../examples/frontend/vue3-ssr/lesson-store.mts
+
+<<< ../../../examples/frontend/vue3-ssr/route-data.mts
+
+两端入口：
+
+<<< ../../../examples/frontend/vue3-ssr/entry-server.mts
+
+<<< ../../../examples/frontend/vue3-ssr/entry-client.mts
+
+安全文档输出：
+
+<<< ../../../examples/frontend/vue3-ssr/safe-serialize.ts
+
+<<< ../../../examples/frontend/vue3-ssr/html-template.ts
+
+<<< ../../../examples/frontend/vue3-ssr/server-handler.mts
+
+页面组件：
 
 <<< ../../../examples/frontend/vue3-ssr/App.vue
 
-### 首页
-
 <<< ../../../examples/frontend/vue3-ssr/HomeView.vue
-
-### 课程页
 
 <<< ../../../examples/frontend/vue3-ssr/LessonView.vue
 
-### 404 页
-
 <<< ../../../examples/frontend/vue3-ssr/NotFoundView.vue
 
-这组文件聚焦 SSR 的应用边界，因此未包含具体 Node/Edge 平台启动器、Vite 双构建配置和依赖安装。`handleRequest()` 使用 Web Standard `Request` / `Response`，平台适配层只需把原生请求转换后调用它。生产项目优先采用框架官方模板，不要直接把教学 handler 当成完整服务器。
+因果主线：
 
-## 26. 进一步阅读
+```text
+每个 HTTP 请求创建独立应用
+  ↓
+根据 URL 加载一份数据快照
+  ↓
+生成 HTML、Head、状态码
+  ↓
+只传输必要状态并安全序列化
+  ↓
+浏览器先恢复同一快照
+  ↓
+Hydrate 已有 DOM
+  ↓
+后续导航按普通 SPA 管理取消与竞态
+```
 
-- [Vue：服务端渲染（SSR）](https://vuejs.org/guide/scaling-up/ssr.html)
-- [Vue：服务端渲染 API](https://vuejs.org/api/ssr.html)
-- [Vite：Server-Side Rendering](https://vite.dev/guide/ssr)
+## 常见误区
+
+### 在服务端复用 Pinia 单例
+
+会让请求和用户状态串线。每个请求创建新实例。
+
+### 认为 SSR HTML 出现就已可交互
+
+事件需要客户端 JavaScript 和 Hydration。测量可见与可交互两个阶段。
+
+### 在两端分别请求首屏数据
+
+结果快照可能不同并浪费请求。传输状态并去重。
+
+### 用 JSON.stringify 直接拼进 script
+
+JSON 合法不等于 HTML 安全。使用适合脚本上下文的安全序列化。
+
+### 从 Host 推导内部 API Origin
+
+可能形成 SSRF 或凭据泄漏。Origin 由可信部署配置提供。
+
+### 用 data-allow-mismatch 压掉所有警告
+
+它不会修复权限、状态和结构不一致，只用于确实不可避免的局部差异。
+
+### 把所有页面都改成 SSR
+
+后台和静态内容可能更适合 CSR 或 SSG。按路由的内容、SEO和时效需求选择。
+
+## 本课小结
+
+- SSR 让内容更早到达，Hydration 让已有 DOM 获得交互能力；
+- 同一页面在服务端和客户端执行两次，首帧必须共享同一 URL 与状态快照；
+- App、Router、Pinia 和用户相关服务必须每请求创建，防止跨用户泄漏；
+- 首屏数据在渲染前加载，并通过安全 payload 交给浏览器复用；
+- API Origin、Header 转发和网络响应解析都是服务端安全边界；
+- 随机数、时区、非法 HTML 和浏览器状态是常见 mismatch 根因；
+- 浏览器副作用放在 mounted，浏览器专用库还要延迟 import；
+- 状态码、Head、Teleport、缓存、超时和日志都是完整 SSR 输出的一部分；
+- 手写 Vite SSR 能解释原理，生产业务通常应采用 Nuxt 等成熟框架。
+
+下一节是[Vue 2 到 Vue 3 的渐进式迁移与大型应用架构](/frontend/vue3/vue2-to-vue3-progressive-migration-and-architecture)。SSR 强调请求级边界，迁移课会把前面所有组件、状态、路由、测试和构建边界放回真实大型 Vue 2 系统中，解释如何逐步替换而不是一次重写。
+
+## 官方资料
+
+- [Vue：服务端渲染](https://vuejs.org/guide/scaling-up/ssr.html)
+- [Vue：SSR API](https://vuejs.org/api/ssr.html)
 - [Pinia：Server Side Rendering](https://pinia.vuejs.org/ssr/)
-- [Vue Router：不同 History 模式](https://router.vuejs.org/guide/essentials/history-mode.html)
-- [Nuxt：Rendering Modes](https://nuxt.com/docs/4.x/guide/concepts/rendering)
-- [Nuxt：Data Fetching](https://nuxt.com/docs/4.x/getting-started/data-fetching)
-
-## 27. 本节小结
-
-SSR 的核心不是把 `renderToString()` 接到服务器，而是维护一次安全、确定、可观测的状态交接：服务端按请求创建隔离应用，路由和数据产生 HTML 与状态快照；浏览器用同一结构和同一快照 Hydration，再接管后续交互。
-
-工程中最危险的错误通常位于边界：模块单例导致跨请求污染，原始 JSON 导致 XSS，个性化 HTML 进入公共缓存，客户端重复请求造成 mismatch，浏览器 API 混入服务端执行。把这些边界设计清楚，SSR 才能从“能跑的 Demo”变成可靠的生产架构。
+- [Vue Router：Memory History](https://router.vuejs.org/guide/essentials/history-mode.html#memory-mode)
+- [Vite：Server-Side Rendering](https://vite.dev/guide/ssr.html)
+- [Nuxt：数据获取](https://nuxt.com/docs/4.x/getting-started/data-fetching)

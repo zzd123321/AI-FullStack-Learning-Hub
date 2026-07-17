@@ -1,7 +1,23 @@
 import { renderPage } from './entry-server'
 import { renderDocument } from './html-template'
+import type { ServerRuntimeConfig } from './ssr-types'
 
-export async function handleRequest(request: Request): Promise<Response> {
+function pickSessionCookie(cookieHeader: string | null): string | undefined {
+  if (!cookieHeader) return undefined
+
+  // 示例应用只允许向内部 API 转发这一枚会话 Cookie。
+  const session = cookieHeader
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('__Host-session='))
+
+  return session || undefined
+}
+
+export async function handleRequest(
+  request: Request,
+  config: ServerRuntimeConfig
+): Promise<Response> {
   const requestUrl = new URL(request.url)
   const requestId = crypto.randomUUID()
 
@@ -10,8 +26,9 @@ export async function handleRequest(request: Request): Promise<Response> {
       `${requestUrl.pathname}${requestUrl.search}`,
       {
         requestId,
-        origin: requestUrl.origin,
-        cookie: request.headers.get('cookie') ?? undefined
+        // API Origin 来自可信部署配置，不能使用 requestUrl.origin 或 Host。
+        apiOrigin: config.apiOrigin,
+        sessionCookie: pickSessionCookie(request.headers.get('cookie'))
       }
     )
 
@@ -21,7 +38,7 @@ export async function handleRequest(request: Request): Promise<Response> {
       initialState: page.initialState,
       metadata: page.metadata,
       teleportHtml,
-      clientEntryUrl: '/src/entry-client.mts'
+      clientEntryUrl: config.clientEntryUrl
     })
 
     return new Response(html, {

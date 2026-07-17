@@ -10,6 +10,29 @@ function assertSafeId(id: string): void {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function parseLesson(value: unknown): Lesson {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== 'string' ||
+    typeof value.title !== 'string' ||
+    typeof value.summary !== 'string' ||
+    typeof value.updatedAt !== 'string'
+  ) {
+    throw new Error('课程接口返回了无效数据')
+  }
+
+  return {
+    id: value.id,
+    title: value.title,
+    summary: value.summary,
+    updatedAt: value.updatedAt
+  }
+}
+
 export function createServerLessonService(
   context: RequestContext,
   fetcher: typeof fetch = fetch
@@ -24,15 +47,18 @@ export function createServerLessonService(
       })
 
       // 只向可信的同源 API 转发明确允许的凭据，切勿复制全部请求头。
-      if (context.cookie) headers.set('cookie', context.cookie)
+      if (context.sessionCookie) headers.set('cookie', context.sessionCookie)
 
-      const url = new URL(`/api/lessons/${encodeURIComponent(id)}`, context.origin)
+      const url = new URL(
+        `/api/lessons/${encodeURIComponent(id)}`,
+        context.apiOrigin
+      )
       const response = await fetcher(url, { headers, signal: signal ?? null })
 
       if (response.status === 404) return null
       if (!response.ok) throw new Error(`课程接口失败：${response.status}`)
 
-      return (await response.json()) as Lesson
+      return parseLesson(await response.json())
     }
   }
 }
@@ -49,7 +75,7 @@ export function createBrowserLessonService(fetcher: typeof fetch = fetch): Lesso
       if (response.status === 404) return null
       if (!response.ok) throw new Error(`课程接口失败：${response.status}`)
 
-      return (await response.json()) as Lesson
+      return parseLesson(await response.json())
     }
   }
 }
