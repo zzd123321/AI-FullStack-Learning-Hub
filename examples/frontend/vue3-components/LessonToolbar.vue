@@ -8,6 +8,7 @@ const emit = defineEmits<{
 
 const selection = inject(lessonSelectionKey)
 
+// InjectionKey 保证值的类型，但运行时不能保证组件一定位于 Provider 内。
 if (!selection) {
   throw new Error(
     'LessonToolbar 必须位于 LessonSelectionProvider 内'

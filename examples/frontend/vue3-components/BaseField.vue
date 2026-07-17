@@ -16,6 +16,7 @@ const model = defineModel<string>({
   required: true
 })
 
+// 每个组件实例获得稳定且不冲突的 input / error 关联 ID。
 const inputId = useId()
 const errorId = `${inputId}-error`
 </script>

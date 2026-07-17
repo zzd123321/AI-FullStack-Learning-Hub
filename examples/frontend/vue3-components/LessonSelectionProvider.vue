@@ -7,6 +7,7 @@ export interface LessonSelectionContext {
   clear(): void
 }
 
+// Symbol 避免字符串键冲突，InjectionKey 同步 Provider / Consumer 类型。
 export const lessonSelectionKey = Symbol(
   'lesson-selection'
 ) as InjectionKey<LessonSelectionContext>
@@ -34,6 +35,7 @@ function clear(): void {
 }
 
 const context: LessonSelectionContext = {
+  // Consumer 只能读取状态；所有写入都经过下面两个命名操作。
   selectedId: readonly(selectedId),
   select,
   clear
