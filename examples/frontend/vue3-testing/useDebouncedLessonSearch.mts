@@ -19,8 +19,11 @@ export function useDebouncedLessonSearch(
   const error = ref<string | null>(null)
   let timer: ReturnType<typeof setTimeout> | undefined
   let controller: AbortController | undefined
+  let latestRequestId = 0
 
   const stop = watch(query, (value) => {
+    // 查询一变化就换所有者；即使服务忽略 AbortSignal，旧结果也不得写回。
+    const requestId = ++latestRequestId
     if (timer) clearTimeout(timer)
     controller?.abort()
     pending.value = false
@@ -38,18 +41,24 @@ export function useDebouncedLessonSearch(
       pending.value = true
 
       try {
-        results.value = await service.search(normalized, current.signal)
+        const nextResults = await service.search(normalized, current.signal)
+        if (requestId === latestRequestId) results.value = nextResults
       } catch (cause: unknown) {
-        if (!(cause instanceof DOMException && cause.name === 'AbortError')) {
+        if (
+          requestId === latestRequestId &&
+          !(cause instanceof DOMException && cause.name === 'AbortError')
+        ) {
           error.value = '搜索失败'
         }
       } finally {
-        if (!current.signal.aborted) pending.value = false
+        // 旧请求的 finally 不能关闭新请求的 pending。
+        if (requestId === latestRequestId) pending.value = false
       }
     }, delay)
   })
 
   onScopeDispose(() => {
+    latestRequestId += 1
     stop()
     if (timer) clearTimeout(timer)
     controller?.abort()

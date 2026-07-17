@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import {
   useDebouncedLessonSearch,
+  type LessonSearchResult,
   type LessonSearchService
 } from './useDebouncedLessonSearch'
 import { withSetup } from './withSetup'
@@ -61,6 +62,50 @@ describe('useDebouncedLessonSearch', () => {
     await nextTick()
     await vi.advanceTimersByTimeAsync(0)
     expect(signals[0]?.aborted).toBe(true)
+
+    app.unmount()
+  })
+
+  it('ignores a stale result even when the service cannot really cancel', async () => {
+    vi.useFakeTimers()
+    let resolveFirst!: (value: Array<{ id: string; title: string }>) => void
+    let resolveSecond!: (value: Array<{ id: string; title: string }>) => void
+    const service: LessonSearchService = {
+      search: vi
+        .fn()
+        .mockImplementationOnce(
+          () =>
+            new Promise<LessonSearchResult[]>((resolve) => {
+              resolveFirst = resolve
+            })
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise<LessonSearchResult[]>((resolve) => {
+              resolveSecond = resolve
+            })
+        )
+    }
+    const [search, app] = withSetup(() =>
+      useDebouncedLessonSearch(service, 100)
+    )
+
+    search.query.value = 'vue'
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(100)
+
+    search.query.value = 'react'
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(100)
+
+    resolveSecond([{ id: 'react', title: 'React' }])
+    await Promise.resolve()
+    expect(search.results.value).toEqual([{ id: 'react', title: 'React' }])
+
+    // 旧服务故意忽略 signal 并在最后返回，仍不能覆盖 React 结果。
+    resolveFirst([{ id: 'vue', title: 'Vue' }])
+    await Promise.resolve()
+    expect(search.results.value).toEqual([{ id: 'react', title: 'React' }])
 
     app.unmount()
   })

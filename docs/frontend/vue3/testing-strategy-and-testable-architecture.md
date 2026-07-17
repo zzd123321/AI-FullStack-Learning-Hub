@@ -1,871 +1,495 @@
 ---
 title: Vue 3 测试策略与可测试架构
-description: 使用 Vitest、Vue Test Utils、Pinia、Router 与 Playwright建立稳定、分层且关注用户行为的测试体系
+description: 从业务风险出发，使用 Vitest、Vue Test Utils、Pinia、Router 与 Playwright建立分层、稳定的测试体系
 ---
 
 # Vue 3 测试策略与可测试架构
 
-> 适用环境：Vue 3、TypeScript、Vite、Vitest 4.x、Vue Test Utils 2.x、Pinia 3.x、Vue Router 4、Playwright。本节重点是稳定原则；具体版本配置应以项目锁文件和官方迁移指南为准。
+> 适用环境：Vue 3、TypeScript、Vite、Vitest、Vue Test Utils 2、Pinia、Vue Router 4 与 Playwright。工具配置会随版本变化，本课重点是稳定的测试边界和推理方法。
 
-## 1. 学习目标
+上一课解释了状态变化如何触发组件更新。这一课要验证的不是“Vue 有没有更新”，而是：
 
-完成本节后，你应该能够：
+> 当用户以真实方式操作时，系统是否仍然遵守业务契约？
 
-- 根据风险选择单元、组件、集成与端到端测试。
-- 区分“代码覆盖”与“业务信心”。
-- 使用 Vitest 测试纯 TypeScript 规则、异常与边界。
-- 使用 Vue Test Utils 从 DOM 和公共接口测试组件。
-- 正确等待 Vue 更新、Promise、Timer 和 Router 导航。
-- 判断何时注入依赖、Mock 模块、Mock 网络或使用真实实现。
-- 为生命周期 Composable 构建宿主组件并验证清理。
-- 隔离 Pinia 与 Vue Router 的每个测试实例。
-- 测试 Props、Events、Slots、v-model、表单与异步错误。
-- 使用 Playwright 编写依赖可访问语义、自动等待的 E2E。
-- 识别并治理 flaky tests、全局污染和过度 Snapshot。
-- 设计更易测试且生产边界更清晰的组件与服务。
+测试不是越多越好。一个断言很多、覆盖率很高的测试集，也可能完全没有覆盖最昂贵的失败。
 
-## 2. 测试的目标不是证明“没有 Bug”
+## 从风险开始，不要从文件列表开始
 
-测试只能验证被覆盖的输入、环境和行为。它的工程价值是：
+先想象功能会怎样失败：
 
-- 捕获重要回归。
-- 让重构有快速反馈。
-- 固化业务契约和边界条件。
-- 迫使依赖与状态所有权更清晰。
-- 在 CI 中阻止已知错误进入生产。
-- 缩短故障定位范围。
+- 未登录用户是否能进入受限课程？
+- 双击提交会不会创建两条报名记录？
+- 请求 A 晚于请求 B 返回时，会不会覆盖新结果？
+- 服务端拒绝表单后，用户输入是否丢失？
+- 路由参数变化后，页面是否仍显示旧实体？
+- 中文输入、时区、真实浏览器导航是否异常？
 
-测试数量、覆盖率和断言数量都不是最终目标。真正的问题是：“如果这段代码以最可能、最昂贵的方式出错，哪一层测试能及时发现？”
+再选择能以最低成本证明该风险的测试层。
 
-## 3. 测试分层不是固定金字塔配额
+| 层级 | 适合验证 | 不擅长证明 |
+| --- | --- | --- |
+| 纯单元测试 | 规则、转换、边界组合 | Vue、DOM 和插件接线 |
+| Composable / Store | 响应式状态机、Action | 完整页面交互 |
+| 组件测试 | Props、Events、Slots、DOM 行为 | 真实布局和完整部署 |
+| 集成测试 | Router、Pinia、组件和服务协作 | 后端和生产资源是否正确 |
+| E2E | 真实浏览器中的关键流程 | 大量细粒度边界的快速定位 |
 
-| 层级 | 主要对象 | 优势 | 局限 |
-| --- | --- | --- | --- |
-| 单元测试 | 纯函数、领域规则、转换器 | 快、定位精确、边界覆盖多 | 不验证 Vue、DOM 与系统接线 |
-| Composable/Store | 响应式状态机、Actions | 快，能验证 Vue 状态逻辑 | 可能遗漏真实组件交互 |
-| 组件测试 | Props、Events、Slots、DOM 行为 | 接近用户交互，反馈仍快 | 模拟 DOM 与真实浏览器有差异 |
-| 集成测试 | Router、Pinia、多个组件、服务边界 | 验证接线和协作 | 设置更多、失败定位更宽 |
-| E2E | 真实浏览器中的关键用户流程 | 信心最高，覆盖部署形态 | 慢、数据与环境成本高 |
+这不是要求固定比例的金字塔。同一个风险通常只需要一两个最合适的层级：
 
-不是每个功能都需要每一层。领域边界组合很多时，多写单元表格测试；组件交互复杂时，加强组件测试；支付、登录、核心发布流程必须有少量可靠 E2E。
+- 权限规则有几十种组合：纯函数表格测试；
+- 提交按钮的 pending 与错误恢复：组件测试；
+- 路由记录和 Props 是否接对：使用真实 Router 的集成测试；
+- 登录到支付的核心路径：少量 E2E。
 
-## 4. 从风险而不是文件开始
+## 一条好测试应该提供什么信号
 
-“每个文件一个测试”容易产生低价值断言。先列风险：
+测试应该尽量同时做到：
 
-- 未报名用户是否误看到学习入口？
-- 双击是否创建两次订单？
-- 路由权限是否被错误重定向？
-- 服务端字段错误是否丢掉输入？
-- 请求 B 是否被旧请求 A 覆盖？
-- 中文输入、时区和货币是否异常？
-- 离开页面是否丢草稿？
+- **可读**：用例名和断言能表达业务契约；
+- **确定**：同样环境与输入得到同样结果；
+- **隔离**：不消费上一用例留下的 Store、Router、计时器或数据库数据；
+- **接近使用方式**：点击、输入并观察公开结果，而不是操纵组件私有 ref；
+- **失败可定位**：失败信息能指出哪条行为被破坏。
 
-再为每个风险选择成本最低、信号最强的测试层。
+这些属性存在权衡。E2E 最接近真实使用，却更慢、数据隔离更难；纯函数单测极稳定，却无法证明页面接线。测试策略的工作就是做有意识的组合。
 
-## 5. 好测试的四个属性
+### 测试不能证明“没有 Bug”
 
-### 可读
+自动化测试只验证写进用例的输入、环境和观察结果。它的价值是：
 
-失败时能从用例名和断言看懂业务契约。
+- 捕获已知高风险回归；
+- 固化业务边界；
+- 给重构提供快速反馈；
+- 暴露模糊的依赖和所有权；
+- 缩小故障定位范围。
 
-### 确定
+覆盖率、用例数和 Snapshot 数量只是间接指标，不是业务信心本身。
 
-同样输入和环境得到相同结果，不依赖真实时间、随机数、公共测试账号或用例顺序。
+## 可测试架构先把纯规则从框架中拿出来
 
-### 隔离
+权限规则若藏在模板长表达式里：
 
-每个测试创建自己的状态、Router、Pinia 和 Mock，不消费前一个测试遗留数据。
+```vue
+<button v-if="role === 'student' && status === 'published' && !enrolled">
+  报名
+</button>
+```
 
-### 接近使用方式
+测试只能先 mount 组件，构造很多无关依赖。把规则提成纯函数：
 
-组件测试点击按钮、填写控件、观察 DOM；不要直接调用组件私有方法然后断言内部 ref。
+<<< ../../../examples/frontend/vue3-testing/lesson-policy.ts
 
-这四项常有权衡。真实后端 E2E 接近使用方式，但隔离和速度更难；纯函数单测极稳定，但无法验证页面接线。
+测试就可以直接覆盖输入矩阵：
 
-## 6. 测试公共行为，不测试实现细节
+<<< ../../../examples/frontend/vue3-testing/lesson-policy.test.mts
 
-组件公共可观察面主要是：
+纯函数测试适合：
 
-- 输入 Props、Slots、Provide/Inject、用户操作。
-- 输出 DOM、可访问状态、Events、导航、服务调用。
+- 空值、最小值、最大值和越界值；
+- 角色与资源状态组合；
+- Draft 到 DTO 的转换；
+- 排序、规范化和错误映射；
+- 异常类型与返回协议。
 
-脆弱测试：
+### Fixture Builder 降低噪声，但不能隐藏关键前提
+
+<<< ../../../examples/frontend/vue3-testing/test-builders.ts
+
+Builder 提供一个业务有效的默认对象，用例只覆盖关心字段：
+
+```ts
+buildAccessInput({ role: 'guest' })
+```
+
+它能避免每个用例重复十几个无关字段，也把实体新增必填属性的修改集中到一处。
+
+但默认值不能神秘到让测试读不懂。断言依赖的前提应显式传入；时间、随机数和递增序号要能注入或重置。每个用例还应创建新对象，不能共享会被修改的 fixture。
+
+### 用例名应该描述结果
+
+```ts
+it('prevents duplicate enrollment while the request is pending')
+it('keeps the email when the server rejects enrollment')
+```
+
+“works”或“test button”无法在 CI 失败时提供业务信息。Arrange、Act、Assert 不一定要写成注释，但三个阶段应该一眼可辨：
+
+```ts
+// Arrange
+const service = createService()
+const wrapper = mount(Component, { props: { service } })
+
+// Act
+await wrapper.get('form').trigger('submit')
+
+// Assert
+expect(service.enroll).toHaveBeenCalledOnce()
+```
+
+一个用例可以有多个共同证明同一行为的断言，不需要为了断言数量机械拆成多次 mount。
+
+## 组件测试观察公共接口
+
+Vue 组件的公开输入通常是：
+
+- Props；
+- Slots；
+- provide/inject 的约定；
+- 用户输入和浏览器事件；
+- 服务或数据流。
+
+公开输出通常是：
+
+- DOM 与可访问状态；
+- Emits；
+- 导航；
+- 服务调用；
+- 用户可感知的副作用。
+
+脆弱断言：
 
 ```ts
 expect((wrapper.vm as any).pending).toBe(true)
 ```
 
-更稳定：
+更稳定的行为断言：
 
 ```ts
 expect(wrapper.get('button').attributes('disabled')).toBeDefined()
 expect(wrapper.get('button').text()).toBe('报名中…')
 ```
 
-内部 ref 从 `pending` 改名为 `submitting` 不应破坏测试；用户可见行为变化才应触发更新。
+内部变量从 pending 改名成 submitting，不应让测试失败；用户可见行为改变才应该影响测试。
 
-## 7. Vitest 为什么适合 Vite 项目
+Vue 官方同样建议组件测试关注“做了什么”，而不是“怎样实现”。复杂私有方法若值得独立覆盖，通常说明其中的规则应该提取成纯函数或服务。
 
-Vue 官方推荐在 Vite 项目中使用 Vitest，因为它复用 Vite 的解析、转换、Alias 和插件流水线。优势包括：
+## 依赖边界让组件既容易测试也容易维护
 
-- ESM 与 TypeScript 支持。
-- Watch 模式和按文件筛选。
-- Mock、Spy、Fake Timer。
-- Coverage。
-- Node、DOM 模拟和 Browser Mode。
-- 与 Vite 配置协作。
-
-本工作树没有安装这些测试依赖，且本专题禁止修改 `package.json`。本课提供的是完整参考文件，不会假装已经运行 Vitest。
-
-## 8. 典型 Vitest 配置
-
-```ts
-// vitest.config.ts
-import { defineConfig } from 'vitest/config'
-import vue from '@vitejs/plugin-vue'
-
-export default defineConfig({
-  plugins: [vue()],
-  test: {
-    environment: 'happy-dom',
-    setupFiles: ['./tests/setup.ts'],
-    restoreMocks: true,
-    clearMocks: true,
-    unstubGlobals: true,
-    unstubEnvs: true,
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'html']
-    }
-  }
-})
-```
-
-不要复制后直接假设适合所有项目。纯 Node 领域测试使用 DOM 环境会增加成本；可按测试项目或文件注释分环境。
-
-## 9. Node、模拟 DOM 与真实浏览器
-
-### Node Environment
-
-适合纯函数、服务转换、无 DOM Store。速度快，没有 `document`。
-
-### happy-dom / jsdom
-
-在 Node 中模拟 DOM，适合大部分 Vue Test Utils 测试。但布局、CSS、Canvas、导航、原生事件和部分 Web API 与真实浏览器不同。
-
-### Vitest Browser Mode / 浏览器组件测试
-
-在真实浏览器环境运行，适合依赖原生事件、样式和浏览器 API 的组件，成本更高且 Mock 能力与 Node Mode 存在差异。
-
-### Playwright E2E
-
-通过用户入口访问完整应用，不导入组件源代码。验证路由、构建、资源和浏览器集成。
-
-环境要按风险选择，不是越真实越好。
-
-## 10. 测试结构：Arrange、Act、Assert
-
-```ts
-it('prevents a second enrollment', async () => {
-  // Arrange：准备服务与组件
-  const service = createService()
-  const wrapper = mount(Component, { props: { service } })
-
-  // Act：按用户方式操作
-  await wrapper.get('form').trigger('submit')
-
-  // Assert：验证公开结果
-  expect(service.enroll).toHaveBeenCalledOnce()
-})
-```
-
-不用强制写注释，但逻辑阶段应清楚。一个用例可以有多个相关断言，共同证明一个行为；不要为每个属性机械拆成独立 mount。
-
-## 11. 用例名描述业务结果
-
-不推荐：
-
-```ts
-it('works')
-it('test button')
-```
-
-推荐：
-
-```ts
-it('prevents duplicate submission while enrollment is pending')
-it('keeps the email when the server rejects enrollment')
-```
-
-失败报告本身应能帮助定位风险。不要把实现方法名当作全部语义。
-
-## 12. 纯函数优先单元测试
-
-权限和业务策略不应藏在模板中的长表达式：
-
-<<< ../../../examples/frontend/vue3-testing/lesson-policy.ts
-
-它不依赖 Vue、DOM、Router 或 Pinia，因此测试无需 mount：
-
-<<< ../../../examples/frontend/vue3-testing/lesson-policy.test.mts
-
-这样的测试速度快，适合覆盖大量角色、状态和边界组合。
-
-## 13. 表格测试
-
-`it.each()` 适合相同规则的输入矩阵：
-
-```ts
-it.each([
-  ['guest', guestInput, false],
-  ['eligible student', studentInput, true]
-])('%s', (_name, input, expected) => {
-  expect(canEnroll(input)).toBe(expected)
-})
-```
-
-表格不要塞进完全不同的行为；失败只显示“row 17”会难读。为复杂场景提供描述列，并保持输入对象清晰。
-
-边界值比大量随机正常值更有价值：空、最小、最大、最大 + 1、未知枚举、重复、时区转换点。
-
-## 14. Fixture Builder
-
-<<< ../../../examples/frontend/vue3-testing/test-builders.ts
-
-Builder 提供有效默认值，测试只覆盖关心字段：
-
-```ts
-buildAccessInput({ role: 'guest' })
-```
-
-优点：
-
-- 实体新增必填字段时集中更新。
-- 用例噪声更少。
-- 默认对象保持业务有效。
-
-风险：默认值过于隐蔽会让测试看不懂。断言依赖的重要字段应显式覆盖。Builder 的序号、时间和随机数也要可重置或注入。
-
-## 15. 不要共享可变 Fixture
-
-错误：
-
-```ts
-const lesson = buildLesson()
-
-it('A', () => { lesson.status = 'draft' })
-it('B', () => { expect(lesson.status).toBe('published') })
-```
-
-B 是否通过取决于执行顺序。每个测试内部创建新对象，或在 `beforeEach` 创建。深层对象也要避免浅复制后共享嵌套数组。
-
-测试并行执行会放大任何模块全局可变状态问题。
-
-## 16. 组件可测试性来自依赖边界
-
-组件若直接 import 一个全局 HTTP 单例、读取全局 Store、操作 location 并弹 Toast，测试必须 Mock 整个世界。
-
-更清晰的设计：
-
-- I/O 放在 Service。
-- 组件通过 Props/Inject/Store Action 获取稳定接口。
-- 领域错误有明确类型。
-- 组件负责用户状态和渲染。
-
-报名服务契约：
+报名组件不直接 import 一个全局 HTTP 单例，而是接收明确接口：
 
 <<< ../../../examples/frontend/vue3-testing/enrollment-contract.ts
 
-依赖注入不是“为了测试而污染生产代码”；它让运行时依赖本身变得明确。
-
-## 17. 完整异步组件
+完整组件：
 
 <<< ../../../examples/frontend/vue3-testing/LessonEnrollment.vue
 
-组件公开行为包括：
+组件只负责：
 
-- 输入邮箱。
-- 提交时禁用按钮。
-- 调用服务并传递 AbortSignal。
-- 成功显示 status。
-- 领域失败显示 alert 且保留输入。
+- 读取和规范化邮箱；
+- 管理 pending、receipt 与可见错误；
+- 阻止重复提交；
 - 卸载时取消请求。
 
-测试无需知道内部 ref 名称，也无需 Mock Vue 响应式系统。
-
-## 18. Vue Test Utils 的 mount
-
-```ts
-const wrapper = mount(LessonEnrollment, {
-  props: { lessonId, service },
-  global: {
-    plugins: [],
-    provide: {},
-    stubs: {}
-  },
-  attachTo: document.body
-})
-```
-
-- `props` 提供组件输入。
-- `global.plugins` 安装 Pinia、Router、i18n。
-- `global.provide` 提供 Inject。
-- `global.stubs` 替换无关边界。
-- `attachTo` 只在需要真实 document 关系、Teleport 或焦点时使用；用后必须 unmount/清理。
-
-默认尽量使用完整 mount，只有明确隔离目的时才 shallow/stub。
-
-## 19. `get` 与 `find`
-
-- `get(selector)` 找不到会立即抛出，适合元素必须存在。
-- `find(selector)` 返回空 Wrapper，适合断言不存在。
-
-```ts
-expect(wrapper.get('[role="alert"]').text()).toContain('失败')
-expect(wrapper.find('[role="status"]').exists()).toBe(false)
-```
-
-选择表达测试意图的 API。不要到处 `find(...).exists()` 后再 `get()`。
-
-## 20. Selector 优先级
-
-优先使用用户可感知语义：
-
-1. Role + accessible name。
-2. Label / 文本。
-3. 稳定业务属性。
-4. `data-testid` 作为无法表达语义时的最后手段。
-
-Vue Test Utils 是低层 API，常用 CSS selector。即使如此也应选 `input[type=email]`、`[role=alert]` 等契约，而不是 `.mt-4 > div:nth-child(2)`。
-
-类名主要用于样式，DOM 层级经常重构，不应成为默认测试 API。
-
-## 21. 完整组件测试
+测试可以传入一个快速、可控制的服务替身，不需要知道 Axios、fetch、Base URL 或认证头细节：
 
 <<< ../../../examples/frontend/vue3-testing/LessonEnrollment.test.mts
 
-它验证三条高风险路径：
+依赖注入不是“为了测试污染生产设计”。它同时让：
 
-- 成功时输入规范化、服务调用和回执。
-- Pending 时禁止重复提交。
-- 领域错误可见且用户输入保留。
+- 组件职责更小；
+- 服务契约可替换；
+- SSR、离线实现或不同后端更容易接入；
+- 测试控制成功、失败和 pending 时机。
 
-测试 Service 是协作者，而不是重新实现 HTTP。Service 自身的请求/响应映射应另有契约测试。
+不要把所有依赖都做成 Prop。应用级服务也可通过 provide/inject 或组合根提供；关键是依赖来源明确，不在组件深处偷偷创建不可控制单例。
 
-## 22. Vue DOM 更新为什么要 await
+## Vue Test Utils 帮助我们操作组件，不替我们定义正确性
 
-Vue 会批量缓冲 DOM 更新。测试运行器会继续同步执行，因此：
-
-```ts
-wrapper.get('button').trigger('click')
-expect(wrapper.text()).toContain('新值') // 可能太早
-```
-
-Vue Test Utils 中会导致 DOM 更新的方法通常返回 `nextTick()`：
+`mount()` 创建一个真实 Vue 应用实例并挂载组件。常用操作：
 
 ```ts
-await wrapper.get('button').trigger('click')
-await wrapper.get('input').setValue('Vue')
-```
+const wrapper = mount(LessonEnrollment, {
+  props: { lessonId: 'vue-testing', service }
+})
 
-这个 await 只等待 Vue 的更新，不保证独立 Promise 已完成。
-
-## 23. `nextTick` 与 `flushPromises`
-
-### `nextTick()`
-
-等待 Vue 当前 DOM flush。
-
-### `flushPromises()`
-
-让已经排队的未决 Promise 回调继续执行，适合 Mock HTTP Promise 或 Router 导航后的异步链。
-
-典型顺序：
-
-```ts
+await wrapper.get('input').setValue('student@example.com')
 await wrapper.get('form').trigger('submit')
-expect(wrapper.get('button').text()).toBe('保存中…')
-
-resolveRequest(response)
-await flushPromises()
-expect(wrapper.get('[role=status]').text()).toContain('成功')
 ```
 
-不要用反复 `await nextTick()` 猜网络 Promise 何时结束。
+### `get()` 和 `find()` 表达不同预期
 
-## 24. Deferred Promise 测 Pending 状态
+- `get(selector)`：元素必须存在，否则立即给出清楚错误；
+- `find(selector)`：元素可能不存在，可用 `exists()` 判断；
+- `findAll(selector)`：得到多个匹配。
 
-直接 `mockResolvedValue()` 可能在断言前很快完成。手动控制 Promise：
+如果成功提示本来就必须存在，用 `get()`；如果错误提示应该消失，用 `find().exists()`。
+
+### 选择器优先表达用户语义
+
+在能用的情况下优先：
+
+- label 与表单控件关系；
+- role、可访问名称和可见文本；
+- 稳定业务语义。
+
+CSS class 多用于样式，重构 class 不应破坏行为测试。`data-test` 适合没有稳定语义或需要精确定位的容器，但不要用它绕过缺失的 label 和可访问名称。
+
+模拟 DOM 环境不完整支持浏览器布局和原生校验。依赖真实几何、Canvas、复杂焦点、拖放或 CSS 行为时，应使用浏览器组件测试或 E2E。
+
+## 异步测试先识别你在等待哪一个时钟
+
+“加一个 await”不是通用答案。Vue 应用里常见四类异步来源：
+
+| 来源 | 应等待什么 |
+| --- | --- |
+| Vue 响应式 DOM 更新 | `nextTick()`，或 await VTU 的 `trigger/setValue/setProps` |
+| 已经排队的 Promise | `flushPromises()` 或具体 Promise |
+| setTimeout / debounce | Fake Timer 推进时间 |
+| Router 导航 | `router.isReady()`、导航 Promise，再等待相关更新 |
+
+### 为什么 `await trigger()` 不等于接口完成
+
+`trigger()` 返回的 Promise 方便等待 Vue 下一轮 DOM 更新，但组件发出的网络 Promise 可能仍在 pending。
+
+`flushPromises()` 会让已经可结算的 Promise 回调继续执行，它不会：
+
+- 自动推进未到期的 timer；
+- 让永远 pending 的 Promise 完成；
+- 等待真实网络；
+- 替你判断业务究竟应该等待什么。
+
+“到处 flushPromises”经常掩盖测试不理解异步链的问题。优先等待最具体的边界。
+
+### Deferred Promise 能观察中间状态
+
+测试重复提交时，不能让 Mock 立即 resolve，否则 pending 状态转瞬即逝。创建由测试掌握 resolve 的 Promise：
 
 ```ts
-let resolve!: (value: Result) => void
-const pending = new Promise<Result>((done) => { resolve = done })
-service.call.mockReturnValue(pending)
+let resolve!: (receipt: EnrollmentReceipt) => void
+const pending = new Promise<EnrollmentReceipt>((done) => {
+  resolve = done
+})
 ```
 
-先触发提交并断言 Loading/Disabled，再调用 `resolve()`，最后 `flushPromises()` 断言成功。
+现在测试可以：
 
-这比在 Mock 中 `setTimeout(1000)` 更快、更确定。
+1. 提交一次；
+2. 在 Promise 未结束时再次提交；
+3. 断言服务只调用一次、按钮已禁用；
+4. 手动 resolve；
+5. 断言按钮恢复和结果出现。
 
-## 25. Mock、Stub、Fake、Spy
+这是控制状态机，不是靠 `setTimeout(100)` 猜请求何时完成。
 
-术语在不同团队略有差异，实用区分：
+## 防抖、取消和竞态必须分别测试
 
-- Stub：返回预设结果，不关心调用。
-- Spy：记录真实或替代函数如何被调用。
-- Mock：带预期的替代依赖，常泛指上述工具。
-- Fake：有简化但可工作的实现，如内存仓库。
-
-选择最简单、最能表达风险的测试替身。不要为一个返回值搭建复杂通用 Mock 框架。
-
-## 26. 依赖注入与模块 Mock 的选择
-
-### 注入接口
-
-优点：类型清晰、每个实例独立、无 hoist 困惑，适合 Service/Clock/Storage。
-
-### `vi.mock()`
-
-适合难以注入的第三方模块或模块边界。它会被提升到 import 前，Factory 不能随意引用后声明变量；可使用 `vi.hoisted()`。
-
-### `vi.spyOn()`
-
-适合观察对象方法，默认可保留真实实现。但 Browser Mode 对 ESM Namespace Spy 有限制。
-
-Vitest 官方强调测试后清理/恢复 Mock。可用配置 `restoreMocks`，也可在 `afterEach` 明确执行。
-
-## 27. 不要 Mock 你真正想验证的东西
-
-如果测试目标是“Router 守卫组合后是否进入详情页”，就使用真实 Router；如果目标只是“点击按钮向 Router 请求导航到哪个位置”，可 Mock `push`。
-
-如果目标是“组件如何显示服务端 422”，Mock Service 返回领域错误即可；如果目标是“HTTP 422 能否转换为领域错误”，测试真实 Service + Mock 网络。
-
-先写一句测试目标，再决定替换哪一层。
-
-## 28. 网络 Mock 的层级
-
-### Mock Service 方法
-
-组件测试最简单，验证组件与 Service 契约。
-
-### Mock fetch/HTTP Client
-
-验证 Service 的 URL、Headers、序列化和错误映射。不要在每个组件测试重复。
-
-### Service Worker/网络拦截
-
-MSW 等工具从请求边界响应，组件、Store、Service 均保持真实。适合集成测试，但 Handler 也需要按用例重置。
-
-### 测试后端
-
-真正端到端，验证部署、鉴权和数据库，数据治理成本最高。
-
-不要在单元测试调用真实公共 API；它慢、易变、有速率限制且可能产生数据。
-
-## 29. Composable 测试分两类
-
-### 只用响应式 API
-
-可以直接调用并断言 refs/computed。
-
-### 依赖组件实例
-
-使用以下 API 时需要宿主：
-
-- `onMounted` / `onUnmounted` / `onScopeDispose`。
-- Provide / Inject。
-- Template Ref 或实例上下文。
-
-创建 App 并 mount，使生命周期真正发生；结束时 unmount 验证清理。
-
-## 30. 生命周期 Composable 宿主
-
-<<< ../../../examples/frontend/vue3-testing/withSetup.mts
-
-Helper 返回 Composable 结果和 App：
-
-```ts
-const [result, app] = withSetup(() => useFeature())
-// assertions
-app.unmount()
-```
-
-不要忘记 unmount。计时器、监听器和请求清理只有在卸载时才会被验证。
-
-复杂 Composable 若与 DOM 或多个组件协作，写一个测试宿主组件往往比直接断言 refs 更自然。
-
-## 31. 可取消防抖搜索 Composable
+可取消搜索 composable：
 
 <<< ../../../examples/frontend/vue3-testing/useDebouncedLessonSearch.mts
 
-它包含多种异步来源：
+它依赖组件作用域来清理 timer 和请求，因此测试通过宿主组件运行：
 
-- Vue watcher 调度。
-- `setTimeout` 防抖。
-- Service Promise。
-- AbortController。
-- Scope Disposal。
-
-测试必须分别控制这些时钟，不能靠真实等待。
-
-## 32. Fake Timer 测试
-
-<<< ../../../examples/frontend/vue3-testing/useDebouncedLessonSearch.test.mts
-
-关键顺序：
-
-1. `vi.useFakeTimers()`。
-2. 修改 query。
-3. `await nextTick()` 让 watcher 创建 timer。
-4. `advanceTimersByTimeAsync()` 推进 timer 和异步回调。
-5. 断言请求与结果。
-6. `app.unmount()` 验证生命周期结束。
-7. `afterEach` 恢复真实 Timer。
-
-Fake Timer 会改变 Date/Timer 行为，若不恢复会污染后续测试。不要同时混合真实睡眠和 Fake Timer。
-
-## 33. 测试取消与竞态
-
-只测最后结果不够。竞态测试应控制两个请求：
-
-- 启动 A，捕获 A 的 signal。
-- 输入新值，确认 A aborted。
-- 启动 B 并先完成。
-- 即使 A 之后错误/完成，也不能覆盖 B。
-
-若客户端不支持 AbortSignal，注入 Deferred Promise 并反序 resolve，验证请求序号策略。
-
-这类测试对搜索、路由数据、自动保存和异步校验非常重要。
-
-## 34. Pinia Store 单测隔离
-
-每个用例创建新 active Pinia：
-
-```ts
-beforeEach(() => {
-  setActivePinia(createPinia())
-})
-```
-
-否则 Store 实例缓存和状态会跨测试泄漏。不要从应用入口 import 已安装的全局 Pinia。
-
-完整 Store：
-
-<<< ../../../examples/frontend/vue3-testing/lesson-selection-store.mts
+<<< ../../../examples/frontend/vue3-testing/withSetup.mts
 
 完整测试：
 
+<<< ../../../examples/frontend/vue3-testing/useDebouncedLessonSearch.test.mts
+
+其中三种行为不能互相替代：
+
+1. **防抖**：299ms 不请求，第 300ms 才请求；
+2. **取消**：新查询让旧 Signal 进入 aborted；
+3. **结果所有权**：即使服务忽略 Signal，晚到的旧结果也不能覆盖新结果。
+
+只断言 `signal.aborted === true` 仍不足以证明 UI 正确，因为底层服务可能无法真正取消。最强的测试会让旧请求故意最后返回，然后断言屏幕仍保留新查询结果。
+
+Fake Timer 用完必须恢复。推进 timer 后还要按实现等待 Promise microtask；不要把假时间和真实时间混在同一个测试中。
+
+## Mock 的目标是控制边界，不是让一切都变成假的
+
+几个词的职责不同：
+
+- **Fake**：可工作的简化实现，例如内存仓库；
+- **Stub**：返回预设结果；
+- **Spy**：记录真实函数怎样被调用；
+- **Mock**：带调用预期的测试替身。
+
+选择范围时先问：这条测试真正想验证什么？
+
+### 注入接口
+
+适合组件或 composable 的业务服务。类型明确、每例独立，不依赖模块加载顺序。
+
+### `vi.mock()`
+
+适合无法轻易注入的模块边界、平台 SDK 或遗留单例。它会受模块缓存和提升语义影响，过量使用会让测试只证明 Mock 之间能合作。
+
+### `vi.spyOn()`
+
+适合保留对象其余真实行为，只观察或临时替换一个公开方法。测试结束后应恢复。
+
+### 网络层
+
+可以在不同层拦截：
+
+- 组件测试 Stub 服务接口；
+- 服务测试拦截 fetch/HTTP Client；
+- 更真实的集成测试用 Service Worker 或本地测试服务；
+- E2E 可路由拦截，也可连接专用后端。
+
+如果目标是验证 JSON 映射和 HTTP 错误处理，就不要把整个 service Mock 掉；如果目标只是按钮状态，也无需启动真实后端。
+
+## Composable 是否需要宿主取决于它使用了什么
+
+只使用 ref、computed 等响应式 API 的 composable，可以直接调用测试。
+
+使用以下能力时需要组件实例：
+
+- 生命周期钩子；
+- provide/inject；
+- 依赖组件作用域自动停止的 watcher；
+- 当前实例上下文。
+
+`withSetup()` 创建最小宿主并返回 app。测试结束必须 `app.unmount()`，这样才能验证并执行 `onScopeDispose()`、定时器取消和订阅清理。
+
+清理本身就是行为。至少应有测试证明卸载后：
+
+- Signal 被取消；
+- timer 不再触发；
+- 外部事件监听已移除；
+- 旧异步结果不能修改活跃状态。
+
+## Pinia 测试每例都要有新的状态容器
+
+Store 示例：
+
+<<< ../../../examples/frontend/vue3-testing/lesson-selection-store.mts
+
+测试：
+
 <<< ../../../examples/frontend/vue3-testing/lesson-selection-store.test.mts
 
-## 35. Store 应测试什么
+`setActivePinia(createPinia())` 放在 `beforeEach`，使每个用例获得全新 Store 实例。否则测试顺序会决定 selectedIds 初值。
 
-- 初始状态。
-- Getter 派生结果。
-- Action 成功和失败状态。
-- 异步竞态与取消。
-- Reset。
-- 与其他 Store 的协作边界。
+Store 单测重点是：
 
-不要断言“内部 ref 被设置了三次”，应断言 action 完成后的公开状态和 Service 调用。
+- Action 如何转换状态；
+- Getter / computed 的派生结果；
+- 并发请求和错误状态；
+- reset、取消与资源清理；
+- 业务不变量。
 
-如果 Store 依赖插件，Pinia 插件只有安装到 App 后才生效，测试必须创建空 App 并 `app.use(pinia)`。
+不需要为 Pinia 已经保证的 ref 响应性写大量测试。
 
-## 36. `createTestingPinia`
+### `createTestingPinia()` 的边界
 
-`@pinia/testing` 适合组件测试：
+组件测试中可用 Testing Pinia 快速提供 Store，并默认 Stub Actions。但若这条测试要验证 Action 真实改变状态，就必须明确关闭 Stub 或使用真实 Pinia。
 
-```ts
-const testingPinia = createTestingPinia({
-  initialState: {
-    session: { authenticated: true }
-  },
-  stubActions: true,
-  createSpy: vi.fn
-})
-```
+“Action 被调用”与“Action 正确完成业务转换”是不同证据。
 
-默认 Stub Action 便于验证“组件请求调用 action”，但不会执行 action 逻辑。若测试需要真实状态转换，设置 `stubActions: false`。
+## Router 测试：导航协议用真实实例更可靠
 
-不要一边以为 Action 在运行，一边只断言 Mock 状态。明确测试目标是组件协作还是 Store 行为。
+若组件只是调用一次 `router.push()`，Mock `useRouter()` 可以验证目标对象。
 
-## 37. Router 测试：Mock 还是 Real
+若风险涉及以下行为，应使用隔离的真实 Router：
 
-### Mock Router
+- path 与 name 是否匹配；
+- params 是否转成 Props；
+- 嵌套路由渲染；
+- query、redirect 和 404；
+- 导航守卫；
+- RouterLink 与 RouterView 的协作。
 
-适合只验证导航意图：
-
-```ts
-expect(push).toHaveBeenCalledWith({
-  name: 'lesson-edit',
-  params: { lessonId: 'vue-testing' }
-})
-```
-
-### Real Router
-
-适合验证路径匹配、Props、Redirect、Guard、Nested RouterView 和真实 RouterLink。
-
-每个测试创建新 Router，优先 `createMemoryHistory()`，先 push 初始地址并等待 `router.isReady()`。
-
-## 38. 完整 Router 集成测试
+完整集成测试：
 
 <<< ../../../examples/frontend/vue3-testing/router.integration.test.mts
 
-测试过程：
+它为每个测试创建：
 
-- 创建独立 memory router。
-- 等待初始导航完成。
-- 作为 Plugin 安装到 mount。
-- 通过真实 RouterLink 点击。
-- `flushPromises()` 等待异步导航。
-- 同时断言 URL 与渲染内容。
+- `createMemoryHistory()`；
+- 新 router；
+- 最小路由表；
+- 只服务当前用例的宿主组件。
 
-若每个组件测试都如此设置会很重；把 Router 集成测试集中在真正需要匹配行为的地方。
+初始导航要先 push，再 `await router.isReady()`，否则断言可能发生在首次导航确认之前。
 
-## 39. 导航守卫怎么测
+守卫本身若包含复杂权限规则，应把规则提纯做单测，再用少量真实 Router 测试证明规则被正确接线。不要在几十个路由集成用例中重复所有权限排列。
 
-把纯权限判断提取为函数，先用表格单测；再用少量真实 Router 测试保证 Guard 接线正确：
+## 表单、Events、Slots 与 Inject 应测契约
 
-- 未登录进入受保护页 → Login + redirect。
-- 无角色 → Forbidden。
-- 已授权 → 目标页。
-- Login 本身不会循环重定向。
+表单组件关注：
 
-Guard 依赖 Pinia 时，每个测试创建同一 App 上下文的 Pinia 和 Router。SSR 还要确保实例不跨请求。
+- label 能否定位控件；
+- 用户输入后模型和 DOM 是否一致；
+- submit 时 DTO 是否规范化；
+- pending 是否阻止重复提交；
+- 字段错误和表单错误如何显示；
+- 失败是否保留输入；
+- 成功后 reset 或导航语义；
+- 异步错误是否可能覆盖新值。
 
-## 40. 表单组件测试
-
-覆盖用户状态转换：
-
-- 输入前不显示错误。
-- Blur 或 submit 后显示字段错误。
-- 修复输入后错误消失。
-- 异步校验 pending 和竞态。
-- Submit DTO 正确。
-- 服务端字段错误映射。
-- 错误摘要和焦点。
-- 动态字段添加删除使用正确 ID。
-
-使用 `setValue` 和 `trigger('blur')`，不要直接写 `wrapper.vm.model.title`。
-
-注意模拟 DOM 不会完整实现原生 Constraint Validation、布局和真实文件选择；关键浏览器行为要用浏览器组件测试或 E2E。
-
-## 41. Events 与 v-model 测试
-
-事件：
+Events 关注 payload 和触发条件：
 
 ```ts
-await wrapper.get('button').trigger('click')
-expect(wrapper.emitted('select')).toEqual([['lesson-1']])
+expect(wrapper.emitted('update:modelValue')).toEqual([['next']])
 ```
 
-组件 v-model 可建立受控宿主，让 emitted update 回写 Props，再断言 DOM：
+组件 `v-model` 测试可以在一个小宿主中把 `update:modelValue` 写回 Prop，验证完整受控循环，而不只断言 emit 存在。
+
+Slots 关注传入内容是否位于正确语义结构，Scoped Slot 是否收到承诺的 slot props。
+
+provide/inject 测试应通过 `global.provide` 或真实 Provider 宿主注入，不要直接改 composable 私有变量。
+
+Teleport 的目标 DOM 需要在测试前创建、测试后移除；Transition 通常可以 Stub 以避免动画时间，只有动画本身是需求时才进入真实浏览器测试。
+
+## Snapshot 只能回答“输出变了吗”
+
+大型 HTML Snapshot 很容易出现：
+
+- 每次结构调整都大面积更新；
+- 审查者直接接受新快照；
+- 它记录很多 class，却没有解释什么才算正确；
+- 动态 ID、时间使结果不稳定。
+
+Snapshot 适合小而稳定的序列化结构、编译产物或错误对象。组件核心行为仍应写语义断言：
 
 ```ts
-const wrapper = mount(Input, {
-  props: {
-    modelValue: '',
-    'onUpdate:modelValue': value => wrapper.setProps({ modelValue: value })
-  }
-})
+expect(wrapper.get('[role="alert"]').text())
+  .toBe('你已经报名过该课程')
 ```
 
-只断言 emit 而不模拟父级回写，可能遗漏组件依赖受控值更新的行为。
+更新 Snapshot 不是修复测试，必须先确认变化符合需求。
 
-## 42. Slots 测试
+## 时间、随机数和全局环境都必须归还
 
-提供真实 Slot 内容并观察渲染：
+不稳定来源常包括：
 
-```ts
-mount(Card, {
-  slots: {
-    default: '<p>课程内容</p>',
-    actions: ({ save }) => h('button', { onClick: save }, '保存')
-  }
-})
-```
+- `Date.now()`、时区和 Locale；
+- `Math.random()` 和随机 ID；
+- fake timers 未恢复；
+- `window.matchMedia`、ResizeObserver 等全局 Stub；
+- localStorage、document.body；
+- process env；
+- 未恢复的 Spy；
+- 未卸载的 Vue app。
 
-Scoped Slot Props 是公共 API，应验证名称和用户操作，而不是 Snapshot 整个内部 VNode。
-
-## 43. Provide / Inject 测试
-
-简单 Consumer：
-
-```ts
-mount(Consumer, {
-  global: {
-    provide: {
-      [key as symbol]: fakeContext
-    }
-  }
-})
-```
-
-需要验证 Provider 与 Consumer 协作时完整 mount 二者。必需 Inject 缺失应抛出清晰错误，也值得测试。
-
-避免在全局 Test Setup 提供所有依赖；用例会在不知道的情况下通过，掩盖组件真实契约。
-
-## 44. Teleport 测试
-
-Teleport 内容不在 Wrapper 根 DOM 中，但仍属于组件 VNode。通常：
-
-- 在 document 创建目标节点。
-- `attachTo: document.body` mount。
-- 从 document 或 `findComponent` 断言内容。
-- 测试后 wrapper.unmount 并移除目标。
-
-也可全局 Stub Teleport 进行简单单元测试，但必须保留至少一个真实集成测试验证目标和焦点管理。
-
-## 45. Transition 测试
-
-Vue Test Utils 默认可 Stub Transition，使内容同步出现。组件逻辑测试不应依赖 CSS 动画毫秒数。
-
-真正需要验证：
-
-- 进入/离开后最终可见状态。
-- Reduced Motion。
-- 动画期间交互是否被阻塞。
-- Transition Hook 是否调用必要清理。
-
-视觉时序和 CSS 应在真实浏览器测试，不要在模拟 DOM 重造浏览器动画引擎。
-
-## 46. Suspense 与 async setup
-
-使用 async setup 的组件必须在 Suspense 中 mount：
-
-```ts
-const Host = defineComponent({
-  components: { AsyncView },
-  template: '<Suspense><AsyncView /></Suspense>'
-})
-
-const wrapper = mount(Host)
-await flushPromises()
-```
-
-外层 Wrapper 的 vm 是 Host，不是 AsyncView；需要时用 `findComponent(AsyncView)`。
-
-测试 fallback、成功和拒绝路径，不要只等待最终 DOM。
-
-## 47. KeepAlive 测试
-
-关注业务行为：
-
-- 切回后本地草稿是否保留。
-- Deactivated 时轮询是否暂停。
-- Activated 时是否正确恢复。
-- 超出 max 后最旧实例是否被销毁。
-- 权限/退出登录后缓存是否失效。
-
-不要测试 Vue 自身 LRU 算法的所有细节；测试你的 include/key/生命周期接线和资源清理。
-
-## 48. Snapshot 测试的边界
-
-Snapshot 适合稳定、结构化且人工能审查的输出，例如：
-
-- 小型序列化 AST。
-- 邮件/文档模板。
-- 有意稳定的复杂错误结构。
-
-组件整个 HTML Snapshot 常见问题：
-
-- 小 class 变化产生巨大 diff。
-- 团队习惯直接更新。
-- 看不出关键业务断言。
-- 多个状态被压成一张静态图。
-
-Snapshot 可补充，不能替代“按钮被禁用”“错误关联字段”“事件载荷正确”等明确断言。
-
-## 49. Mock 时间与随机数
-
-涉及 `Date.now()`、时区、过期和 ID 时：
+策略是注入时钟和 ID 生成器，或在测试中固定时间：
 
 ```ts
 vi.useFakeTimers()
-vi.setSystemTime(new Date('2026-07-13T00:00:00Z'))
+vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
 ```
 
-测试后恢复真实 Timer。更清晰的领域代码可注入 Clock：
+`afterEach` 中恢复 timer、Mock、全局和 DOM。更好的做法是每例只创建自己需要的资源，不把清理压力都交给一个巨大全局 setup。
 
-```ts
-interface Clock { now(): Date }
-```
+## E2E 验证的是用户入口和完整接线
 
-随机 ID 可注入 `IdGenerator`。不要在测试里只用正则接受任何值，结果仍不可复现。
+E2E 不导入 Vue 组件源码，而是从浏览器访问应用：
 
-时区测试要明确运行环境 TZ，避免本机上海通过、CI UTC 失败。
+<<< ../../../examples/frontend/vue3-testing/lesson-enrollment.e2e.spec.mts
 
-## 50. 全局与环境清理
+这个场景验证：
 
-测试常污染：
+- 路由能进入课程页面；
+- 标题对用户可见；
+- label 能找到邮箱；
+- 点击可访问名称为“确认报名”的按钮；
+- 请求 DTO 正确；
+- 成功状态最终出现。
 
-- `window.location`、localStorage、matchMedia。
-- Fake Timer 和系统时间。
-- Mock/Spy 调用记录和实现。
-- document.body、Teleport target。
-- Event Listener、Observer。
-- Pinia、Router、模块单例。
-- `import.meta.env`。
+### Locator 应依赖用户能感知的语义
 
-使用 `afterEach` 和 Vitest 的 restore/unstub 配置。清理应紧邻创建资源的测试 Helper，而不是依赖某个远处全局脚本。
-
-## 51. Coverage 应如何看
-
-Coverage 常见指标：
-
-- Statements。
-- Branches。
-- Functions。
-- Lines。
-
-高行覆盖仍可能遗漏：
-
-- 错误分支。
-- 并发顺序。
-- 浏览器集成。
-- 业务断言。
-- 不正确但被执行的逻辑。
-
-Coverage 用于发现明显空白，不应作为唯一质量 KPI。分支覆盖对权限、校验和状态机通常比行覆盖更有提示价值。
-
-## 52. 覆盖率阈值
-
-阈值能防止覆盖率持续下降，但统一 100% 会鼓励无意义测试和忽略难测架构问题。
-
-更合理：
-
-- 核心领域规则高分支覆盖。
-- 生成代码、类型声明和简单导出合理排除。
-- 新改动不得显著降低基线。
-- 关键风险必须有显式行为测试，不以百分比替代。
-
-定期审查未覆盖代码是否是死代码，而不只是补测试。
-
-## 53. Mutation Testing
-
-Mutation Tool 会故意把 `>` 改成 `>=`、true 改 false、删除语句，看测试是否失败。它能发现“代码执行了但断言不敏感”。
-
-Mutation Testing 成本高，适合核心领域规则或抽样运行。不是每次本地保存都必须全量执行。
-
-即使不用工具，也可问：如果把这个条件反过来，哪个测试会红？若答案不明确，断言可能没有保护契约。
-
-## 54. E2E 应覆盖什么
-
-少量关键旅程：
-
-- 登录、退出和会话过期。
-- 注册/购买/报名。
-- 核心创建、编辑、发布流程。
-- 权限拒绝。
-- 路由刷新和深链接。
-- 上传、下载等浏览器能力。
-
-不要把所有字段边界组合放进 E2E；纯函数或组件测试更快、更易定位。
-
-## 55. Playwright Locator
-
-优先：
+优先使用：
 
 ```ts
 page.getByRole('button', { name: '确认报名' })
@@ -873,369 +497,259 @@ page.getByLabel('邮箱')
 page.getByRole('status')
 ```
 
-Locator 会在执行操作时重新查找元素，并有自动等待和可操作性检查。不要缓存 `elementHandle` 或使用易变 XPath/CSS 层级。
+复杂 CSS 链条与 DOM 层级紧耦合。若找不到一个控件，先检查它是否缺少可访问名称，而不是立即添加任意 selector。
 
-语义 Locator 同时推动页面可访问名称更清晰，但它不等于完整无障碍审计。
-
-## 56. Web-first Assertions
+### 使用 Web-first Assertions
 
 ```ts
-await expect(page.getByRole('status')).toContainText('报名成功')
+await expect(page.getByRole('status'))
+  .toContainText('enrollment-e2e-1')
 ```
 
-Playwright assertion 会在超时内重试，适合异步 UI。不要写：
+Playwright 会在超时范围内重试 locator 和断言。不要写固定等待：
 
 ```ts
 await page.waitForTimeout(1000)
-expect(await locator.textContent()).toContain('成功')
 ```
 
-固定 Sleep 既慢又不稳定：CI 可能需要 1200ms，本机只需 50ms。等待用户可观察条件或明确网络响应。
+固定时间在快机器上浪费，在慢 CI 上仍不够。等待可观察条件：响应、URL、元素状态或业务结果。
 
-## 57. 完整 Playwright 场景
+### 网络拦截与真实后端各证明不同事情
+
+示例拦截接口，精确控制响应并断言请求体，适合稳定前端流程。
+
+连接专用测试后端才能证明：
+
+- 数据库约束；
+- 认证 Cookie；
+- CORS；
+- 真正序列化协议；
+- 后端部署接线。
+
+核心系统通常同时需要少量拦截型场景和更少量全栈场景。
+
+### 数据隔离是 E2E 稳定性的基础
+
+并行用例不应共享一个会互相修改的账号。可选策略：
+
+- 每例通过 API 创建唯一数据；
+- worker 级隔离租户或账号；
+- 测试后可靠清理；
+- 数据库事务或重置；
+- 使用幂等的固定只读 fixture。
+
+登录状态可由 setup project 生成 storage state 复用，但涉及登录安全本身的场景仍要走真实登录。复用认证不能让用例共享业务状态。
+
+跨浏览器测试有递减收益：主流程在 Chromium 全量运行，关键兼容风险再覆盖 WebKit/Firefox，通常比所有用例三倍运行更经济。
+
+## Flaky Test 是系统问题，不是“多重跑几次”
+
+常见根因：
+
+- 固定时间等待；
+- 用例顺序依赖；
+- 共用账号和数据；
+- 未等待导航或异步结果；
+- selector 依赖易变 DOM；
+- 动画、网络和系统时钟不受控；
+- Promise、timer、订阅没有清理；
+- CI 资源竞争；
+- 生产代码本身存在竞态。
+
+治理顺序：
+
+1. 保存 trace、截图、视频、console 和 network 证据；
+2. 找到等待条件、数据所有权或清理缺口；
+3. 修复测试或生产竞态；
+4. 只把重试作为采集偶发证据的短期手段；
+5. 记录 flaky 率和负责人，不能永久静默忽略。
+
+隔离测试虽然能让主分支暂时恢复，但必须有到期和修复责任。
+
+## Coverage 告诉你执行过什么，不告诉你断言是否有意义
+
+100% 行覆盖仍可能漏掉：
+
+- 错误分支没有正确提示；
+- 请求调用了两次；
+- 旧请求覆盖新值；
+- 时区边界错误；
+- CSS 让按钮不可点击；
+- 断言根本没有观察业务结果。
+
+覆盖率适合发现“完全没执行过”的区域，而不是作为质量分数。阈值应按风险和模块性质设置：
+
+- 领域规则可要求较高分支覆盖；
+- UI 外壳更依赖组件和 E2E 行为；
+- 生成代码和类型声明通常应排除。
+
+Mutation Testing 会故意改变条件和返回值，看测试是否失败。它比行覆盖更接近“断言是否能发现错误”，但运行成本高，可用于关键领域模块而非全仓默认。
+
+## CI 应按反馈速度分层
+
+一个常见流水线：
+
+```text
+静态检查、类型检查、纯单元测试
+  ↓
+组件与集成测试
+  ↓
+构建应用
+  ↓
+关键 Chromium E2E
+  ↓
+扩展浏览器、视觉或全栈回归
+```
+
+前层失败就尽早停止；慢测试按文件或历史耗时并行分片。并行前必须先解决模块单例、端口、数据库和账号共享问题，否则只会放大 flaky。
+
+测试自身也要有性能预算。常见拖慢原因：
+
+- 每例 mount 整个应用；
+- 所有测试都使用 DOM 环境；
+- 大量真实 timer；
+- 重复创建昂贵 fixture；
+- E2E 每例重新登录；
+- Helper 隐藏了过多无关 setup。
+
+优化不能牺牲隔离。复用不可变构建产物可以，复用会改变的 Store 和数据库实体通常不可以。
+
+## 可测试架构的信号
+
+容易测试的生产代码通常同时具备：
+
+- 纯规则与 I/O 分离；
+- 服务接口明确；
+- 依赖在边界提供；
+- 组件通过 Props/Events/DOM 表达契约；
+- Router 和 Store 可以为每个应用实例创建；
+- 时间、随机数和存储可以替换；
+- 异步任务有取消和结果所有权；
+- 错误是结构化协议；
+- 资源有明确清理生命周期。
+
+如果一个组件只能靠十几个模块 Mock 才能 mount，往往说明它承担了过多职责。
+
+但不要为了测试暴露私有 ref、添加只供测试调用的方法，或把所有内部细节做成公共 API。测试困难应推动更好的生产边界，而不是破坏封装。
+
+## 当前工作树的验证边界
+
+本仓库当前没有安装 Vitest、Vue Test Utils、Pinia、Vue Router 或 Playwright，也不允许本专题修改根 `package.json`。因此：
+
+- `*.test.mts` 和 E2E 文件是完整参考源码；
+- 本课不会声称已实际运行这些测试；
+- 可独立的纯 TypeScript 规则仍可由现有 TypeScript 检查覆盖；
+- 引入到真实项目时，应按锁文件版本安装依赖并实际运行；
+- Vue SFC 还应使用 `vue-tsc` 做模板类型检查。
+
+明确验证边界比给出一条虚假的“全部测试通过”更重要。
+
+## 阅读完整示例的顺序
+
+先看纯业务契约：
+
+<<< ../../../examples/frontend/vue3-testing/lesson-policy.ts
+
+<<< ../../../examples/frontend/vue3-testing/lesson-policy.test.mts
+
+再看组件与可替换服务：
+
+<<< ../../../examples/frontend/vue3-testing/enrollment-contract.ts
+
+<<< ../../../examples/frontend/vue3-testing/LessonEnrollment.vue
+
+<<< ../../../examples/frontend/vue3-testing/LessonEnrollment.test.mts
+
+然后看异步 composable 的作用域和竞态：
+
+<<< ../../../examples/frontend/vue3-testing/withSetup.mts
+
+<<< ../../../examples/frontend/vue3-testing/useDebouncedLessonSearch.mts
+
+<<< ../../../examples/frontend/vue3-testing/useDebouncedLessonSearch.test.mts
+
+最后看真实插件与浏览器边界：
+
+<<< ../../../examples/frontend/vue3-testing/lesson-selection-store.test.mts
+
+<<< ../../../examples/frontend/vue3-testing/router.integration.test.mts
 
 <<< ../../../examples/frontend/vue3-testing/lesson-enrollment.e2e.spec.mts
 
-这个示例使用浏览器页面和真实组件，但拦截报名 API，因此更准确地说是“浏览器级前端 E2E/契约场景”，不是全栈数据库 E2E。
+整条推理链是：
 
-它同时验证：
-
-- URL 可直接进入。
-- 标题和表单可访问语义。
-- 请求 DTO。
-- 成功响应后的 UI。
-
-另保留少量连接真实测试后端的全栈场景，验证鉴权、数据库和部署接线。
-
-## 58. E2E 数据隔离
-
-稳定策略：
-
-- 每个测试生成唯一用户/实体。
-- 通过受控 API 创建前置数据，而不是 UI 重复铺设所有步骤。
-- 测试后清理，或每个 Worker 独立数据库 Schema。
-- 不依赖用例顺序。
-- 不共用一个会被修改的账号。
-- 并行 Worker 的数据命名包含 Worker/Test ID。
-
-对第三方支付、邮件、地图，测试自己的集成边界，不要自动化测试第三方网站本身。
-
-## 59. Authentication State
-
-Playwright 可在 Setup Project 登录一次并保存 `storageState`，供多个测试复用。注意：
-
-- State 文件可能包含敏感 Cookie，不应提交仓库。
-- 共享账号仍可能产生数据冲突。
-- 权限矩阵需要不同角色 State。
-- 测试登录流程本身仍要有独立用例。
-- 会话过期场景不能全部复用永不过期状态。
-
-优化登录速度不能牺牲用例隔离。
-
-## 60. Cross-browser 策略
-
-Playwright 支持 Chromium、Firefox、WebKit。不是所有用例都必须三浏览器全跑：
-
-- 核心冒烟流程可跨浏览器。
-- 大部分功能回归跑主浏览器。
-- 浏览器差异高风险功能（文件、日期、输入法、媒体）重点覆盖。
-- PR 与 Nightly 使用不同矩阵。
-
-跨浏览器覆盖有递减收益，应依据用户分布和失败历史调整。
-
-## 61. Visual Regression
-
-适合：
-
-- 设计系统组件。
-- 图表、复杂布局。
-- 响应式断点。
-- 打印页面。
-
-稳定视觉测试需要固定：
-
-- 浏览器、Viewport、DPR。
-- 字体与操作系统。
-- 动画、光标和时间。
-- 网络数据和图片。
-
-视觉 diff 发现“看起来变了”，不能证明交互和语义正确。与行为断言并用。
-
-## 62. 自动化无障碍测试
-
-axe 等工具可发现：
-
-- 缺失 label。
-- 部分 ARIA 错误。
-- 对比度和结构问题。
-- 重复 ID。
-
-它不能完全验证：
-
-- 键盘流程是否自然。
-- 焦点移动是否合理。
-- 读屏文案是否有上下文。
-- 动态通知是否过度。
-- 认知负担。
-
-组件语义断言 + 自动扫描 + 键盘 E2E + 人工辅助技术检查共同构成无障碍质量。
-
-## 63. Flaky Test 的常见来源
-
-- 固定 Sleep 与时序猜测。
-- 未 await Vue/Promise/Router。
-- 真实时间、随机数和时区。
-- 共享全局 Store/Router/数据库。
-- CSS/文本 selector 易变。
-- 网络、第三方服务和速率限制。
-- 动画未关闭。
-- 用例依赖顺序。
-- 并行 Worker 操作同一实体。
-- 测试后未清理 Timer、DOM、Mock。
-
-Flaky 不是“多重跑几次就好”。重试可收集诊断，但必须记录、分流并修复根因。
-
-## 64. Flaky Test 治理
-
-1. 保存 Trace、Screenshot、Video、Console、Network。
-2. 判断产品 Bug、测试 Bug、环境 Bug。
-3. 建立负责人和截止时间。
-4. 隔离时保持可见告警，不要永久 skip。
-5. 统计 flaky 率和高频文件。
-6. 修复后移除不必要重试。
-
-若套件长期红绿随机，团队会忽略失败，测试系统失去价值。
-
-## 65. 并行执行与模块单例
-
-Vitest 文件可并行，Playwright Worker 也并行。以下模块状态危险：
-
-```ts
-export const router = createRouter(/* ... */)
-export const store = useStore()
-export let currentUser = fixture
+```text
+先识别昂贵风险
+  ↓
+选择最低成本且信号足够的层级
+  ↓
+从公开输入操作
+  ↓
+等待真正的异步边界
+  ↓
+断言用户可观察结果
+  ↓
+隔离并清理所有资源
 ```
 
-测试工厂应返回新实例：
+## 常见反模式
 
-```ts
-createTestRouter()
-createTestPinia()
-createFakeService()
-```
+### 只测试“能够 mount”
 
-生产中的 SSR 同样受益：可实例化架构防止请求间状态泄漏。
+它只能发现极少量初始化错误，不能证明任何业务行为。
 
-## 66. Test Helper 也需要克制
+### 主要断言 `wrapper.vm`
 
-过度封装：
+测试绑定内部命名和实现。优先从 DOM、Events、导航和服务边界观察。
 
-```ts
-await completeEntireApplicationHappyPath(page)
-```
+### 所有子组件都 shallow stub
 
-失败时不知道哪一步，测试也看不出业务意图。更好的 Helper：
-
-- `loginAs(role)`。
-- `buildLesson(overrides)`。
-- `mountWithPlugins(component, options)`。
-- Page Object 中稳定的领域动作。
-
-Helper 应隐藏技术样板，不隐藏本用例的关键业务步骤和断言。
-
-## 67. Page Object
-
-Page Object 可集中 Locator 与常用动作：
-
-```ts
-class EnrollmentPage {
-  constructor(readonly page: Page) {}
-  email = this.page.getByLabel('邮箱')
-  submit = this.page.getByRole('button', { name: '确认报名' })
-}
-```
-
-不要让 Page Object 内部包含所有断言和分支，变成另一个应用。测试仍应清楚表达期待结果。
-
-## 68. CI 测试流水线
-
-典型顺序：
-
-1. 静态类型与 Lint。
-2. 快速 Unit/Component。
-3. 构建生产产物。
-4. 关键 E2E 冒烟。
-5. 更大跨浏览器/视觉矩阵按 Nightly 或合并后运行。
-
-可按修改路径选择测试，但核心跨模块场景不能永远被跳过。CI 应缓存依赖而不是缓存测试结果到掩盖变更。
-
-失败产物需要保留足够时间，尤其 Playwright Trace。
-
-## 69. 测试性能
-
-慢测试套件会降低运行频率。定位：
-
-- 过多 DOM Environment。
-- 每个测试重复 mount 巨大 App。
-- 未恢复的 Timer/Open Handle。
-- 大量 Module Reset。
-- 过度全局 Setup。
-- 无差别 E2E 登录和数据创建。
-
-优化反馈时间不能把所有测试变成浅 Stub。按风险保留不同层，使用并行、工厂和合理 Project 拆分。
-
-## 70. 可测试架构的信号
-
-- 领域规则能作为纯函数测试。
-- Service 有稳定接口和错误类型。
-- 组件通过 Props/Events/Inject 使用依赖。
-- Router/Pinia 可由 Factory 创建。
-- 时间、随机数和存储可替换。
-- 异步操作接受 AbortSignal。
-- UI 使用语义 HTML 和明确可访问名称。
-- 状态所有者能重置并清理资源。
-
-“很难测试”常是架构反馈：依赖隐藏、职责混合、全局状态过多或副作用没有边界。
-
-## 71. 不要为测试破坏封装
-
-不推荐：
-
-- 导出私有 ref 只为了断言。
-- 给生产 DOM 到处加无语义内部类。
-- 把私有方法暴露到 `defineExpose()`。
-- 增加仅测试环境分支改变行为。
-
-应该：
-
-- 提取真正独立的领域纯函数。
-- 注入真实的外部依赖接口。
-- 通过 DOM、Event、Service 调用观察结果。
-- 在测试工具层提供工厂与 Fixture。
-
-## 72. 常见反模式
-
-### 只测试 mount 不报错
-
-几乎没有业务保护。至少断言关键输入对应的渲染或操作。
-
-### 断言组件内部 State
-
-重构易碎，且可能 UI 根本没更新。断言公开行为。
-
-### 所有子组件 shallow stub
-
-Props/Event/Slot 接线错误无法发现。默认完整 mount，明确昂贵/无关边界才 Stub。
+可能把真正有风险的 Props、Slots 和事件接线全部替换掉。只 Stub 与当前风险无关且昂贵的边界。
 
 ### Mock 所有模块
 
-测试只证明 Mock 按设定工作。保留真实领域与 Vue 协作，Mock 外部边界。
+测试最后只证明手写返回值能被手写断言读取。保留真正想验证的实现。
 
 ### 到处 `flushPromises()`
 
-掩盖不知道等待什么。优先 await 明确操作/Promise/条件。
+它掩盖对 timer、Vue flush、导航或业务 Promise 的混淆。等待具体原因。
 
 ### 固定等待
 
-慢且 flaky。使用 Fake Timer、Deferred Promise、Web-first Assertion。
+机器快慢会让结果 flaky。等待可观察条件。
 
 ### 追求 100% Snapshot
 
-Diff 噪声大且缺少意图。用明确行为断言。
+大量输出变化没有业务含义，审查容易失效。关键行为写明确断言。
 
-### E2E 共用一个账号
+### E2E 共用账号
 
-并行冲突、状态泄漏。每例/Worker 数据隔离。
+并行修改造成顺序依赖。为数据和身份建立隔离策略。
 
-## 73. Vue 2 测试迁移提示
+## 本课小结
 
-- Vue Test Utils v2 面向 Vue 3，API 与 v1 有差异，应按官方迁移指南更新。
-- `propsData` 改为 `props`。
-- `mocks`、`stubs`、`plugins` 等位于 `global` Mount Option。
-- Vuex 测试可重新评估 Pinia 的每例 active instance。
-- Vue Router 4 导航异步，需要 `isReady()` / `flushPromises()`。
-- Composition API Composable 可直接或通过宿主测试。
-- 不要机械保留对 `wrapper.vm`、私有 methods 和 `$nextTick` 的大量白盒断言。
-- 从 Jest 迁移 Vitest 时注意 ESM、Mock Hoist、Fake Timer 和 Browser Mode 差异。
+- 测试从风险出发，不从文件数量或固定层级比例出发；
+- 纯规则优先提取成无框架函数，组件测试关注 DOM 和公共契约；
+- `nextTick`、`flushPromises`、Fake Timer 和 Router 等待解决不同异步来源；
+- 防抖、Signal 取消和旧结果所有权必须分别验证；
+- Mock 应控制边界，不能替换掉真正想证明的系统；
+- Pinia、Router、宿主组件和全局环境都应每例隔离并清理；
+- Playwright 的语义 Locator 与 Web-first Assertions 比固定等待稳定；
+- Coverage 是未覆盖区域的线索，不等于业务信心；
+- flaky 往往暴露等待、数据所有权或生产竞态，重试不是根治；
+- 可测试性来自清晰依赖、明确生命周期和结构化错误，而不是暴露内部实现。
 
-## 74. 工程检查清单
+下一节是[Vue 3 SSR、Hydration 与同构应用边界](/frontend/vue3/ssr-hydration-and-universal-application-boundaries)。测试课区分了模拟 DOM 与真实浏览器，SSR 课会继续解释同一组件在服务端请求环境和浏览器环境中为何必须拥有不同的状态与副作用边界。
 
-- 测试是否围绕风险和用户行为，而不是文件数量？
-- 纯业务规则是否从组件提取并单测？
-- 组件断言是否通过 DOM、Events 和依赖调用？
-- 是否正确区分 nextTick、flushPromises 和 Fake Timer？
-- 每个测试是否创建独立 Pinia/Router/Fixture？
-- Mock 是否位于正确边界且测试后恢复？
-- 异步 Pending、失败、取消和竞态是否覆盖？
-- 表单是否覆盖错误时机、服务端错误与焦点？
-- Router 是否分别测试导航意图与真实匹配？
-- E2E 是否使用语义 Locator 和 Web-first Assertion？
-- 是否避免固定 Sleep、共享账号和第三方真实 API？
-- Coverage 是否用于发现空白而非替代风险分析？
-- Flaky 是否有追踪、负责人和诊断产物？
-- CI 是否先快后慢，并保留失败 Trace？
-- Test Helper 是否隐藏样板而不隐藏业务意图？
+## 官方资料
 
-## 75. 概念辨析与因果回顾
-
-### `nextTick()` 与 `flushPromises()` 有什么区别？
-
-`nextTick()` 等待 Vue 的 DOM 更新队列；`flushPromises()` 推进 Vue 不知道的 Promise 回调，例如 Mock HTTP 或 Router 异步导航。
-
-### 为什么组件测试不应主要断言 `wrapper.vm`？
-
-它耦合私有实现，不能保证最终 DOM 和用户行为正确。应通过 Props、DOM、Events 和协作者调用观察公共契约。
-
-### Pinia Store 测试为什么每例创建 active Pinia？
-
-Store 实例缓存在 Pinia 中；复用实例会让状态跨用例泄漏并产生顺序依赖。
-
-### Router 测试何时 Mock，何时使用真实 Router？
-
-只验证导航意图时 Mock `push`；验证匹配、守卫、重定向、Props 和 RouterView 时使用每例独立真实 Router。
-
-### Fake Timer 有什么风险？
-
-它会替换 Timer，并可能改变 Date；若 watcher 尚未运行就推进时间、或测试后未恢复，会产生错误结果和全局污染。
-
-### Coverage 100% 为什么仍可能有严重 Bug？
-
-代码被执行不代表断言正确，也可能遗漏输入组合、竞态、真实浏览器和系统接线。
-
-### 如何降低 E2E Flaky？
-
-使用稳定语义 Locator、Web-first Assertion、隔离数据、控制网络与时间、避免固定 Sleep，并保留 Trace 定位根因。
-
-## 76. 本节总结
-
-- 测试策略从业务风险出发，不从文件或覆盖率配额出发。
-- 纯规则用单元测试，组件通过 DOM/Events 测公共行为，关键旅程用少量 E2E。
-- Vue DOM 更新、普通 Promise、Timer 和 Router 导航需要不同等待方式。
-- 注入 Service 接口能同时改善生产边界和测试隔离。
-- 生命周期 Composable 需要宿主与 unmount 验证清理。
-- Pinia 和 Router 每例创建独立实例，避免状态污染。
-- Mock 要位于不想验证的边界，不能替换测试目标本身。
-- Playwright 使用语义 Locator、自动等待和隔离数据，不使用固定 Sleep。
-- Coverage、Snapshot 和重试只是工具，不能代替有意图的行为断言。
-- Flaky 必须作为缺陷治理，否则团队会失去对测试信号的信任。
-
-## 77. 下一步学习
-
-下一节建议学习：**Vue 3 SSR、Hydration 与同构应用边界**。
-
-将继续讲解服务端渲染流水线、每请求实例、数据预取、序列化安全、Hydration mismatch、客户端专属 API、流式渲染、缓存与 Nuxt 架构边界。
-
-## 78. 参考资料
-
-- [Vue 官方指南：Testing](https://vuejs.org/guide/scaling-up/testing.html)
-- [Vue Test Utils：Getting Started](https://test-utils.vuejs.org/guide/)
-- [Vue Test Utils：Asynchronous Behavior](https://test-utils.vuejs.org/guide/advanced/async-suspense.html)
-- [Vue Test Utils：Testing Vue Router](https://test-utils.vuejs.org/guide/advanced/vue-router.html)
-- [Vitest：Getting Started](https://vitest.dev/guide/)
+- [Vue：测试指南](https://vuejs.org/guide/scaling-up/testing.html)
+- [Vue Test Utils 2：入门](https://test-utils.vuejs.org/guide/)
+- [Vue Test Utils：异步行为](https://test-utils.vuejs.org/guide/advanced/async-suspense.html)
+- [Vue Test Utils：编写易测试组件](https://test-utils.vuejs.org/guide/essentials/easy-to-test.html)
 - [Vitest：Mocking](https://vitest.dev/guide/mocking.html)
+- [Vitest：Fake Timers](https://vitest.dev/guide/mocking/timers)
 - [Vitest：Coverage](https://vitest.dev/guide/coverage.html)
-- [Pinia：Testing Stores](https://pinia.vuejs.org/cookbook/testing.html)
-- [Playwright：Best Practices](https://playwright.dev/docs/best-practices)
-- [Playwright：Assertions](https://playwright.dev/docs/test-assertions)
-- [Playwright：Test Fixtures](https://playwright.dev/docs/test-fixtures)
-- [Playwright：Authentication](https://playwright.dev/docs/auth)
+- [Playwright：Locators](https://playwright.dev/docs/locators)
+- [Playwright：Auto-waiting](https://playwright.dev/docs/actionability)
+- [Playwright：Test Isolation](https://playwright.dev/docs/browser-contexts)
