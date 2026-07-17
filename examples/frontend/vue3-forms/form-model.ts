@@ -38,8 +38,12 @@ export interface CreateLessonInput {
 
 let nextOutcomeId = 1
 
-function createOutcomeId(): string {
-  return `outcome-${nextOutcomeId++}`
+export function createOutcomeDraft(text = ''): OutcomeDraft {
+  // 时间戳便于调试，递增序号保证同一毫秒内连续添加也不会重复。
+  return {
+    id: `outcome-${Date.now()}-${nextOutcomeId++}`,
+    text
+  }
 }
 
 export function createEmptyDraft(): LessonDraft {
@@ -49,7 +53,7 @@ export function createEmptyDraft(): LessonDraft {
     summary: '',
     level: 'intermediate',
     estimatedHours: '',
-    outcomes: [{ id: createOutcomeId(), text: '' }]
+    outcomes: [createOutcomeDraft()]
   }
 }
 

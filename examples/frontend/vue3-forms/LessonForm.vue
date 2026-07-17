@@ -25,6 +25,7 @@ const {
   validateField,
   addOutcome,
   removeOutcome,
+  validateOutcomes,
   submit,
   restore,
   reset
@@ -246,7 +247,7 @@ function resetForm(): void {
           maxlength="120"
           aria-describedby="outcomes-hint"
           :aria-invalid="Boolean(errors.outcomeById[outcome.id])"
-          @blur="touch('outcomes')"
+          @blur="touch('outcomes'); validateOutcomes()"
         />
         <p v-if="errors.outcomeById[outcome.id]" class="error">
           {{ errors.outcomeById[outcome.id] }}

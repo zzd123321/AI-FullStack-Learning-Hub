@@ -1,6 +1,14 @@
-import { computed, reactive, ref, watch, onWatcherCleanup } from 'vue'
+import {
+  computed,
+  onScopeDispose,
+  onWatcherCleanup,
+  reactive,
+  ref,
+  watch
+} from 'vue'
 import {
   cloneDraft,
+  createOutcomeDraft,
   createEmptyDraft,
   serializeDraft,
   toCreateLessonInput,
@@ -13,7 +21,8 @@ import { hasErrors, validateDraft, validateScalarField } from './validators.js'
 import {
   createLesson,
   FormSubmissionError,
-  isSlugAvailable
+  isSlugAvailable,
+  type ServerFieldErrors
 } from './lesson-service.js'
 
 function emptyTouched(): TouchedState {
@@ -38,6 +47,19 @@ function replaceErrors(target: FormErrors, source: FormErrors): void {
   Object.assign(target, source)
 }
 
+function applyCurrentServerErrors(
+  errors: FormErrors,
+  fieldErrors: ServerFieldErrors,
+  submitted: LessonDraft,
+  current: LessonDraft
+): void {
+  for (const [field, message] of Object.entries(fieldErrors)) {
+    const name = field as keyof ServerFieldErrors
+    // 服务端校验的是提交快照。字段已被继续编辑时，旧错误不再描述当前值。
+    if (message && current[name] === submitted[name]) errors[name] = message
+  }
+}
+
 export function useLessonForm() {
   const initial = createEmptyDraft()
   const model = reactive<LessonDraft>(cloneDraft(initial))
@@ -48,6 +70,8 @@ export function useLessonForm() {
   const submitting = ref(false)
   const submitError = ref<string | null>(null)
   const submittedLessonId = ref<string | null>(null)
+  let latestSlugCheckId = 0
+  let activeSubmitController: AbortController | null = null
 
   const dirty = computed(() => serializeDraft(model) !== baseline.value)
   const valid = computed(() => !hasErrors(validateDraft(model)))
@@ -65,7 +89,17 @@ export function useLessonForm() {
   watch(
     [() => model.slug, () => touched.slug],
     async ([slug, isTouched]) => {
-      if (!isTouched) return
+      // 每次回调都先换“所有者”；即使本轮不发请求，上一轮也不能再提交结果。
+      const checkId = ++latestSlugCheckId
+      if (!isTouched) {
+        checkingSlug.value = false
+        return
+      }
+      // submit() 会用提交快照做最终检查，不再并行启动字段级查重。
+      if (submitting.value) {
+        checkingSlug.value = false
+        return
+      }
 
       validateField('slug')
       if (errors.slug) {
@@ -79,21 +113,26 @@ export function useLessonForm() {
 
       try {
         const available = await isSlugAvailable(slug, controller.signal)
+        if (checkId !== latestSlugCheckId) return
         if (!available) errors.slug = '该 Slug 已被占用'
       } catch (cause: unknown) {
-        if (!(cause instanceof DOMException && cause.name === 'AbortError')) {
+        if (
+          checkId === latestSlugCheckId &&
+          !(cause instanceof DOMException && cause.name === 'AbortError')
+        ) {
           errors.slug = '暂时无法检查 Slug，请稍后重试'
         }
       } finally {
-        if (!controller.signal.aborted) checkingSlug.value = false
+        // 旧请求结束时不能关闭新请求的 pending。
+        if (checkId === latestSlugCheckId) checkingSlug.value = false
       }
     }
   )
 
   function addOutcome(): void {
-    const id = `outcome-${Date.now()}-${model.outcomes.length}`
-    model.outcomes.push({ id, text: '' })
+    model.outcomes.push(createOutcomeDraft())
     touched.outcomes = true
+    delete errors.outcomes
   }
 
   function removeOutcome(id: string): void {
@@ -101,6 +140,14 @@ export function useLessonForm() {
     if (index >= 0) model.outcomes.splice(index, 1)
     delete errors.outcomeById[id]
     touched.outcomes = true
+    validateOutcomes()
+  }
+
+  function validateOutcomes(): void {
+    const next = validateDraft(model)
+    if (next.outcomes) errors.outcomes = next.outcomes
+    else delete errors.outcomes
+    errors.outcomeById = { ...next.outcomeById }
   }
 
   function validateAll(): boolean {
@@ -122,45 +169,69 @@ export function useLessonForm() {
     submittedLessonId.value = null
     if (!validateAll() || submitting.value) return false
 
+    // 提交使用快照。用户在请求期间继续编辑时，成功结果只更新这份快照的基线。
+    const submissionDraft = cloneDraft(model)
     submitting.value = true
     const controller = new AbortController()
+    activeSubmitController = controller
 
     try {
-      if (!(await isSlugAvailable(model.slug, controller.signal))) {
+      if (!(await isSlugAvailable(submissionDraft.slug, controller.signal))) {
         errors.slug = '该 Slug 已被占用'
         return false
       }
 
-      const created = await createLesson(toCreateLessonInput(model), controller.signal)
-      baseline.value = serializeDraft(model)
+      const created = await createLesson(
+        toCreateLessonInput(submissionDraft),
+        controller.signal
+      )
+      baseline.value = serializeDraft(submissionDraft)
       submittedLessonId.value = created.id
       return true
     } catch (cause: unknown) {
-      if (cause instanceof FormSubmissionError) {
-        Object.assign(errors, cause.fieldErrors)
+      if (cause instanceof DOMException && cause.name === 'AbortError') {
+        return false
+      } else if (cause instanceof FormSubmissionError) {
+        applyCurrentServerErrors(
+          errors,
+          cause.fieldErrors,
+          submissionDraft,
+          model
+        )
         submitError.value = cause.message
       } else {
         submitError.value = '网络异常，请确认连接后重试'
       }
       return false
     } finally {
-      submitting.value = false
+      if (activeSubmitController === controller) {
+        activeSubmitController = null
+        submitting.value = false
+      }
     }
   }
 
   function restore(draft: LessonDraft): void {
+    latestSlugCheckId += 1
+    checkingSlug.value = false
     Object.assign(model, cloneDraft(draft))
     Object.assign(touched, emptyTouched())
     replaceErrors(errors, { outcomeById: {} })
   }
 
   function reset(): void {
+    // 重置意味着旧提交结果已经失去表单状态的所有权。
+    activeSubmitController?.abort()
+    activeSubmitController = null
+    submitting.value = false
     const empty = createEmptyDraft()
     restore(empty)
     baseline.value = serializeDraft(empty)
     submitError.value = null
     submittedLessonId.value = null
   }
+
+  onScopeDispose(() => activeSubmitController?.abort())
 
   return {
     model,
@@ -176,6 +247,7 @@ export function useLessonForm() {
     validateField,
     addOutcome,
     removeOutcome,
+    validateOutcomes,
     submit,
     restore,
     reset

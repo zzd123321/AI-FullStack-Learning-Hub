@@ -12,6 +12,7 @@ interface StoredDraftV1 {
 }
 
 const storageKey = 'ai-learning:lesson-draft'
+const maxDraftAgeMs = 7 * 24 * 60 * 60 * 1000
 const levels = new Set<LessonLevel>(['beginner', 'intermediate', 'advanced'])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -48,28 +49,51 @@ function parseDraft(value: unknown): LessonDraft | null {
   }
 }
 
-export function loadDraft(storage: Storage): LessonDraft | null {
-  const raw = storage.getItem(storageKey)
-  if (!raw) return null
-
+export function loadDraft(
+  storage: Storage,
+  now = Date.now()
+): LessonDraft | null {
   try {
+    const raw = storage.getItem(storageKey)
+    if (!raw) return null
     const stored: unknown = JSON.parse(raw)
-    if (!isRecord(stored) || stored.version !== 1) return null
+    if (
+      !isRecord(stored) ||
+      stored.version !== 1 ||
+      typeof stored.savedAt !== 'string'
+    ) {
+      return null
+    }
+
+    const savedAt = Date.parse(stored.savedAt)
+    const age = now - savedAt
+    if (!Number.isFinite(savedAt) || age < 0 || age > maxDraftAgeMs) return null
     return parseDraft(stored.draft)
   } catch {
+    // 隐私模式、存储策略或损坏 JSON 都不应阻止表单打开。
     return null
   }
 }
 
-export function saveDraft(storage: Storage, draft: LessonDraft): void {
+export function saveDraft(storage: Storage, draft: LessonDraft): boolean {
   const value: StoredDraftV1 = {
     version: 1,
     savedAt: new Date().toISOString(),
     draft: cloneDraft(draft)
   }
-  storage.setItem(storageKey, JSON.stringify(value))
+  try {
+    storage.setItem(storageKey, JSON.stringify(value))
+    return true
+  } catch {
+    return false
+  }
 }
 
-export function removeDraft(storage: Storage): void {
-  storage.removeItem(storageKey)
+export function removeDraft(storage: Storage): boolean {
+  try {
+    storage.removeItem(storageKey)
+    return true
+  } catch {
+    return false
+  }
 }
