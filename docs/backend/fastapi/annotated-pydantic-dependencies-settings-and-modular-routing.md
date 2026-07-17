@@ -16,6 +16,8 @@ outline: deep
 
 这些并不是“文件太长”造成的，而是**对象从哪里来、谁拥有它、何时创建与释放**没有成为显式模型。本课用参数绑定、Pydantic、dependency injection、`BaseSettings` 和 `APIRouter` 建立这套模型。
 
+第一次只追踪一项 dependency：FastAPI 根据签名创建请求需要的对象，endpoint 使用它，`yield` 后半段无论成功或异常都执行清理。`Annotated` 是把类型与参数元数据放在一起，不是新的运行时类型；复杂依赖缓存和配置来源优先级以后再深入。
+
 > 本课验证环境：CPython 3.13.4；FastAPI 0.139.0、Pydantic 2.13.4、pydantic-settings 2.14.2、Starlette 1.3.1、Uvicorn 0.51.0、httpx2 2.7.0、pytest 9.1.1。项目声明支持 Python 3.11+。
 
 ## 1. 本课要解决的核心问题

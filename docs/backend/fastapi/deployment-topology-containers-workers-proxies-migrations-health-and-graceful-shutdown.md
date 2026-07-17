@@ -26,6 +26,8 @@ flowchart LR
 
 任一层配置错误都可能表现为“FastAPI 有问题”：proxy buffering 让流式响应不流；错误信任 forwarded header 让 client IP 可伪造；每个 worker 各建连接池导致数据库连接耗尽；所有副本同时迁移导致 DDL 竞争；termination grace 太短则长请求被强制切断。
 
+第一次只沿两条线阅读：请求从代理到某个 Uvicorn worker；发布时新 worker 准备就绪、旧 worker 收到终止信号并清理。容器、Kubernetes 和多 worker 是运行拓扑，不改变每个 Python 进程拥有独立内存与连接池的事实。
+
 > 版本基准：Python 3.11+、FastAPI 0.139.x、Starlette 1.3.x、Uvicorn 0.51.x。容器和编排行为以当前 FastAPI、Uvicorn、Docker 与 Kubernetes 官方文档为依据。本课不修改仓库部署配置，示例只实现应用自身必须承担的生命周期合同。
 
 ## 1. “部署”不是把开发服务器搬到公网

@@ -26,6 +26,8 @@ async def root():
 
 本课先建立请求从 socket 到 response 的完整因果链，再解释每一段代码为什么存在。
 
+第一次阅读只要能说清：Uvicorn 接收连接，FastAPI 匹配路由，Pydantic 校验外部数据，path operation 执行业务，响应模型约束输出；lifespan 在进程启动和关闭时管理共享资源。ASGI 消息细节、严格转换和完整 OpenAPI 边界用于第二遍理解。
+
 ## 2. 本课目标
 
 完成本课后，应能解释：

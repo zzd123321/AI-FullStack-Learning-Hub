@@ -14,6 +14,7 @@ SENSITIVE_KEYS = {"authorization", "cookie", "password", "token", "secret"}
 
 
 def redact(value: object) -> object:
+    # 在结构进入 formatter 前递归脱敏，避免秘密被序列化进日志行。
     if isinstance(value, dict):
         return {
             str(key): "[REDACTED]" if str(key).casefold() in SENSITIVE_KEYS else redact(item)
@@ -26,6 +27,7 @@ def redact(value: object) -> object:
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
+        # ContextVar 让当前异步请求的 ID 跟随 Task 上下文，而不是使用全局变量。
         span_context = trace.get_current_span().get_span_context()
         payload = {
             "level": record.levelname,
@@ -63,6 +65,7 @@ def build_metrics() -> Metrics:
         requests=Counter(
             "http_server_requests_total",
             "Completed HTTP requests",
+            # route 使用模板而不是原始 URL，避免 task_id 等无限增加 label 基数。
             ["method", "route", "status"],
             registry=registry,
         ),

@@ -35,12 +35,15 @@ class OutboxRelay:
         if event is None:
             return False
         try:
+            # Broker 接收成功后，进程可能在数据库标记 published 前崩溃。
+            # 因此恢复后同一 event 可能再次发送，消费者必须幂等。
             self.broker.publish(event["id"], event["payload"])
             if crash_after_publish:
                 raise RuntimeError("relay crashed before acknowledgement")
             self.store.mark_published(event["id"])
             return True
         except Exception:
+            # 记录下次尝试时间，不在紧密循环中持续打击故障下游。
             next_attempt = event["attempts"] + 1
             self.store.record_failure(
                 event["id"], now + self.retry_delay(next_attempt)

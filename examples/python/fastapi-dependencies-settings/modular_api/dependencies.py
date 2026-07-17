@@ -40,10 +40,12 @@ async def open_request_context(
     ] = None,
 ) -> AsyncIterator[RequestContext]:
     request_id = x_request_id or uuid4().hex
+    # yield 前半段为本次请求创建资源或上下文。
     request.app.state.request_events.append(f"open:{request_id}")
     try:
         yield RequestContext(request_id=request_id)
     finally:
+        # endpoint 正常返回、抛异常或被取消都会进入 finally 做请求级清理。
         request.app.state.request_events.append(f"close:{request_id}")
 
 
@@ -53,6 +55,7 @@ RequestContextDep = Annotated[RequestContext, Depends(open_request_context)]
 def enforce_page_size(
     query: Annotated[TaskQuery, Query()], settings: SettingsDep
 ) -> TaskQuery:
+    # 依赖可以继续依赖 Settings；FastAPI 会按图解析并在同一请求内复用结果。
     if query.limit > settings.max_page_size:
         raise PageSizeExceededError(query.limit, settings.max_page_size)
     return query

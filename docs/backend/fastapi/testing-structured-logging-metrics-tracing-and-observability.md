@@ -15,6 +15,8 @@ outline: deep
 - metric：聚合趋势、SLO 与告警；
 - trace/span：单次分布式请求的时序和因果关系。
 
+第一次先做到两件事：失败路径有自动化测试；一条请求能用安全的 request ID 串起响应和日志。Metric 用于看总体趋势，trace 用于看一次跨组件时序，它们不能用“多打日志”替代。采集器、exporter 和完整 OpenTelemetry 配置属于部署阶段。
+
 > 验证环境：CPython 3.13.4；FastAPI 0.139.0、OpenTelemetry SDK 1.43.0、semantic conventions 0.64b0、prometheus-client 0.25.0、pytest 9.1.1。OpenTelemetry traces/metrics 已稳定，logs 状态与相关 package 仍需按当前版本核对；示例使用 Python logging 输出 JSON。
 
 ## 1. 为什么四种信号不能互相替代

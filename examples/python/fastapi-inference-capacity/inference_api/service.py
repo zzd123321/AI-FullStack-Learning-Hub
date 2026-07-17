@@ -25,6 +25,7 @@ class CapacityLease:
         self.release()
 
     def release(self) -> None:
+        # 幂等释放避免异常清理与断线清理重复归还同一个许可。
         if not self.released:
             self.released = True
             self.service._active -= 1
@@ -52,6 +53,7 @@ class InferenceService:
 
     async def reserve(self, queue_timeout: float) -> CapacityLease:
         try:
+            # admission timeout 只限制排队取容量，不包含取得许可后的模型执行。
             async with asyncio.timeout(queue_timeout):
                 await self._semaphore.acquire()
         except TimeoutError as error:
@@ -69,6 +71,7 @@ class InferenceService:
     ) -> str:
         lease = await self.reserve(queue_timeout)
         try:
+            # async with 保证成功、模型异常、timeout 和 cancellation 都释放许可。
             async with lease, asyncio.timeout(inference_timeout):
                 tokens = [
                     token.text

@@ -27,6 +27,8 @@ flowchart TB
 
 箭头表示代码依赖。核心业务不知道 FastAPI、SQLite 或另一个业务模块的内部类型；最外层 composition root 认识所有实现并完成连接。
 
+> 这是完成一个普通 FastAPI 应用后的总结课。第一次只掌握“HTTP 适配器不放业务规则、用例编排一次业务动作、领域对象保护不变量、最外层连接具体实现”。Port、UoW、事件和缓存都是在这个依赖方向上按问题引入，不是每个小项目必须拥有的文件夹。
+
 > 版本基准：Python 3.11+、FastAPI 0.139.x、Pydantic 2.13.x、Uvicorn 0.51.x。示例用标准库 SQLite 展示 transaction/UoW，不重复 SQLAlchemy 教程。生产 schema 仍应由独立 Alembic migration 管理。
 
 ## 1. 为什么需要架构，而不是为什么需要更多文件夹

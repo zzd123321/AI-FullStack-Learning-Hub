@@ -21,6 +21,8 @@ outline: deep
   → 必须释放容量
 ```
 
+第一次只掌握三条：模型在 lifespan 创建并关闭；请求必须先取得有限执行容量；超时、客户端取消或生成失败都必须释放容量。流式响应改善首 token 等待体验，却不降低总计算成本；batching、KV cache 和 GPU 调度属于具体运行时进阶。
+
 > 版本基准：Python 3.11+、FastAPI 0.139.x、Starlette 1.3.x、Uvicorn 0.51.x。FastAPI 原生 JSON Lines 与通用 streaming API 在 0.134.0 加入。示例使用可控的假模型，因此不需要下载权重或 GPU。
 
 ## 1. 为什么普通 CRUD 的并发直觉不够用

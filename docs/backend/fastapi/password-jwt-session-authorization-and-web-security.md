@@ -10,6 +10,8 @@ outline: deep
 
 本课实现一个可运行的最小系统：注册、Argon2 password hash、OAuth2 password form 登录、短期 Bearer JWT、`iss/aud/exp/jti` 验证、单 token logout、token version 全局失效，以及 document owner/admin 授权。
 
+第一次不要从 JWT 字段表开始。先追踪：用户提交密码，服务器验证 hash，签发短期凭据，后续请求恢复 principal，再检查“能否操作这个资源”。JWT 与 Session 只是持续身份的两种方案；CSRF、CORS 和 XSS 分别处在不同攻击边界。
+
 > 验证环境：CPython 3.13.4；FastAPI 0.139.0、pwdlib 0.3.0、argon2-cffi 25.1.0、PyJWT 2.13.0、python-multipart 0.0.32、Pydantic 2.13.4、pytest 9.1.1。示例仅用于解释机制，production identity system 还需持久化、rate limit、MFA、审计、密钥轮换和恢复流程。
 
 ## 1. 先分清四个概念

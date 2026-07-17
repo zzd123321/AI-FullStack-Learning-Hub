@@ -20,16 +20,20 @@ def get_store(request: Request) -> TaskStore:
 
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+    # 每个 worker 进程各执行一次 lifespan，并拥有自己的一份 store。
     application.state.task_store = TaskStore()
     application.state.ready = True
     try:
+        # yield 之前是启动阶段；yield 之后等待 ASGI server 请求关闭应用。
         yield
     finally:
+        # 无论正常关闭还是启动后的异常退出，都把共享资源清理放在 finally。
         application.state.ready = False
         await application.state.task_store.close()
 
 
 def create_app() -> FastAPI:
+    # application factory 让测试或不同运行环境可以创建彼此隔离的 app 实例。
     application = FastAPI(
         title="Learning Task API",
         version="1.0.0",
@@ -81,6 +85,7 @@ def create_app() -> FastAPI:
     async def create_task(
         payload: TaskCreate, request: Request, response: Response
     ) -> TaskResponse:
+        # 执行到这里时 payload 已通过 Pydantic 解析和校验。
         task = await get_store(request).create(title=payload.title, priority=payload.priority)
         response.headers["Location"] = f"/api/tasks/{task.id}"
         return TaskResponse.model_validate(task)
