@@ -25,6 +25,75 @@ outline: deep
 
 > 版本基准：Python 3.11+、FastAPI 0.139.x、Starlette 1.3.x、Uvicorn 0.51.x。FastAPI 原生 JSON Lines 与通用 streaming API 在 0.134.0 加入。示例使用可控的假模型，因此不需要下载权重或 GPU。
 
+## 用三个同时到达的请求理解容量
+
+假设模型一次最多安全处理两个生成请求，每次大约占用 8 秒：
+
+```text
+request A 到达 → 取得 slot 1 → 开始生成
+request B 到达 → 取得 slot 2 → 开始生成
+request C 到达 → 没有 slot → 进入有时间上限的等待
+```
+
+如果 C 可以无限等待，随后 D、E、F 都会堆进内存。用户还未得到任何字节，代理可能已经超时；即使 GPU 后来空闲，结果对客户端也可能没有价值。
+
+容量治理因此分成两段：
+
+```text
+admission
+  → 是否还有执行槽
+  → 最多愿意排队多久
+  → 超过边界就快速拒绝
+
+execution
+  → 已取得槽位
+  → 最多允许生成多久/多少 token
+  → 完成、超时、取消都释放槽位
+```
+
+### C 的三种合理结果
+
+1. A 很快完成，C 在 queue deadline 前取得槽位并执行；
+2. 等待超过 queue deadline，C 得到 503/明确过载错误，可稍后重试；
+3. C 的客户端先断开，等待应取消，不能继续占队列位置。
+
+“让所有请求排队”不是更友好。有限容量下，快速拒绝一部分请求可以保护已经接纳的 A/B 按时完成。
+
+## Streaming 只改变结果交付方式
+
+非流式：
+
+```text
+生成 100 tokens
+  → 全部完成
+  → 一次返回 JSON
+```
+
+流式：
+
+```text
+生成 token 1 → 发送 chunk 1
+生成 token 2 → 发送 chunk 2
+...
+生成 token 100 → done
+```
+
+流式降低 time-to-first-token，让用户更早看到输出，但模型仍生成 100 tokens，占用槽位的总时间可能几乎不变。若网络客户端读取很慢，发送也会形成背压，generator 不能无限提前生产并把 chunk 堆在内存。
+
+## 资源释放必须覆盖所有出口
+
+```text
+正常完成
+模型抛错
+execution timeout
+客户端取消
+response body generator 尚未真正启动
+```
+
+任何出口漏掉 release，容量计数都会永久减少，最终所有请求都显示“满载”。这就是示例为什么让 lease 拥有显式生命周期，并在 response 与 generator 的 `finally` 中防守释放，而不是只在正常循环结尾 `release()`。
+
+第一次学习不用理解 GPU scheduler；先能解释 A/B/C 三个请求的状态变化，并证明每条退出路径都归还 slot。
+
 ## 1. 为什么普通 CRUD 的并发直觉不够用
 
 数据库 API 的单次响应通常较短，连接池会形成明确容量边界。生成式模型却有不同成本结构：

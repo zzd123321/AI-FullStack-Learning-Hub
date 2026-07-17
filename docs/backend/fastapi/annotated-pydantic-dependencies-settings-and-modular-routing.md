@@ -20,6 +20,77 @@ outline: deep
 
 > 本课验证环境：CPython 3.13.4；FastAPI 0.139.0、Pydantic 2.13.4、pydantic-settings 2.14.2、Starlette 1.3.1、Uvicorn 0.51.0、httpx2 2.7.0、pytest 9.1.1。项目声明支持 Python 3.11+。
 
+## 从重复代码推导 dependency，而不是先背 `Depends`
+
+假设两个 endpoint 都需要解析 request id 和取得任务 repository：
+
+```python
+@app.get("/tasks/{task_id}")
+async def get_task(task_id: str, request: Request):
+    request_id = request.headers.get("X-Request-ID") or str(uuid4())
+    repository = request.app.state.repository
+    ...
+
+@app.post("/tasks")
+async def create_task(payload: TaskCreate, request: Request):
+    request_id = request.headers.get("X-Request-ID") or str(uuid4())
+    repository = request.app.state.repository
+    ...
+```
+
+复制函数可以消除重复文本，却仍没有表达“endpoint 依赖什么”。FastAPI dependency 把获取过程变成声明：
+
+```python
+RequestId = Annotated[str, Depends(get_request_id)]
+TaskRepositoryDep = Annotated[TaskRepository, Depends(get_repository)]
+
+@app.get("/tasks/{task_id}")
+async def get_task(
+    task_id: str,
+    request_id: RequestId,
+    repository: TaskRepositoryDep,
+):
+    ...
+```
+
+运行时不是 endpoint 主动调用 provider，而是 FastAPI 先构建依赖图：
+
+```text
+收到请求
+  → 解析 get_request_id 需要的 Header
+  → 调用 get_request_id，得到 str
+  → 调用 get_repository，得到 repository
+  → 所有依赖成功后才调用 get_task
+  → 将结果注入对应参数
+```
+
+若某个 dependency 抛出 HTTP 异常，后续依赖和 endpoint 都不会继续执行。
+
+### `yield` dependency 为什么不是普通 return
+
+需要打开和关闭资源时：
+
+```python
+async def request_resource():
+    resource = await open_resource()
+    try:
+        yield resource
+    finally:
+        await resource.close()
+```
+
+`yield` 前是请求进入时的 setup，`yield` 出去的值注入 endpoint，`finally` 是响应成功、业务异常或取消后都要执行的 teardown。它类似 Java `try-with-resources`，不是后台任务，也不是 Python generator 课程里随意暂停数据流的用法。
+
+### 三种对象不要混成一种生命周期
+
+| 对象 | 典型生命周期 | 创建位置 |
+| --- | --- | --- |
+| Settings | 应用启动时一次 | application factory / lifespan |
+| Repository/client pool | 通常应用级共享 | lifespan |
+| request context / transaction handle | 每个请求一份 | `yield` dependency |
+
+把应用级对象每次请求重建会浪费连接和初始化成本；把请求级可变状态放到全局又会让并发请求互相污染。dependency 的核心价值是让这些所有权在函数签名和生命周期中可见。
+
 ## 1. 本课要解决的核心问题
 
 先看目标请求：

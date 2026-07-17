@@ -31,6 +31,79 @@ flowchart TB
 
 > 版本基准：Python 3.11+、FastAPI 0.139.x、Pydantic 2.13.x、Uvicorn 0.51.x。示例用标准库 SQLite 展示 transaction/UoW，不重复 SQLAlchemy 教程。生产 schema 仍应由独立 Alembic migration 管理。
 
+## 从一条散落的业务规则开始重构
+
+假设最初的下单 endpoint 是：
+
+```python
+@router.post("/orders")
+async def place_order(payload: OrderCreate):
+    product = PRODUCTS[payload.product_id]
+    if not product["active"]:
+        raise HTTPException(409, "product inactive")
+    total = product["price"] * payload.quantity
+    order = {"product_name": product["name"], "total": total}
+    ORDERS.append(order)
+    return order
+```
+
+它很短，但五类职责已经粘在一起：
+
+```text
+HTTP：接收 body、选择 status
+查询：取得商品
+业务规则：已下架商品不能下单
+领域计算：数量 × 价格、冻结商品快照
+存储：保存订单
+```
+
+当 CLI、消息 consumer 或定时任务也要下单时，只能复制 endpoint 逻辑，或者错误地从 Python 内部调用 HTTP route。
+
+## 按变化原因拆开，不按流行目录拆开
+
+```text
+Order API adapter
+  → 把 HTTP DTO 转成 PlaceOrderCommand
+  → 调用 PlaceOrder use case
+  → 把结果/错误转换成 HTTP
+
+PlaceOrder use case
+  → 从 ProductCatalog port 取得商品
+  → 创建 Order domain object
+  → 通过 UnitOfWork 保存并提交
+
+Order domain
+  → 保护 quantity、price、total 等不变量
+
+Adapters
+  → 实现商品查询和订单持久化技术细节
+```
+
+依赖方向的关键是：use case 可以调用 `ProductCatalog` 抽象，但不 import FastAPI router 或 SQLite connection。外层知道内层，内层不知道外层框架。
+
+### 为什么这不是“每个函数套三层”
+
+如果 endpoint 只有返回固定健康状态，没有业务规则和复用需求，直接写 route 就足够。分层在以下情况才产生收益：
+
+- 同一个 use case 有 HTTP、消息或 CLI 多个入口；
+- 业务不变量需要独立测试；
+- 外部服务和存储需要替换或模拟失败；
+- 一次提交包含多个写入和事件；
+- 模块之间需要禁止直接访问内部数据。
+
+## 用依赖测试验证架构，不靠目录名称
+
+把文件放进 `domain/` 不会阻止它 import FastAPI。真正的规则应能检查：
+
+```text
+domain 不依赖 fastapi/sqlite/HTTP DTO
+application 只依赖 domain 和 port
+adapter 可以依赖框架并实现 port
+composition root 是少数认识所有具体实现的地方
+```
+
+第一次阅读本课，只追踪一次 `POST /orders`：HTTP 数据在哪里停止、业务规则在哪里执行、transaction 在哪里提交、错误在哪里重新变成 HTTP。Repository、event、cache 都必须服务于这条 use case，而不是为了目录看起来完整。
+
 ## 1. 为什么需要架构，而不是为什么需要更多文件夹
 
 架构的直接价值是降低变化传播和错误半径。例如“下单时冻结商品名称与价格”包含这些决定：

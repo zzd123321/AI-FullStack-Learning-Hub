@@ -14,6 +14,65 @@ outline: deep
 
 > 验证环境：CPython 3.13.4；FastAPI 0.139.0、pwdlib 0.3.0、argon2-cffi 25.1.0、PyJWT 2.13.0、python-multipart 0.0.32、Pydantic 2.13.4、pytest 9.1.1。示例仅用于解释机制，production identity system 还需持久化、rate limit、MFA、审计、密钥轮换和恢复流程。
 
+## 先跟踪 alice 从登录到读取文档
+
+### 第一次：提交密码
+
+```text
+alice 输入 username + password
+  → HTTPS 把请求送到登录 endpoint
+  → 服务端按 username 查到 password hash
+  → 使用 Argon2 参数对输入密码做 verify
+  → 成功后签发短期 access token
+```
+
+数据库保存的是不可逆 password hash，不是可以解密的密码。登录成功也不表示以后每次都重新发送密码；token/session 正是为了建立后续请求身份。
+
+### 第二次：携带 token 读取文档
+
+```http
+GET /api/documents/doc-7 HTTP/1.1
+Authorization: Bearer ey...
+```
+
+服务端依次做两类判断：
+
+```text
+认证：token 签名、algorithm、issuer、audience、expiry 是否有效
+  → 恢复 principal = alice
+
+授权：doc-7 是否属于 alice，或 alice 是否具有 admin 权限
+  → 允许/拒绝资源操作
+```
+
+token 有效只证明“这份凭据代表 alice”，不证明 alice 可以读取任何文档。把这两步合成一个 `if token:` 是最常见的越权来源。
+
+## 用攻击结果理解每个机制
+
+| 攻击/故障 | 对应防线 | 防线的边界 |
+| --- | --- | --- |
+| 密码数据库泄漏 | 慢 password hash + 独立 salt | 不能拯救极弱或复用密码 |
+| 猜测用户名是否存在 | 不存在用户也做 dummy verify，响应保持一致 | 仍需 rate limit 和监控 |
+| token 被窃取 | 短 expiry、撤销策略、最小权限 | Bearer token 被拿到即可使用 |
+| 伪造 JWT algorithm/claims | 固定允许算法并验证 iss/aud/exp | JWT 默认不加密 payload |
+| 用户 A 修改 URL 读取用户 B 文档 | resource-level authorization | RBAC 角色检查本身可能不够 |
+| 恶意网页借浏览器 cookie 发请求 | SameSite/CSRF token/origin policy | 只适用于浏览器自动携带凭据场景 |
+| 恶意脚本读取 token | XSS 防护、谨慎存储 token | CORS 不能修复同源 XSS |
+
+这张表说明 JWT、CORS、CSRF 不是可以互换的安全开关。它们面对的攻击路径不同。
+
+## 401 与 403 放回请求过程
+
+```text
+没有凭据 / 凭据无法证明身份
+  → 401 Unauthorized（实际含义是 unauthenticated）
+
+身份已经确认，但不允许执行此资源操作
+  → 403 Forbidden
+```
+
+某些系统会用 404 隐藏敏感资源是否存在，但这应是明确安全策略，不是因为分不清认证和授权。
+
 ## 1. 先分清四个概念
 
 ### 1.1 Identification

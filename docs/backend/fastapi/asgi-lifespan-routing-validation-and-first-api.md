@@ -2,6 +2,60 @@
 
 > 版本基线：FastAPI 0.139.0、Pydantic 2.13.4、Starlette 1.3.1、Uvicorn 0.51.0、httpx2 2.7.0；Python 3.11+。示例已在 CPython 3.13.4 的隔离虚拟环境中完成 6 项 HTTP 测试。
 
+## 先观察一次真实请求，再学习名词
+
+第一次接触 FastAPI 时，只看下面这条路径：
+
+```text
+浏览器 fetch("/api/tasks/42")
+  → 操作系统把 TCP 数据交给 Uvicorn
+  → Uvicorn 解析 HTTP，按 ASGI 合同调用 FastAPI app
+  → FastAPI 根据 method + path 找到 path operation
+  → path/query/body 被解析并交给 Pydantic 校验
+  → 你的 Python 函数得到已经转换的参数
+  → 返回值经过 response model 和 JSON 序列化
+  → Uvicorn 写回 status、headers 和 body
+```
+
+这条链里没有任何一步是 decorator “自己监听了端口”。`@app.get` 只在应用导入时注册路由；真正接受网络连接的是 Uvicorn。
+
+用前端经验对照：
+
+```text
+Vue router：URL → 页面组件
+FastAPI router：HTTP method + path → path operation
+
+Vue props 校验：组件内部开发约束
+Pydantic 校验：不可信网络数据进入系统的运行时边界
+
+Vite dev server：开发阶段运行前端
+Uvicorn：运行 ASGI 应用的协议服务器
+```
+
+### 为什么一个简单 GET 也可能失败
+
+假设路由声明：
+
+```python
+@app.get("/api/tasks/{task_id}")
+async def get_task(task_id: int) -> TaskResponse:
+    ...
+```
+
+请求 `/api/tasks/abc` 时，你的函数根本不会开始执行：FastAPI 先尝试把 `"abc"` 转成 `int`，失败后直接产生校验响应。请求 `/api/tasks/42` 才进入函数。
+
+因此排查问题要先问“失败发生在哪一段”：
+
+| 现象 | 更可能的阶段 |
+| --- | --- |
+| 端口无法连接 | Uvicorn 未启动、地址/防火墙错误 |
+| 404 | 路由没有匹配 method/path |
+| 422 | 参数或 body 在进入函数前校验失败 |
+| 函数日志出现后 500 | 业务执行或响应序列化失败 |
+| 启动阶段直接退出 | lifespan/config/resource 初始化失败 |
+
+第一遍读完后，只要能拿一个失败响应定位到这条链上的阶段，就已经达到本课核心目标。ASGI message 结构是为了进一步理解 server/framework 边界，不要求第一次背诵。
+
 ## 1. 为什么第一个 API 不能只从 decorator 开始
 
 下面三行能返回 JSON：

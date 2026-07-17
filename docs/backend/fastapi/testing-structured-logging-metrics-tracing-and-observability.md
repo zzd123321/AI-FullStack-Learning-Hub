@@ -19,6 +19,66 @@ outline: deep
 
 > 验证环境：CPython 3.13.4；FastAPI 0.139.0、OpenTelemetry SDK 1.43.0、semantic conventions 0.64b0、prometheus-client 0.25.0、pytest 9.1.1。OpenTelemetry traces/metrics 已稳定，logs 状态与相关 package 仍需按当前版本核对；示例使用 Python logging 输出 JSON。
 
+## 从一次用户报错开始选择信号
+
+用户反馈：“10:05 左右保存任务失败了。”如果系统只打印：
+
+```text
+ERROR request failed
+```
+
+你仍不知道哪个实例、哪个 endpoint、失败类型、影响范围和下游阶段。一个可诊断流程应该逐步缩小问题：
+
+```text
+用户提供响应中的 request_id
+  → 用 request_id 找到结构化错误日志
+  → 日志给出 route、error_type、trace_id（不含密码和 token）
+  → trace 显示请求在外部 API 等待 1.8 秒后超时
+  → metric 显示过去 5 分钟该 route 的 5xx 从 0.1% 升到 8%
+```
+
+四种信号各回答不同问题：
+
+| 问题 | 首选证据 |
+| --- | --- |
+| “这一个请求发生了什么？” | request ID + log + trace |
+| “有多少用户受影响？” | metric |
+| “时间花在哪一段？” | trace/span |
+| “异常包含什么诊断上下文？” | structured log |
+
+## 测试与可观测性共同描述失败
+
+测试在发布前固定预期行为：
+
+```text
+给定下游超时
+  → API 返回约定 status/problem body
+  → 不泄漏内部异常
+```
+
+可观测性在运行后提供真实证据：
+
+```text
+发生多少次下游超时
+  → 哪些 route/版本受影响
+  → p95/p99 延迟怎样变化
+  → 与哪个发布或依赖相关
+```
+
+日志不能代替测试，因为日志只在问题发生后告诉你；测试也不能代替监控，因为测试环境无法证明生产流量、容量和依赖状态。
+
+## 为什么 metric label 不能放 request ID
+
+Prometheus 一条时间序列由 metric name 加完整 label 组合确定：
+
+```text
+http_requests_total{method="GET",route="/tasks/{id}",status="200"}
+```
+
+`route` 模板只有有限组合。如果换成真实 path `/tasks/每个UUID` 或加入 request ID，每次请求都会产生新时间序列，内存、存储和查询成本持续增长。单请求 identity 应进入 log/trace，不进入低基数聚合 metric。
+
+第一遍先实现：失败测试、响应 request ID、结构化错误日志和少量 RED 指标（rate/errors/duration）。只有需要解释跨组件耗时时再加入 trace，不要一次接入所有 exporter 后才开始理解数据。
+
 ## 1. 为什么四种信号不能互相替代
 
 ```mermaid

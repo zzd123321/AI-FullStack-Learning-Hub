@@ -14,6 +14,83 @@ outline: deep
 
 > 版本基准：Python 3.11+、FastAPI 0.139.x、Uvicorn 0.51.x。FastAPI 原生 SSE API 从 0.135.0 加入。示例用 SQLite 和内存 broker 暴露机制，不把它伪装成生产消息系统。
 
+## 先决定用户等待到哪一步
+
+假设用户点击“生成学习报告”，生成需要 40 秒。把 endpoint 写成同步等待会占住连接，浏览器、代理或用户可能先超时。此时有三种不同合同：
+
+### 合同 A：请求内完成
+
+```text
+POST /reports
+  → 生成 40 秒
+  → 200 + report
+```
+
+适合短且必须当场得到结果的工作；40 秒任务通常不适合。
+
+### 合同 B：响应后在当前进程继续
+
+```text
+POST /reports
+  → 把函数交给 BackgroundTasks
+  → 立即响应
+  → 当前 API 进程在响应后执行
+```
+
+它降低用户等待，但进程重启、部署或崩溃时任务可能消失，也会继续占用 API 实例资源。
+
+### 合同 C：先持久接受，再由 worker 执行
+
+```http
+HTTP/1.1 202 Accepted
+Location: /api/report-jobs/job-42
+
+{"job_id":"job-42","status":"PENDING"}
+```
+
+```text
+API 持久记录 job
+  → 独立 worker 领取
+  → RUNNING
+  → SUCCEEDED / FAILED
+  → 客户端查询或通过 SSE 得到状态变化
+```
+
+`202` 只表示已接受，不表示最终一定成功。job resource 必须有失败、超时、取消、结果保留和权限合同。
+
+## 用进程崩溃检查“可靠”是否成立
+
+在每个箭头后假设进程立刻崩溃：
+
+```text
+业务数据 commit
+  → 崩溃
+publish message
+```
+
+会留下“业务成功但没有任务”。交换顺序：
+
+```text
+publish message
+  → 崩溃
+业务数据 commit
+```
+
+又会留下“任务开始但业务事实不存在”。Transactional Outbox 的核心不是多建一张表，而是把业务事实和“待发送事实”放入同一个本地 transaction，再由 relay 重试发布。
+
+## SSE 只负责告诉前端，不负责执行
+
+```text
+worker 更新 job 状态
+  → 状态持久层保存
+  → SSE endpoint 读取/订阅状态
+  → 浏览器 EventSource 接收进度
+```
+
+浏览器断线不会让 worker 自动取消；SSE server 重启也不应让 job 消失。若需要续传，客户端发送 `Last-Event-ID`，服务端必须从可靠事件记录恢复，而不是只依赖某个进程内队列。
+
+第一次阅读只做出一个选择：这个工作可以丢吗？若不能丢，就不要把 `BackgroundTasks` 当作 durable queue。
+
 ## 1. 先区分三个经常混淆的目标
 
 假设创建订单后要发送通知：

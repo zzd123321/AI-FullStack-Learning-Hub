@@ -30,6 +30,59 @@ flowchart LR
 
 > 版本基准：Python 3.11+、FastAPI 0.139.x、Starlette 1.3.x、Uvicorn 0.51.x。容器和编排行为以当前 FastAPI、Uvicorn、Docker 与 Kubernetes 官方文档为依据。本课不修改仓库部署配置，示例只实现应用自身必须承担的生命周期合同。
 
+## 先区分四个经常被叫成“服务”的东西
+
+假设部署两个容器，每个容器运行两个 Uvicorn worker：
+
+```text
+FastAPI application code：一份 Python 定义
+Uvicorn worker process：4 个独立 Python 进程
+container/instance：2 个运行隔离单元
+load balancer Service：在 2 个实例之间选择
+```
+
+这意味着：
+
+- module global 和 `app.state` 各有 4 份，不会自动共享；
+- 每个 worker 若创建 20 个数据库连接，总上限可能是 80；
+- 每个 worker 若加载 4 GB 模型，机器可能需要约 16 GB 以上模型内存；
+- 一个 worker 崩溃不等于整个 Service 消失；
+- readiness 是每个实例/进程能否接流量的信号，不是代码仓库的状态。
+
+在本地单进程里用内存 dict 保存用户或 job，扩成多 worker 后会出现“同一请求下一次读不到”的现象，这不是负载均衡 bug，而是状态从未共享或持久化。
+
+## 一次滚动发布的正确时间线
+
+旧版本 v1 正在处理请求，新版本 v2 开始发布：
+
+```mermaid
+sequenceDiagram
+    participant L as Load balancer
+    participant V1 as v1 instance
+    participant V2 as v2 instance
+    V2->>V2: process start + lifespan startup
+    V2->>V2: validate config / open pools / warm resources
+    V2-->>L: readiness=true
+    L->>V2: new requests begin
+    L->>V1: stop sending new requests
+    V1->>V1: receive termination signal
+    V1->>V1: finish in-flight work + lifespan cleanup
+    V1->>V1: exit before grace deadline
+```
+
+顺序错了会出现具体故障：
+
+- v2 尚未 ready 就接流量：启动期 503；
+- v1 收到 SIGTERM 后仍被选中：新请求进入正在关闭的进程；
+- grace period 短于最长合法请求：长响应被强制切断；
+- 应用忽略/收不到信号：平台到期后强杀，cleanup 不执行。
+
+## 开发模式不能直接等于生产模式
+
+`--reload` 会监视文件并重启子进程，适合本地修改反馈；生产需要稳定进程、明确 worker 数、资源上限和外部 supervisor/orchestrator。开发服务器能返回页面，只证明代码路径基本可运行，不证明 TLS、代理 header、信号、容量和发布兼容正确。
+
+第一次阅读先画“一个请求落到哪个进程”和“发布时新旧实例怎样交接”。容器镜像、Kubernetes probes 和 proxy 配置都围绕这两条时间线服务。
+
 ## 1. “部署”不是把开发服务器搬到公网
 
 生产系统至少要覆盖 FastAPI 官方总结的几类问题：
