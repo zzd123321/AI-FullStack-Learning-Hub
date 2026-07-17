@@ -12,6 +12,10 @@ function toMessage(error: unknown): string {
   return error instanceof Error ? error.message : '发生未知错误'
 }
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError'
+}
+
 export const useLessonStore = defineStore('lessons', () => {
   const items = ref<LessonSummary[]>([])
   const keyword = ref('')
@@ -21,8 +25,11 @@ export const useLessonStore = defineStore('lessons', () => {
   const publishing = ref(false)
   const error = ref<string | null>(null)
 
-  let requestSequence = 0
+  // 控制器节省无效工作；序号阻止无法取消或较晚结束的任务提交状态。
+  let loadSequence = 0
+  let publishSequence = 0
   let activeLoadController: AbortController | undefined
+  let activePublishController: AbortController | undefined
 
   const publishedCount = computed(
     () => items.value.filter((lesson) => lesson.status === 'published').length
@@ -43,7 +50,7 @@ export const useLessonStore = defineStore('lessons', () => {
     activeLoadController?.abort()
 
     const controller = new AbortController()
-    const sequence = ++requestSequence
+    const sequence = ++loadSequence
     activeLoadController = controller
     loading.value = true
     error.value = null
@@ -51,7 +58,7 @@ export const useLessonStore = defineStore('lessons', () => {
     try {
       const nextItems = await fetchLessons(currentQuery(), controller.signal)
 
-      if (sequence !== requestSequence) return
+      if (sequence !== loadSequence) return
 
       items.value = nextItems
 
@@ -59,10 +66,10 @@ export const useLessonStore = defineStore('lessons', () => {
         selectedId.value = nextItems[0]?.id ?? null
       }
     } catch (cause: unknown) {
-      if (cause instanceof DOMException && cause.name === 'AbortError') return
-      if (sequence === requestSequence) error.value = toMessage(cause)
+      if (isAbortError(cause)) return
+      if (sequence === loadSequence) error.value = toMessage(cause)
     } finally {
-      if (sequence === requestSequence) {
+      if (sequence === loadSequence) {
         loading.value = false
         activeLoadController = undefined
       }
@@ -77,24 +84,38 @@ export const useLessonStore = defineStore('lessons', () => {
     const lessonId = selectedId.value
     if (!lessonId || publishing.value) return
 
+    const controller = new AbortController()
+    const sequence = ++publishSequence
+    activePublishController = controller
     publishing.value = true
     error.value = null
 
     try {
-      const updated = await publishLesson(lessonId)
+      const updated = await publishLesson(lessonId, controller.signal)
+
+      if (sequence !== publishSequence) return
+
       const index = items.value.findIndex((lesson) => lesson.id === updated.id)
 
       if (index >= 0) items.value[index] = updated
     } catch (cause: unknown) {
-      error.value = toMessage(cause)
+      if (isAbortError(cause)) return
+      if (sequence === publishSequence) error.value = toMessage(cause)
     } finally {
-      publishing.value = false
+      if (sequence === publishSequence) {
+        publishing.value = false
+        activePublishController = undefined
+      }
     }
   }
 
   function $reset(): void {
     activeLoadController?.abort()
-    requestSequence += 1
+    activePublishController?.abort()
+    activeLoadController = undefined
+    activePublishController = undefined
+    loadSequence += 1
+    publishSequence += 1
     items.value = []
     keyword.value = ''
     status.value = 'all'

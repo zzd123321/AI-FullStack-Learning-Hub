@@ -39,16 +39,22 @@ const lessons: LessonSummary[] = [
 
 function wait(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(resolve, ms)
+    if (signal?.aborted) {
+      reject(new DOMException('Request aborted', 'AbortError'))
+      return
+    }
 
-    signal?.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer)
-        reject(new DOMException('Request aborted', 'AbortError'))
-      },
-      { once: true }
-    )
+    const handleAbort = (): void => {
+      clearTimeout(timer)
+      reject(new DOMException('Request aborted', 'AbortError'))
+    }
+
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', handleAbort)
+      resolve()
+    }, ms)
+
+    signal?.addEventListener('abort', handleAbort, { once: true })
   })
 }
 
