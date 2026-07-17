@@ -8,6 +8,22 @@ outline: deep
 
 > 基准环境：Apache Maven 3.9.16、JDK 25 运行 Maven、Java 17 编译目标。
 
+## Maven 应该在 Spring Boot 之前学，但不必先学成构建专家
+
+前面的 Java 示例直接用 `javac` 编译。真实项目有许多源码、测试和第三方库，如果每个人手写下载与编译命令，机器之间很快会出现不同结果。Maven 用 `pom.xml` 描述项目身份、依赖和标准构建过程。
+
+第一次学习只追踪这条主线：
+
+```text
+读取 pom.xml
+  → 解析并下载依赖到本地仓库
+  → compile 编译 main 源码
+  → test 编译并运行测试
+  → package 生成 jar
+```
+
+先会读坐标、依赖、标准目录和 `mvn test/package`。effective POM、依赖调解、插件管理、多模块 reactor 与可复现构建属于项目复杂后再深入的内容。
+
 ## 1. 学习目标
 
 完成本节后，你应该能够：
