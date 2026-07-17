@@ -23,6 +23,24 @@ ASGI 与第一个 API
   → 部署和后端架构
 ```
 
+## 先建立一条请求主线
+
+FastAPI 的类型、依赖和 decorator 很多，但它们都依附在同一次请求上。第一次学习只追踪这一条线：
+
+```text
+客户端发送 HTTP 请求
+  → Uvicorn 接收网络数据
+  → FastAPI 匹配路由并解析输入
+  → Pydantic 校验外部数据
+  → dependency 准备本次请求需要的资源
+  → 业务函数执行
+  → 输出被序列化为 HTTP 响应
+```
+
+第 1、2 课解决“请求怎样进入程序”，第 5 课解决“请求是谁发出的、允许做什么”，第 6 课解决“怎样证明它正确并观察失败”。数据访问课程由数据库学习主线配合阅读。后台任务、AI 推理和部署属于第二轮，架构课应放在已经做出一个完整 API 之后。
+
+第一次遇到 Pydantic model 时，只把它理解成系统入口处的“数据安检”；不要立刻把它和数据库对象、领域对象混成同一个类。
+
 ## 课程目录
 
 1. [ASGI、应用生命周期、路由、请求验证与第一个 API](/backend/fastapi/asgi-lifespan-routing-validation-and-first-api)
@@ -36,7 +54,7 @@ ASGI 与第一个 API
 9. [部署拓扑、容器、多 Worker、代理、迁移、健康检查与优雅停机](/backend/fastapi/deployment-topology-containers-workers-proxies-migrations-health-and-graceful-shutdown)
 10. [后端架构、分层、模块边界、领域模型、Repository、事件、缓存与演进](/backend/fastapi/backend-architecture-layers-modules-domain-repository-events-cache-and-evolution)
 
-后续课程将在本目录继续追加。配套源码统一放在 `examples/python/fastapi-*`，课程页面使用 VitePress 源文件导入展示完整代码。
+配套源码统一放在 `examples/python/fastapi-*`，课程页面使用 VitePress 源文件导入展示完整代码。注释会优先解释请求期与应用生命周期、同步与异步边界，以及资源由谁创建和关闭。
 
 ## 前置知识
 
