@@ -21,16 +21,17 @@ interface SearchFilters {
   publishedOnly: boolean
 }
 
-const filters: SearchFilters = reactive({
+const filters = reactive({
   query: '',
   publishedOnly: false
-})
+} satisfies SearchFilters)
 
 const normalizedQuery = computed(() =>
   filters.query.trim().toLocaleLowerCase()
 )
 
 const resultState = shallowRef<readonly LessonSummary[]>([])
+// 对外只暴露只读视图；本组件仍通过 resultState 提交新快照。
 const results = readonly(resultState)
 const loading = ref(false)
 const errorMessage = ref('')
@@ -83,6 +84,7 @@ watch(
     const requestId = ++latestRequestId
     const controller = new AbortController()
 
+    // 下一次搜索开始或组件卸载前，立即取消当前未完成请求。
     onWatcherCleanup(() => controller.abort())
 
     loading.value = true
@@ -96,6 +98,7 @@ watch(
       )
 
       if (requestId === latestRequestId) {
+        // shallowRef 只在整体替换 .value 时通知依赖。
         resultState.value = nextResults
       }
     } catch (error: unknown) {
@@ -108,6 +111,7 @@ watch(
           : '搜索失败'
       }
     } finally {
+      // 旧请求的 finally 不能关闭较新请求的 loading。
       if (requestId === latestRequestId) {
         loading.value = false
       }
