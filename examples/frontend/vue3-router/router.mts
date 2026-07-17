@@ -19,9 +19,19 @@ function firstQueryValue(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
+function positivePage(value: unknown): number {
+  const page = Number(firstQueryValue(value))
+  return Number.isSafeInteger(page) && page > 0 ? page : 1
+}
+
 function safeRedirect(to: RouteLocationNormalized): string {
   const redirect = firstQueryValue(to.query.redirect)
-  return redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/'
+  // 只接受站内绝对路径；额外拒绝反斜杠，避免不同 URL 解析器产生歧义。
+  return redirect.startsWith('/') &&
+    !redirect.startsWith('//') &&
+    !redirect.includes('\\')
+    ? redirect
+    : '/'
 }
 
 const routes: RouteRecordRaw[] = [
@@ -39,7 +49,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('./LessonListView.vue'),
         props: (route) => ({
           keyword: firstQueryValue(route.query.keyword),
-          page: Math.max(1, Number(firstQueryValue(route.query.page)) || 1)
+          page: positivePage(route.query.page)
         }),
         meta: { title: '课程列表' }
       },

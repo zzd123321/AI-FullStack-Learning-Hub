@@ -1,105 +1,130 @@
 ---
 title: Vue Router 4 与前端路由架构
-description: 设计 URL 状态、嵌套路由、路由 Props、数据加载、导航守卫、权限边界与代码分割
+description: 从 URL 状态出发，理解路由匹配、数据加载、导航守卫、权限与浏览器历史
 ---
 
 # Vue Router 4 与前端路由架构
 
-> 适用环境：Vue 3、Vue Router 4、TypeScript、Vite。本节以稳定的 Vue Router 4 API 为主，不依赖实验性的文件路由或 Data Loaders。
+> 适用环境：Vue 3、Vue Router 4、TypeScript、Vite。本课使用稳定 API，不把实验性的 Data Loaders 当成默认方案。
 
-## 1. 学习目标
+上一课把 Pinia 定位为“应用运行期间共享的业务状态”。这一课先解决一个很容易混淆的问题：
 
-完成本节后，你应该能够：
+> 课程关键词和页码应该放在 Store，还是放在 Router？
 
-- 把 URL 设计成可分享、可刷新、可前进后退的页面状态。
-- 选择 params、query、hash 和 history state 的正确边界。
-- 使用命名路由、动态参数和嵌套路由设计页面结构。
-- 通过路由 Props 降低视图组件与 Router 的耦合。
-- 处理参数变化时组件复用和异步请求竞态。
-- 理解全局、路由级和组件级导航守卫的职责。
-- 区分前端访问控制与后端授权。
-- 使用动态 `import()` 做路由级代码分割。
-- 正确处理 History 模式、404、滚动与导航失败。
+判断标准不是“有几个组件要用”，而是：
 
-## 2. Router 管理的不是“页面切换动画”
+- 刷新页面后，状态是否应该保留？
+- 复制链接给别人，对方是否应该看到同一个页面？
+- 点击浏览器后退，是否应该回到上一个值？
 
-客户端路由建立三者映射：
+如果答案是“应该”，它通常属于 URL。Router 管理的正是这种**公开、可恢复的导航状态**。
+
+## 先建立全局图景
+
+客户端路由不是简单地“点击后换一个组件”。它持续维护三者之间的关系：
 
 ```text
-URL ↔ 匹配到的路由记录 ↔ 渲染的组件树
+浏览器 URL
+   ↓ 匹配
+路由记录（route records）
+   ↓ 决定布局与出口
+渲染的组件树
 ```
 
-一个可靠 URL 应满足：
+例如：
 
-- 刷新后仍能还原页面。
-- 可复制给另一个有权限的用户。
-- 浏览器前进/后退符合预期。
-- 搜索引擎或服务端能理解入口（若业务需要）。
-- 不暴露敏感信息。
+```text
+/lessons?keyword=vue&page=2
+   ↓
+课程列表路由 + keyword/page
+   ↓
+AppShell → LessonListView
+```
 
-路由不是把组件名放进字符串；它是应用的公开导航协议。
+一次导航还会经过守卫、异步组件解析、滚动恢复等步骤。因此 Router 同时连接了：
 
-## 3. 哪些状态应该进入 URL
+- 产品的信息架构；
+- 浏览器历史；
+- 页面组件的生命周期；
+- 登录与访问控制；
+- 页面数据的加载时机。
 
-| 状态 | 推荐位置 | 示例 |
+学 Router 的主线应该是“URL 如何驱动页面”，而不是背 API 名称。
+
+## URL 和普通状态有什么本质区别
+
+假设课程列表有以下状态：
+
+- 搜索词 `vue`；
+- 当前第 2 页；
+- 搜索框是否聚焦；
+- 删除确认框是否打开；
+- 当前登录用户的访问令牌。
+
+它们不应该放在同一个地方：
+
+| 状态 | 推荐位置 | 原因 |
 | --- | --- | --- |
-| 资源身份 | path params | `/lessons/vue-router` |
-| 可分享筛选、分页 | query | `?keyword=vue&page=2` |
-| 页面内锚点 | hash | `#guards` |
-| 短暂且不适合展示的数据 | history state 或本地状态 | 返回来源、临时 UI 信息 |
-| 敏感凭证 | 不进入 URL | Token、密码、隐私数据 |
+| 资源身份 | path params | `/lessons/vue-router` 能稳定指向一项资源 |
+| 可分享的筛选、排序、分页 | query | 不改变资源层级，但应该随链接恢复 |
+| 文档内位置 | hash | `#navigation-guards` 表示页面内锚点 |
+| 弹窗、焦点、悬停 | 组件本地状态 | 短暂 UI 细节不应污染历史 |
+| 跨页面业务数据 | Pinia | 需要共享，但未必是公开导航协议 |
+| Token、密码、隐私数据 | 安全存储或内存 | URL 会进入历史、日志和 Referer |
 
-URL 会进入浏览器历史、服务器日志、分析系统和 Referer。不要把 Token 或敏感表单数据放进 params/query。
+### URL 是公开输入，不是可信配置
 
-## 4. 创建并安装 Router
+用户可以手改地址栏，旧书签也可能保留过期值。下面这些地址都可能出现：
 
-```ts
-const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
-  routes
-})
-
-createApp(App).use(router).mount('#app')
+```text
+/lessons?page=-1
+/lessons?page=abc
+/lessons?page=999999999999999999999
+/lessons?page=2&page=3
 ```
 
-插件必须在 `mount()` 前安装。安装过程会注册 `RouterLink`、`RouterView`，并提供 `$router`、`$route`、`useRouter()` 与 `useRoute()`。
+所以 query 和 params 到达应用时都只是**未经验证的字符串输入**。TypeScript 能告诉你 `route.query.page` 可能是什么类型，却不能证明它是合法业务页码。
 
-完整入口：
+## 从路由表看应用的信息架构
 
-<<< ../../../examples/frontend/vue3-router/main.mts
-
-<<< ../../../examples/frontend/vue3-router/App.vue
-
-## 5. History 模式怎么选
-
-### `createWebHistory()`
-
-生成正常 URL，如 `/lessons/vue-router`，通常是生产项目首选。服务器必须把未命中静态资源的应用路由回退到 `index.html`，否则直接刷新会返回服务器 404。
-
-回退规则不能吞掉真实 API 和静态文件 404。部署平台应按路径范围配置，而不是无条件返回 HTML。
-
-### `createWebHashHistory()`
-
-生成 `/#/lessons/vue-router`。服务器不接收 `#` 后内容，因此一般不需要 history fallback，但 URL 表达和 SEO 较弱。
-
-### `createMemoryHistory()`
-
-不读取浏览器 URL，适合 SSR、测试或非浏览器环境。SSR 中服务端必须先把请求 URL push 到 Router，并等待 `router.isReady()` 后渲染。
-
-## 6. 路由记录是应用信息架构
-
-按页面结构组织路由，而不是按组件文件随意平铺：
+完整示例使用下面的页面结构：
 
 ```text
 App
-├── /lessons                 课程列表
-├── /lessons/:lessonId       课程详情
-├── /lessons/:lessonId/edit  课程编辑
-├── /login                   登录
-└── /:pathMatch(.*)*         404
+├── /                         重定向到课程列表
+├── /lessons                  课程列表
+├── /lessons/:lessonId        课程详情
+├── /lessons/:lessonId/edit   课程编辑
+├── /forbidden                无权访问
+├── /login                    登录
+└── /:pathMatch(.*)*          应用内 404
 ```
 
-每条路由应有稳定名称。路径可能因产品文案、国际化或层级调整而变化，业务跳转使用路由名能减少硬编码。
+路由配置不是组件清单，而是应用的信息架构。父子路由应表达真实的布局关系：
+
+```ts
+{
+  path: '/',
+  component: AppShell,
+  children: [
+    {
+      path: 'lessons',
+      name: 'lesson-list',
+      component: () => import('./LessonListView.vue')
+    }
+  ]
+}
+```
+
+子路径 `lessons` 没有以 `/` 开头，因此会和父路径组合。父组件中的 `<RouterView />` 是子页面的渲染出口：
+
+<<< ../../../examples/frontend/vue3-router/AppShell.vue
+
+不要为了文件夹整齐而制造很多空布局。只有父层确实共享导航、页头、侧栏或守卫时，嵌套路由才有价值。
+
+### 命名路由比手工拼路径稳定
+
+业务代码推荐按名称导航：
 
 ```ts
 router.push({
@@ -108,185 +133,323 @@ router.push({
 })
 ```
 
-Vue Router 会负责参数编码；不要手工拼接未经编码的路径。
+Vue Router 会完成路径匹配和参数编码。以后即使产品把路径改成 `/courses/:lessonId`，调用方也不必到处替换字符串。
 
-## 7. Params 与 Query 的运行时类型
+路由名是应用内部契约，因此应稳定、唯一，并表达页面含义。
 
-浏览器 URL 本质上只有字符串。即使业务认为 `page` 是数字，`route.query.page` 仍可能是：
+## Router 如何接入应用
 
-- `undefined`。
-- 一个字符串。
-- 重复 query 形成的字符串数组。
-- 非法数字、负数或超大值。
+入口只需要先创建 Router，再作为插件安装：
 
-因此要在路由边界解析和归一化：
+<<< ../../../examples/frontend/vue3-router/main.mts
+
+<<< ../../../examples/frontend/vue3-router/App.vue
+
+`app.use(router)` 必须发生在 `mount()` 前。安装过程会：
+
+- 注册 `RouterLink` 与 `RouterView`；
+- 向组件提供 `useRouter()` 和 `useRoute()`；
+- 启动首次 URL 匹配。
+
+### `route` 和 `router` 不要混淆
+
+- `route` 是“当前导航结果”，包含 params、query、hash、meta、matched 等信息；
+- `router` 是“路由器实例”，负责 push、replace、守卫注册等操作。
+
+可以把它们理解为：
+
+```text
+route  = 当前在哪里
+router = 如何去别处
+```
+
+## History 模式决定 URL 如何与浏览器协作
+
+### HTML5 History
+
+`createWebHistory()` 生成普通 URL：
+
+```text
+https://example.com/lessons/vue-router
+```
+
+这是常见生产项目的首选，但它要求服务器配合。用户直接刷新该地址时，请求先到服务器；服务器若只寻找 `/lessons/vue-router` 这个真实文件，就会返回 404。
+
+正确策略是：
+
+1. API 和真实静态资源按原规则处理；
+2. 未匹配到文件的前端页面路径回退到 `index.html`；
+3. Vue Router 接管后，再判断显示哪一个页面。
+
+### Hash History
+
+`createWebHashHistory()` 的地址类似：
+
+```text
+https://example.com/#/lessons/vue-router
+```
+
+井号后的内容通常不会发送到服务器，所以部署简单；代价是 URL 表达较弱，也不适合依赖搜索引擎理解页面的场景。
+
+### Memory History
+
+`createMemoryHistory()` 不自动读取或修改浏览器地址，适用于 SSR、测试或非浏览器环境。服务端渲染时，需要由服务端把本次请求 URL 推入 Router，并等待初始导航完成。
+
+这里最重要的不是死记三种函数，而是理解：
+
+> History 是 Router 与运行环境之间的适配层。
+
+## 在 Router 边界解析 params 和 query
+
+示例把 query 解析集中在路由配置附近：
 
 ```ts
-props: (route) => ({
-  page: Math.max(1, Number(route.query.page) || 1)
+function firstQueryValue(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function positivePage(value: unknown): number {
+  const page = Number(firstQueryValue(value))
+  return Number.isSafeInteger(page) && page > 0 ? page : 1
+}
+```
+
+为什么不能只写：
+
+```ts
+Math.max(1, Number(route.query.page) || 1)
+```
+
+因为 `Infinity` 仍可能通过，重复 query 也没有明确策略。一个边界解析函数应该明确回答：
+
+- 缺失时用什么默认值；
+- 重复值接受还是拒绝；
+- 是否只接受安全整数；
+- 值超出业务范围后在哪里收敛。
+
+路由层能校验“是不是正整数”；总页数只有服务返回结果后才知道，所以示例会再把过大页码收敛，并用 `router.replace()` 规范化 URL。
+
+### 为什么要让 URL 与屏幕保持一致
+
+假设地址栏是 `?page=99`，接口告诉你实际只有 2 页。如果屏幕显示第 2 页但地址仍是第 99 页：
+
+- 复制链接会继续传播错误状态；
+- 刷新后还要重复纠正；
+- 分页按钮和统计文字的语义互相矛盾。
+
+因此规范化之后应替换当前历史项：
+
+```ts
+await router.replace({
+  name: 'lesson-list',
+  query: { page: '2' }
 })
 ```
 
-TypeScript 只描述 Router API 的可能类型，不能保证用户地址栏输入符合业务规则。
+这里用 `replace`，是因为修正非法 URL 不应该额外增加一条“可后退”的历史记录。
 
-## 8. 路由 Props 解耦视图
+## 路由 Props：让输入关系可见
 
-直接在页面深处读取：
+详情页可以直接读取：
 
 ```ts
-const lessonId = useRoute().params.lessonId
+const route = useRoute()
+const lessonId = route.params.lessonId
 ```
 
-会让组件只能在特定路由中使用。配置 `props: true` 后，动态 params 会作为 Props 传入：
+但这样一来，组件的数据输入藏在 Router 这个外部依赖里。更清楚的做法是：
 
 ```ts
 {
-  path: '/lessons/:lessonId',
-  component: LessonDetailView,
+  path: 'lessons/:lessonId',
+  component: () => import('./LessonDetailView.vue'),
   props: true
 }
 ```
 
-组件只声明：
+然后页面声明：
 
 ```ts
-defineProps<{ lessonId: string }>()
+const props = defineProps<{
+  lessonId: string
+}>()
 ```
 
-它更容易单测、Storybook 展示和复用。对于 query，应使用 Props 函数完成解析，不要把整个 Route 对象传给组件。
-
-路由视图仍可使用 `useRouter()` 执行导航；解耦目标是让数据输入清晰，不是禁止所有 Router API。
-
-## 9. 嵌套路由对应嵌套布局
-
-父路由组件中的 `<RouterView />` 是子路由出口：
-
-<<< ../../../examples/frontend/vue3-router/AppShell.vue
-
-子路由的相对 path 不以 `/` 开头：
+`props: true` 会把 params 作为组件 Props。对于 query，使用函数模式可以顺便完成边界转换：
 
 ```ts
-{
-  path: '/',
-  component: AppShell,
-  children: [
-    { path: 'lessons', component: LessonListView }
-  ]
-}
-```
-
-若子 path 以 `/` 开头，它会成为根路径，但仍可利用组件嵌套。Vue Router 4.1+ 也允许无 component 的父记录，用于只分组 path、meta 或守卫。
-
-嵌套层级应表达真实布局与导航关系，不要仅为了目录结构制造多层空 RouterView。
-
-## 10. 动态参数变化会复用组件
-
-从 `/lessons/a` 导航到 `/lessons/b` 时，两条 URL 匹配同一记录，Vue Router 会复用组件实例。结果是：
-
-- `onMounted()` 不会重新执行。
-- 组件本地状态可能被保留。
-- 必须观察相关 param/prop 的变化。
-
-不要 watch 整个 `route`，只观察真正依赖的字段：
-
-```ts
-watch(() => props.lessonId, load, { immediate: true })
-```
-
-如果参数变化还需要决定能否离开当前状态，使用 `onBeforeRouteUpdate()`；纯数据刷新通常用 watch 更直接。
-
-## 11. 路由级数据获取的两种时机
-
-### 导航后获取
-
-先完成导航并渲染 loading，再由组件加载数据：
-
-- 页面反馈快。
-- 易实现骨架屏和局部错误。
-- 必须处理旧请求取消、空态和内容闪烁。
-
-### 导航前获取
-
-在 `beforeResolve` 或框架数据加载机制中先取数据，再确认导航：
-
-- 用户不会先看到空页面。
-- 慢请求会让导航保持 pending。
-- 需要全局进度、错误跳转和取消策略。
-
-没有一种方案适合所有页面。详情内容通常可导航后加载；进入前必须验证的核心数据或权限可导航前处理。
-
-## 12. 数据请求必须跟随路由生命周期
-
-下面的详情页同时解决组件复用和请求竞态：
-
-<<< ../../../examples/frontend/vue3-router/LessonDetailView.vue
-
-`onWatcherCleanup()` 会在参数变化或 watcher 停止时取消旧请求。旧请求的 `finally` 也不能关闭新请求的 loading，因此示例先检查 `signal.aborted`。
-
-Vue 3.4 及更早版本可使用 watch 回调的第三个 `onCleanup` 参数实现相同目的。
-
-## 13. URL 是筛选状态的事实来源
-
-列表的已提交筛选应该来自 URL，输入中的临时草稿可以留在本地：
-
-```text
-draftKeyword：用户正在输入，尚未提交
-props.keyword：URL 中已提交、可分享的筛选
-```
-
-完整列表页：
-
-<<< ../../../examples/frontend/vue3-router/LessonListView.vue
-
-`router.push()` 创建一条历史记录，适合用户明确提交的新查询；输入每个字符都同步时通常使用节流后的 `router.replace()`，避免污染后退历史。
-
-不要同时让 Store 和 URL 都成为筛选条件的独立事实来源。可以由 Store 缓存结果，但查询键应从规范化 URL 产生。
-
-## 14. 完整数据服务
-
-示例服务与 Vue Router 解耦，并接受 `AbortSignal`：
-
-<<< ../../../examples/frontend/vue3-router/lesson-api.mts
-
-真实服务还应区分 404、未授权、验证错误与网络失败。404 是资源不存在，不一定等于路由记录不存在：`/lessons/missing` 匹配详情路由，但 API 可能返回资源 404。
-
-产品可选择在详情页展示“课程不存在”，或导航到专用资源 404 页面；不要把所有 API 异常都重定向到通用 404。
-
-## 15. 导航守卫的执行结果
-
-现代守卫通过返回值表达结果：
-
-```ts
-router.beforeEach((to) => {
-  if (!canAccess(to)) return { name: 'login' }
-  if (!isValid(to)) return false
+props: (route) => ({
+  keyword: firstQueryValue(route.query.keyword),
+  page: positivePage(route.query.page)
 })
 ```
 
-- 返回 `undefined` 或 `true`：继续。
-- 返回 `false`：取消，并在需要时恢复来源 URL。
-- 返回路由位置：取消当前导航并发起重定向。
-- 抛出错误：取消导航并交给 `router.onError()`。
+收益不是“完全消灭 Router 依赖”。页面仍可以用 `useRouter()` 导航。真正的收益是：
 
-旧式第三参数 `next` 仍受支持，但每条逻辑路径必须恰好调用一次，容易重复或遗漏。新代码优先返回值。
+- 数据输入写进 Props 契约；
+- 组件测试不必伪造完整 Route 对象；
+- params/query 的解析集中在入口；
+- 页面内部拿到的是业务类型，而不是 Router 的联合类型。
 
-## 16. 三类守卫的职责
+官方文档也提醒：Props 函数应保持无状态。它只负责把一次路由结果转换成 Props，不适合读取会独立变化的响应式状态。
 
-### 全局守卫
+## 参数变化不会自动重新挂载页面
 
-`beforeEach` 适合身份与全局访问策略；`beforeResolve` 在异步组件和组件内守卫完成后、确认导航前运行；`afterEach` 不能改变导航，适合标题、分析和可访问性通知。
+从 `/lessons/vue-reactivity` 导航到 `/lessons/vue-router` 时，两者命中同一条路由记录。Vue Router 会复用 `LessonDetailView` 实例，因为这样更高效。
 
-### 路由级 `beforeEnter`
+这意味着：
 
-适合某条记录独有的输入约束。注意只改变 params、query 或 hash 且仍匹配同一条记录时，它不会重新运行。
+- `onMounted()` 不会再次执行；
+- 组件本地状态可能继续保留；
+- 依赖 `lessonId` 的数据必须主动更新。
 
-### 组件内守卫
+因此详情页观察的是输入，而不是只在挂载时取数：
 
-`onBeforeRouteLeave()` 适合未保存草稿；`onBeforeRouteUpdate()` 适合复用组件时对参数变化做可取消处理。
+```ts
+watch(
+  () => props.lessonId,
+  (lessonId) => loadLesson(lessonId),
+  { immediate: true }
+)
+```
 
-守卫越全局，越应只包含真正全局的规则。
+不要为了方便而 watch 整个 `route`。那会让无关的 hash、query 变化也触发请求，读者也看不出真正依赖了什么。
 
-## 17. Meta 是声明，不是权限本身
+如果参数变化前需要询问“是否放弃未保存内容”，才使用 `onBeforeRouteUpdate()` 或 `onBeforeRouteLeave()` 一类守卫。纯粹的数据同步，用精确 watch 更直接。
+
+## 页面数据何时加载
+
+Router 官方文档给出两种都合理的时机。
+
+### 先完成导航，再加载数据
+
+页面先出现，然后展示 loading、骨架屏或局部错误：
+
+```text
+确认导航 → 渲染新页面 → 发请求 → 展示结果
+```
+
+适合：
+
+- 详情页和列表页；
+- 希望用户立即看到导航反馈；
+- 错误可以在页面内解释和重试。
+
+代价是页面必须认真管理 loading、error、空态和请求竞态。
+
+### 先加载关键数据，再确认导航
+
+可以在路由守卫或上层框架的数据机制中完成：
+
+```text
+开始导航 → 加载/验证 → 确认导航 → 渲染页面
+```
+
+适合：
+
+- 没有数据就不能进入的页面；
+- 进入前必须确认的权限或前置条件；
+- SSR 需要首屏携带数据的场景。
+
+代价是等待期间旧页面仍在屏幕上，所以应用需要全局进度反馈、失败去向和取消策略。
+
+选择依据是用户体验，不是哪个 API 看起来更高级。
+
+## 路由变化与异步请求必须共享生命周期
+
+用户可能快速点击第 1、2、3 页。网络返回顺序却可能是 3、1、2。如果直接把每次结果赋值给同一个 ref，旧请求就会覆盖新页面。
+
+完整列表页同时使用两层保护：
+
+<<< ../../../examples/frontend/vue3-router/LessonListView.vue
+
+第一层是 `AbortController`：
+
+- 下一次 watch 执行前，`onWatcherCleanup()` 取消上一次请求；
+- 已经没用的网络和解析工作可以尽早停止。
+
+第二层是递增序号：
+
+```ts
+const requestId = ++latestRequestId
+
+const result = await request()
+
+if (requestId !== latestRequestId) return
+```
+
+序号解决的是“所有权”问题：只有最新请求拥有当前页面状态。即使某个请求实现不支持真正取消，旧结果也无法提交。
+
+`finally` 也必须检查所有权：
+
+```ts
+if (requestId === latestRequestId) {
+  loading.value = false
+}
+```
+
+否则旧请求稍后进入 `finally`，会错误地关闭新请求的 loading。
+
+详情页遵循同样规则：
+
+<<< ../../../examples/frontend/vue3-router/LessonDetailView.vue
+
+服务层则要正确响应已经取消和执行中取消两种情况：
+
+<<< ../../../examples/frontend/vue3-router/lesson-api.mts
+
+## push、replace 和浏览器历史
+
+两者都会导航，但历史语义不同：
+
+- `push` 新增一条记录，后退会回到旧页面；
+- `replace` 替换当前记录，后退不会经过被替换的地址。
+
+一般规律：
+
+| 操作 | 常见选择 | 原因 |
+| --- | --- | --- |
+| 打开详情 | `push` | 用户期望后退到列表 |
+| 切换筛选或分页 | `push` | 前进/后退应恢复浏览过程 |
+| 纠正非法页码 | `replace` | 错误地址不值得保留 |
+| 登录成功离开登录页 | `replace` | 后退不应再次回登录页 |
+| 保存后回详情 | 视流程选择，示例用 `replace` | 编辑页已完成，不必留在历史中 |
+
+完整编辑页还展示了未保存离开确认：
+
+<<< ../../../examples/frontend/vue3-router/LessonEditView.vue
+
+导航方法返回 Promise。`await router.push(...)` 表示等待导航结束，不等同于“必然成功”。导航可能被守卫取消、重定向或判定为重复导航；需要区分时，可结合 `isNavigationFailure()` 检查返回结果。
+
+## 导航守卫应该保护什么
+
+守卫的核心职责是决定：
+
+> 这次导航是否可以继续、应该取消，还是应该去另一个地址？
+
+常见层级：
+
+- 全局 `beforeEach`：登录、统一访问策略；
+- 路由记录 `beforeEnter`：某一页面族的进入条件；
+- 组件内守卫：和组件状态紧密相关的离开或更新判断；
+- `beforeResolve`：异步组件和组件守卫完成后、导航确认前的最后检查；
+- `afterEach`：导航完成后的标题、分析上报等副作用，不能阻止导航。
+
+现代 Vue Router 守卫推荐通过返回值表达结果：
+
+```ts
+router.beforeEach((to) => {
+  if (cannotEnter(to)) return false
+  if (mustLogin(to)) return { name: 'login' }
+  // undefined 表示继续
+})
+```
+
+避免混合旧式 `next()` 和返回值，否则很容易在分支中调用两次或漏调。
+
+## meta 是路由策略声明，不是业务数据库
+
+路由记录可以声明：
 
 ```ts
 meta: {
@@ -296,285 +459,225 @@ meta: {
 }
 ```
 
-`route.meta` 是所有匹配记录 meta 的非递归合并结果，适合让全局守卫统一解释访问策略。可以通过模块扩展为 `RouteMeta` 增加类型。
+全局守卫再统一解释这些声明。这样页面配置表达“需要什么”，守卫负责“如何判断”。
 
-但 meta 只是一段客户端配置。用户可以修改前端代码、直接调用 API，因此后端必须再次验证身份和资源级权限。
+嵌套路由匹配时，`to.matched` 包含从父到子的记录；`to.meta` 是这些记录 meta 的**非递归合并结果**。非递归意味着嵌套对象不会深合并，因此复杂权限最好设计成明确、扁平的字段。
 
-“有 editor 角色”也不代表可以编辑任意课程；对象所有权、租户和记录状态属于后端授权。
+TypeScript 可以通过模块扩展约束 meta：
 
-## 18. 登录重定向安全
+```ts
+declare module 'vue-router' {
+  interface RouteMeta {
+    title: string
+    requiresAuth?: boolean
+    roles?: readonly Role[]
+  }
+}
+```
 
-受保护页面常跳转到：
+这能防止某条新路由漏写标题，也能避免角色字段拼错。
+
+## 前端访问控制不等于后端授权
+
+完整路由配置如下：
+
+<<< ../../../examples/frontend/vue3-router/router.mts
+
+守卫检查了两层：
+
+1. 没登录时去登录页；
+2. 已登录但角色不匹配时去无权访问页。
+
+这改善了交互，也避免用户误入不适合的界面。但浏览器代码和前端状态都由用户控制，攻击者完全可以绕过守卫直接请求 API。
+
+所以：
+
+- 前端守卫负责导航体验；
+- 后端必须独立验证身份、角色和资源归属；
+- 隐藏按钮也不是安全边界。
+
+### 登录回跳为什么要校验
+
+应用常把原地址放进：
 
 ```text
 /login?redirect=/lessons/vue-router/edit
 ```
 
-登录成功后用 `replace()` 返回目标，避免后退再次进入登录页。但 `redirect` 来自不可信 URL，不能直接接受 `https://evil.example` 或 `//evil.example`，否则形成开放重定向。
+登录后再回到原页面。但如果任意接受：
 
-示例只允许以单个 `/` 开头的站内路径，并提供安全默认值。
+```text
+/login?redirect=https://evil.example
+```
 
-## 19. 完整 Router、守卫与 Meta 类型
+应用就可能成为开放重定向入口。因此示例只接受以单个 `/` 开头、且不含反斜杠的站内路径，其余一律回首页。
 
-<<< ../../../examples/frontend/vue3-router/router.mts
+更复杂的系统可以解析目标后，再用 Router 的已知路由或业务白名单校验。不要因为 redirect “只是 query” 就信任它。
 
-会话接口：
-
-<<< ../../../examples/frontend/vue3-router/session.mts
-
-示例为了聚焦 Router 使用同步会话对象。接入 Pinia 时，应确保 `app.use(pinia)` 已执行，或显式把正确 Pinia 实例传给 `useSessionStore(pinia)`；SSR 尤其不能使用跨请求全局 Store。
-
-## 20. 编辑页离开保护
-
-<<< ../../../examples/frontend/vue3-router/LessonEditView.vue
-
-离开守卫只负责“是否允许导航”，保存行为仍属于组件/Store/服务层。还要结合 `beforeunload` 处理关闭标签页或整页刷新；浏览器原生提示文本通常不可自定义。
-
-不要在多个嵌套组件分别弹确认框。由草稿所有者统一维护 dirty 状态和离开策略。
-
-## 21. 代码分割
-
-路由组件使用动态导入：
+## 懒加载解决的是代码到达时间
 
 ```ts
 component: () => import('./LessonDetailView.vue')
 ```
 
-不要写成：
+动态 `import()` 让构建工具把路由组件拆成独立 chunk，用户访问时才加载。它适合页面级边界，因为页面天然对应导航时机。
 
-```ts
-component: defineAsyncComponent(() => import('./LessonDetailView.vue'))
-```
+注意三个区别：
 
-Vue Router 自己支持懒加载函数。构建工具会形成异步 chunk，首次进入路由时加载。
+- 路由懒加载减少首屏 JavaScript，不会自动减少接口数据；
+- 过度拆分会产生大量小请求，需要结合实际构建产物判断；
+- Vue Router 的 route component 函数不是要求你再套一层 `defineAsyncComponent()`。
 
-分包不是越碎越好：
+常访问且很小的首页可以静态导入；后台、编辑器和低频大页面更适合懒加载。
 
-- 同一页面必须同时出现的小组件通常随页面打包。
-- 高频相邻页面可由构建工具手动分组。
-- 大型编辑器、图表等适合独立异步加载。
-- 用真实网络和缓存条件衡量，不只看 chunk 数量。
+## 404 其实有两层
 
-动态导入失败可能来自发布后旧 HTML 引用已删除 chunk，应通过版本化静态资源、合理缓存和错误恢复策略处理。
-
-## 22. `RouterLink` 与原生链接
-
-应用内部导航优先 `RouterLink`：它能生成正确 href、处理编码、阻止无修饰键的整页加载，并提供 active 状态。
-
-仍应使用真实 `<a>` 的场景：
-
-- 外部网站。
-- 文件下载。
-- 需要浏览器完整文档导航。
-- 非 SPA 管理的路径。
-
-不要把普通按钮伪装成链接。导航用链接，提交或改变当前页面状态用按钮。
-
-## 23. `push` 与 `replace`
-
-`push` 增加历史记录：
-
-- 打开详情。
-- 提交新筛选。
-- 用户明确进入下一页。
-
-`replace` 替换当前记录：
-
-- 登录成功离开登录页。
-- 修正规范化 query。
-- 高频同步、不希望后退逐条经过的状态。
-
-两者都返回 Promise。程序化导航后有依赖顺序的逻辑应 `await`，并识别导航失败，而不是假设调用即成功。
-
-## 24. 导航失败与错误
-
-用户被离开守卫取消、重复导航或重定向，不等同于应用崩溃。`router.push()` resolve 后可使用 `isNavigationFailure()` 判断结果。
-
-`router.onError()` 用于未预期错误，例如异步路由组件加载失败。不要把正常取消都记录成错误告警。
-
-`afterEach` 的第三参数也会收到 navigation failure，发送页面浏览分析前应确认没有失败。
-
-## 25. 404 路由
-
-Vue Router 4 的 catch-all：
+应用内 catch-all：
 
 ```ts
 {
   path: '/:pathMatch(.*)*',
   name: 'not-found',
-  component: NotFoundView
+  component: () => import('./NotFoundView.vue')
 }
 ```
 
-放在配置末尾便于阅读。History 模式下还需服务器先回退到 SPA，客户端才能渲染这条 404；服务端若直接返回自己的 404，Router 不会启动。
+它只在 `index.html` 已经加载、Vue Router 已启动后生效。
 
-完整简单页面：
+而用户直接请求 `/unknown` 时，首先面对的是服务器。因此 HTML5 History 还需要服务器回退。两层职责是：
 
-<<< ../../../examples/frontend/vue3-router/NotFoundView.vue
+```text
+服务器：让前端应用有机会启动
+Router：在应用内部展示正确的 404 页面
+```
 
-<<< ../../../examples/frontend/vue3-router/ForbiddenView.vue
+SSR 系统还可能根据匹配结果真正返回 HTTP 404 状态；纯静态 SPA 的服务器通常先返回 `index.html`，再由客户端显示 404。
 
-## 26. 滚动行为
+## 滚动、焦点和页面标题也是导航体验
 
-`scrollBehavior` 只在浏览器 History 导航中生效：
+示例的滚动策略：
 
 ```ts
-scrollBehavior(to, from, savedPosition) {
+scrollBehavior(_to, _from, savedPosition) {
   return savedPosition ?? { top: 0 }
 }
 ```
 
-浏览器后退时恢复 `savedPosition`，新页面回到顶部。锚点页面可返回 `{ el: to.hash }`，但要验证选择器和等待异步内容渲染。
+- 浏览器前进/后退时恢复 `savedPosition`；
+- 普通新页面从顶部开始。
 
-焦点管理与滚动不是一回事。SPA 导航后应让读屏软件获知新页面，可在 `afterEach` 更新标题，并由布局把焦点移动到主标题或提供 live region。
+真实项目还可能处理 hash 锚点和固定头部偏移。
 
-## 27. 登录页完整示例
+滚动位置恢复不等于无障碍完成。单页应用切页后，还应该根据产品结构：
+
+- 更新 `document.title`；
+- 把焦点移到页面主标题或主内容区；
+- 用可感知方式宣布加载错误；
+- 保留合理的键盘操作顺序。
+
+`afterEach` 适合在导航成功后更新标题。示例检查 `failure`，避免失败导航修改标题。
+
+## 把完整示例串起来
+
+路由配置：
+
+<<< ../../../examples/frontend/vue3-router/router.mts
+
+入口与顶层出口：
+
+<<< ../../../examples/frontend/vue3-router/main.mts
+
+<<< ../../../examples/frontend/vue3-router/App.vue
+
+共享布局：
+
+<<< ../../../examples/frontend/vue3-router/AppShell.vue
+
+列表、分页与查询：
+
+<<< ../../../examples/frontend/vue3-router/LessonListView.vue
+
+详情与参数复用：
+
+<<< ../../../examples/frontend/vue3-router/LessonDetailView.vue
+
+编辑离开保护：
+
+<<< ../../../examples/frontend/vue3-router/LessonEditView.vue
+
+登录回跳：
 
 <<< ../../../examples/frontend/vue3-router/LoginView.vue
 
-登录页通过已经归一化的 Prop 接收返回地址，不直接解析原始 query。真实登录成功还应等待会话 Store 更新，再执行 replace，避免目标页守卫看到旧身份后再次重定向。
+会话与服务边界：
 
-## 28. SSR 边界
+<<< ../../../examples/frontend/vue3-router/session.mts
 
-SSR 每个请求需要新的 Router 实例：
+<<< ../../../examples/frontend/vue3-router/lesson-api.mts
 
-1. 使用 memory history 创建 Router。
-2. `router.push(requestUrl)`。
-3. 等待 `router.isReady()`。
-4. 加载当前路由数据并渲染。
-5. 客户端用浏览器 history 创建新 Router 并水合。
+## 做路由设计时的推理顺序
 
-不能把服务器 Router 做成模块单例，否则当前 URL、导航和守卫上下文会跨请求污染。
+遇到新页面时，可以按以下顺序判断：
 
-守卫与组件数据加载也不能无条件访问 `window`、`document` 或 `localStorage`。把客户端专属逻辑放进挂载后生命周期或环境分支。
+1. 哪些状态需要分享、刷新和前进后退？先设计 URL。
+2. path、query、hash 各自表达什么？不要把临时 UI 状态都塞进 URL。
+3. 页面之间共享什么布局？据此设计父子路由。
+4. params/query 在哪个边界解析成业务类型？
+5. 同一记录的参数变化会不会复用组件？数据如何同步？
+6. 请求由谁取消？旧请求如何失去提交结果的资格？
+7. 导航前必须满足什么条件？放在哪一层守卫？
+8. 这是交互限制还是安全授权？后端是否独立校验？
+9. push 还是 replace 才符合浏览器历史语义？
+10. 直接刷新、404、滚动、焦点和标题是否完整？
 
-## 29. 路由配置拆分
+这套顺序比“先写路由表，再到处补守卫”更容易得到可维护的结构。
 
-小应用集中配置更易看清全局信息架构。大型应用可按领域导出 route records：
+## 常见误区
 
-```ts
-export const lessonRoutes: RouteRecordRaw[] = [/* ... */]
-```
+### 把所有共享状态放进 Pinia
 
-根 Router 仍统一负责：
+分页若只在 Store，刷新和复制链接都会丢失。先问它是否属于导航状态。
 
-- History 实例。
-- 全局守卫顺序。
-- 全局 404。
-- 滚动与错误处理。
+### 只在 `onMounted()` 取路由数据
 
-避免每个 feature 自己偷偷注册全局守卫，导入顺序会变成不可见行为依赖。动态 `addRoute()` 适合插件或运行时能力，不应成为普通权限过滤的默认手段。
+参数变化时组件可能复用，挂载钩子不会重跑。观察真正依赖的 prop。
 
-## 30. 常见反模式
+### 认为取消请求就彻底没有竞态
 
-### 所有页面都读取整个 `route`
+不是所有底层任务都能真正取消。取消用于节省资源，序号或其他所有权校验用于保证结果正确。
 
-组件难复用，watch 范围过大。用路由 Props 和精确字段依赖。
+### 在每个页面复制登录判断
 
-### 在 URL 与 Store 各存一份查询状态
+重复代码容易产生策略差异。路由 meta 声明需求，全局守卫统一执行。
 
-刷新、后退和分享后出现冲突。选择 URL 为事实来源，Store 只缓存结果或草稿。
+### 把前端守卫当成权限系统
 
-### 只在 `onMounted` 根据 param 加载
+守卫可被绕过。后端授权才是资源安全边界。
 
-参数变化会复用实例，页面保留旧资源。watch 对应 Prop/param 并清理请求。
+### 配了 catch-all 就认为刷新不会 404
 
-### 把鉴权全部交给前端守卫
+应用内 404 只有前端启动后才工作。HTML5 History 仍需服务器回退。
 
-守卫只能改善导航体验，不能保护数据。后端必须授权每次请求。
+## 本课小结
 
-### 每条路由都放相同 `beforeEnter`
+Vue Router 的核心不是 API 数量，而是把 URL 当成一份公开导航协议：
 
-规则重复且易漂移。公共策略用 meta + 全局守卫，资源特有约束留在路由或数据层。
+- params 表达资源身份，query 表达可分享的视图状态；
+- URL 输入必须在边界解析、校验和规范化；
+- 路由 Props 让页面输入明确，命名路由让跳转契约稳定；
+- 参数变化可能复用组件，异步数据必须跟随路由生命周期；
+- `AbortController` 与请求序号分别解决资源浪费和结果所有权；
+- meta 与守卫组织前端访问体验，后端仍负责真正授权；
+- push、replace、History 回退、404 和滚动都属于浏览器导航语义。
 
-### 使用 `next()` 后继续执行
+下一节是[表单架构与复杂交互状态](/frontend/vue3/form-architecture-and-complex-interaction-state)。路由解决“用户在哪个页面”，表单则要继续解决“页面内的草稿、校验、提交与离开保护由谁拥有”。
 
-可能调用两次并导致导航悬挂。新守卫优先 return。
+## 官方资料
 
-### 强制给 RouterView 加动态 key
-
-`<RouterView :key="$route.fullPath">` 会让每次 query/hash 变化都销毁页面，掩盖生命周期设计问题并丢失状态。只有确实需要重建时使用精确 key。
-
-## 31. Vue Router 3 / Vue 2 迁移提示
-
-- Vue Router 4 通过 `createRouter()` 和明确 history 工厂创建实例。
-- catch-all 从旧 `*` 改为 `/:pathMatch(.*)*`。
-- 组合式组件使用 `useRoute()`、`useRouter()` 和组件守卫函数。
-- 守卫优先返回值，不再围绕 `next()` 组织代码。
-- `router.push()` 返回 Promise，应处理异步结果。
-- `append` 等旧导航行为需改为明确路径或命名路由。
-- 重新检查全局 mixin 中的路由依赖，把输入改成 Props 或组合式函数。
-
-## 32. 工程检查清单
-
-- URL 是否能独立还原页面核心状态？
-- params/query 是否在边界完成解析和校验？
-- 业务跳转是否优先使用命名路由？
-- 路由视图能否通过 Props 接收资源 ID？
-- 参数变化时是否处理组件复用？
-- 数据请求是否会在路由变化时取消或失效？
-- 守卫是否用返回值且避免重定向循环？
-- 前端权限判断是否有后端授权配套？
-- 登录 redirect 是否防止开放重定向？
-- 路由组件是否正确使用动态 import？
-- History 模式是否配置服务器 fallback？
-- 404、资源不存在、无权限是否被区分？
-- 页面标题、焦点和滚动是否支持 SPA 导航？
-- SSR 是否为每个请求创建独立 Router？
-
-## 33. 概念辨析与因果回顾
-
-### `$route` 和 `$router` 有什么区别？
-
-`route` 是当前规范化路由位置，是响应式读取对象；`router` 是执行导航、注册守卫和解析地址的实例。
-
-### 为什么动态参数变化不会重新挂载组件？
-
-两条 URL 匹配同一路由记录和组件，Router 为效率复用实例。应 watch 参数或使用 `onBeforeRouteUpdate()`。
-
-### `beforeEach` 与 `beforeResolve` 的区别？
-
-两者都可拦截导航；`beforeResolve` 在组件内守卫和异步路由组件解析后、导航确认前执行，适合避免对最终无法进入页面的数据预取。
-
-### 为什么路由 Props 更易测试？
-
-组件依赖显式输入，不需要构造完整 Router/Route 环境即可测试资源 ID 对应的渲染与加载逻辑。
-
-### History 模式刷新为什么可能 404？
-
-浏览器会向服务器请求真实路径。服务器若没有对应文件或回退规则，就不会把 SPA 的 `index.html` 返回给客户端。
-
-### 前端守卫能保证安全吗？
-
-不能。它只能控制客户端导航体验，攻击者可绕过前端直接调用 API；安全边界必须在服务端。
-
-## 34. 本节总结
-
-- Router 把 URL、路由记录与组件树连接为应用导航协议。
-- 资源身份用 params，可分享筛选用 query，敏感信息不进入 URL。
-- 命名路由减少路径硬编码，路由 Props 降低视图耦合。
-- 参数变化会复用组件，数据加载必须观察精确字段并清理旧请求。
-- 全局、路由级、组件级守卫分别承担不同范围的决策。
-- Meta 适合声明访问需求，但真正授权必须由后端执行。
-- 路由组件使用动态 import，实现页面级代码分割。
-- History fallback、404、导航失败、滚动和焦点都属于完整路由架构。
-- SSR 必须为每个请求创建独立 Router 和状态上下文。
-
-## 35. 下一步学习
-
-下一节建议学习：**Vue 3 表单架构与复杂交互状态**。
-
-将继续讲解受控字段、校验时机、异步校验、动态表单、草稿与服务端错误、可访问性以及大型表单性能。
-
-## 36. 参考资料
-
-- [Vue Router 官方指南：Getting Started](https://router.vuejs.org/guide/)
-- [Vue Router：Dynamic Route Matching](https://router.vuejs.org/guide/essentials/dynamic-matching.html)
-- [Vue Router：Nested Routes](https://router.vuejs.org/guide/essentials/nested-routes.html)
-- [Vue Router：Passing Props to Route Components](https://router.vuejs.org/guide/essentials/passing-props.html)
-- [Vue Router：Navigation Guards](https://router.vuejs.org/guide/advanced/navigation-guards.html)
-- [Vue Router：Route Meta Fields](https://router.vuejs.org/guide/advanced/meta.html)
-- [Vue Router：Data Fetching](https://router.vuejs.org/guide/advanced/data-fetching.html)
-- [Vue Router：Lazy Loading Routes](https://router.vuejs.org/guide/advanced/lazy-loading.html)
-- [Vue Router：History Modes](https://router.vuejs.org/guide/essentials/history-mode.html)
-- [Vue Router：Navigation Failures](https://router.vuejs.org/guide/advanced/navigation-failures.html)
+- [Vue Router：动态路由匹配](https://router.vuejs.org/guide/essentials/dynamic-matching.html)
+- [Vue Router：向路由组件传递 Props](https://router.vuejs.org/guide/essentials/passing-props.html)
+- [Vue Router：History 模式](https://router.vuejs.org/guide/essentials/history-mode.html)
+- [Vue Router：数据获取](https://router.vuejs.org/guide/advanced/data-fetching.html)
+- [Vue Router：导航守卫](https://router.vuejs.org/guide/advanced/navigation-guards.html)
+- [Vue Router：Route Meta](https://router.vuejs.org/guide/advanced/meta.html)
+- [Vue Router：路由懒加载](https://router.vuejs.org/guide/advanced/lazy-loading.html)

@@ -9,23 +9,29 @@ const props = defineProps<{
 const lesson = ref<Lesson | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
+let latestRequestId = 0
 
 watch(
   () => props.lessonId,
   async (lessonId) => {
+    const requestId = ++latestRequestId
     const controller = new AbortController()
     onWatcherCleanup(() => controller.abort())
     loading.value = true
     error.value = null
 
     try {
-      lesson.value = await getLesson(lessonId, controller.signal)
+      const result = await getLesson(lessonId, controller.signal)
+      if (requestId !== latestRequestId) return
+      lesson.value = result
     } catch (cause: unknown) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return
+      if (requestId !== latestRequestId) return
       lesson.value = null
       error.value = cause instanceof Error ? cause.message : '加载失败'
     } finally {
-      if (!controller.signal.aborted) loading.value = false
+      // 只有最新请求拥有当前页面的 loading 状态。
+      if (requestId === latestRequestId) loading.value = false
     }
   },
   { immediate: true }
