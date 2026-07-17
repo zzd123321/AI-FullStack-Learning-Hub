@@ -6,6 +6,8 @@ outline: deep
 
 # Vue 3 Composition API 与组件类型设计
 
+[上一课](/frontend/typescript/project-configuration-and-module-boundaries)完成了 TypeScript 工程边界。本课开始把严格类型放进 Vue 组件，并从你熟悉的 Vue 2 Options API 逐步迁移到 Composition API。
+
 你已经写过几年 Vue 2，`data`、`computed`、`methods` 和 `watch` 应该都不陌生。学习 Vue 3 时，最容易走进的误区是把 Composition API 当成一张 API 替换表：
 
 ```text
@@ -22,8 +24,6 @@ mounted   → onMounted()
 ```text
 业务状态 → 派生状态 → 用户操作 → 组件边界 → 可复用逻辑
 ```
-
-> 第一次阅读先完成基础部分和完整示例。进阶部分用于处理真实项目中的边界，原理部分用于解释这些 API 为什么这样工作。
 
 ## 本课在学习路线中的位置
 
@@ -110,7 +110,7 @@ const { draft, errors, save } = useLessonDraft(lesson)
 
 ---
 
-## 第一部分：基础——完成一个可工作的组件
+## 先完成一个可工作的组件
 
 ### `<script setup>` 是更简洁的 `setup`
 
@@ -221,6 +221,8 @@ draft.durationMinutes = 120
 ```
 
 这不是绝对语法规则，而是帮助代码表达状态使用方式。
+
+Vue 官方指南由于 `reactive` 不能直接承载原始值、不能随意整体替换，而且普通解构可能断开属性连接，推荐把 `ref` 作为声明响应式状态的主要 API。本课仍对表单草稿使用 `reactive`，是因为这个对象身份稳定、长期按字段修改；这不是“对象都应该用 `reactive`”的默认规则。
 
 ### 用 `computed` 表达派生状态
 
@@ -367,7 +369,7 @@ function submit(): void {
 
 ---
 
-## 第二部分：进阶——处理真实项目中的边界
+## 把简单组件带进真实项目
 
 ### `ref` 和 `reactive` 不是按数据类型二选一
 
@@ -568,7 +570,7 @@ onBeforeUnmount(() => {
 
 ---
 
-## 第三部分：原理——Composition API 为什么这样工作
+## Composition API 为什么这样工作
 
 ### `setup` 逻辑属于组件实例
 
@@ -769,9 +771,9 @@ LessonWorkspace.handleSave
 
 如果调用方必须同时阅读五个文件才能知道状态从哪里来，抽象可能过早。先保持业务逻辑内聚，等能力边界和复用需求稳定后再提取。
 
-## 本节知识链
+## 回看本课的学习链
 
-### 第一次学习必须掌握
+### 先能正确组织组件
 
 - `<script setup>` 顶层绑定可以直接用于模板；
 - `ref` 在脚本使用 `.value`，模板会处理常见解包；
@@ -780,7 +782,7 @@ LessonWorkspace.handleSave
 - Composition API 中的操作就是普通函数；
 - Props 属于父组件，子组件通过事件提交意图。
 
-### 第二次阅读再理解
+### 再处理工程边界
 
 - `ref` 与 `reactive` 应根据状态变化方式选择；
 - `reactive` 变量不应随意整体替换；
@@ -788,7 +790,7 @@ LessonWorkspace.handleSave
 - 本地 Props 草稿在来源切换时需要业务同步策略；
 - 组合式函数应按业务能力提取。
 
-### 进阶阶段需要建立的原理
+### 最后用机制解释现象
 
 - `setup` 状态与模块单例状态具有不同生命周期；
 - 响应式系统在读取时收集依赖，在写入时触发更新；

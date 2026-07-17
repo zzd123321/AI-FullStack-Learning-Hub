@@ -33,7 +33,7 @@ const emit = defineEmits<{
  * 表单的三个字段经常一起读取和修改，因此放进一个 reactive 对象。
  * 这里只复制可编辑字段，避免意外修改父组件拥有的课程对象。
  */
-const draft: LessonDraft = reactive({
+const draft = reactive({
   title: props.lesson.title,
   durationMinutes: props.lesson.durationMinutes,
   published: props.lesson.published
