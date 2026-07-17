@@ -568,7 +568,7 @@ JavaScript 迁移与类型边界
 
 ## 下一课
 
-下一节进入[Vue 3 Composition API 与组件类型设计](/frontend/vue/composition-api-and-component-typing)。你已有约三年 Vue 2 经验，因此不会从模板语法重新开始，而会集中解释：
+下一节进入[Vue 3 Composition API 与组件类型设计](/frontend/vue3/composition-api-and-component-typing)。你已有约三年 Vue 2 经验，因此不会从模板语法重新开始，而会集中解释：
 
 - Composition API 解决的不是“换一套写法”，而是逻辑组织与复用边界；
 - `ref`、`reactive`、`computed` 和 `watch` 的依赖关系及所有权；

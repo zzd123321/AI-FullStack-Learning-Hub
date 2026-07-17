@@ -6,6 +6,8 @@ outline: deep
 
 # TypeScript 对象类型与函数类型
 
+[上一课](/frontend/typescript/from-javascript-to-typescript)建立了从 JavaScript 迁移到 TypeScript 的整体方法，并认识了 `unknown`、类型收窄与边界校验。本课开始系统回答两个最常见的问题：怎样描述业务对象，以及怎样描述操作这些对象的函数。
+
 [上一课：从 JavaScript 到 TypeScript](/frontend/typescript/from-javascript-to-typescript)解决了一个总体问题：TypeScript 能把代码中的隐含假设写成可检查的契约。
 
 这一课只专注两类最常见的契约：
