@@ -1,204 +1,359 @@
 ---
 title: 从 JavaScript 到 TypeScript
-description: 理解 TypeScript 的价值、静态检查、类型推断、联合类型与类型收窄
+description: 从一个真实的接口数据错误出发，循序渐进理解类型推断、函数契约、对象类型、unknown、严格模式和运行时校验
 outline: deep
 ---
 
 # 从 JavaScript 到 TypeScript
 
-> 适用环境：本站锁定的 TypeScript 严格模式与 Node.js 22+。本文只依赖长期稳定的语言基础；具体编译选项以项目 `tsconfig.json` 和锁文件为准。
+你已经有 Vue 2 开发经验，应该很熟悉这样的代码：请求课程列表，把结果放进 `data`，然后在模板里展示。真正麻烦的通常不是请求怎么写，而是接口少了字段、字段类型变化，错误要到某个用户打开某个页面时才出现。
 
-## 1. 学习目标
+TypeScript 的作用，就是尽量让这类“数据和代码的假设不一致”在运行前暴露出来。
 
-完成本节后，你应该能够：
+> 本课只使用长期稳定的 TypeScript 基础语法。第一次阅读建议先完成“基础部分”和“完整示例”；进阶与原理部分可以在写过一些 TypeScript 后再回来阅读。
 
-- 解释 TypeScript 与 JavaScript 的关系。
-- 区分编译阶段的类型检查和运行时行为。
-- 使用类型推断、类型标注和联合类型。
-- 通过条件判断完成类型收窄（Type Narrowing）。
-- 理解 `type` 与 `interface` 的基本使用边界。
-- 把一段简单的 JavaScript 代码迁移到 TypeScript 严格模式。
+## 本课在学习路线中的位置
 
-## 2. 前置知识
+```text
+已有 JavaScript / Vue 2 经验
+          ↓
+本课：理解 TypeScript 在解决什么问题
+          ↓
+下一课：更系统地描述对象和函数
+          ↓
+后续：联合类型、泛型和类型运算
+```
 
-你需要熟悉 JavaScript 变量、函数、对象、数组和条件语句。暂时不需要了解泛型、装饰器或 Vue 3。
+学完本课，你不需要会写复杂类型，但应该能够：
 
-## 3. 为什么需要 TypeScript
+- 看懂常见的 TypeScript 函数和对象类型；
+- 判断哪些类型可以由工具推断，哪些边界需要明确声明；
+- 区分编译时类型检查和运行时数据校验；
+- 用 `unknown` 接住不可信数据，并通过判断逐步缩小类型；
+- 理解为什么新项目应该尽早开启严格模式。
 
-JavaScript 的类型错误经常要等代码执行到特定路径后才会暴露：
+## 从一个真实问题开始
+
+假设接口以前返回：
 
 ```js
-function formatUser(user) {
-  return user.name.trim().toUpperCase()
+const lesson = {
+  id: 1,
+  title: 'TypeScript 入门',
+  progress: 80
 }
-
-formatUser({ name: null })
 ```
 
-这段代码语法正确，但运行后会因为 `null` 没有 `trim` 方法而报错。
+页面直接格式化进度：
 
-TypeScript 在代码运行前检查值与操作是否匹配：
-
-```ts
-type User = {
-  name: string
+```js
+function formatProgress(lesson) {
+  return `${lesson.progress.toFixed(0)}%`
 }
-
-function formatUser(user: User): string {
-  return user.name.trim().toUpperCase()
-}
-
-formatUser({ name: null })
-// 开启 strictNullChecks 后，编辑器和编译器都会指出错误。
 ```
 
-TypeScript 的核心价值不是让代码显得更“高级”，而是让数据结构、函数输入输出和模块边界可以被工具验证。
-
-## 4. TypeScript 与 JavaScript 的关系
-
-TypeScript 在 JavaScript 语法之上增加静态类型语法和检查器。JavaScript 文件通常可以作为迁移起点，但“语法可被解析”不代表它在严格模式下一定没有类型错误；这些错误正是迁移要逐步显式化的隐含假设。
-
-关键过程如下：
+后来某些草稿课程没有 `progress`。JavaScript 仍能启动，但用户打开草稿时才会得到：
 
 ```text
-TypeScript 源码（.ts）
-        ↓ 类型检查
-发现类型错误或通过检查
-        ↓ 移除类型信息并转换
-JavaScript 源码（.js）
-        ↓
-浏览器或 Node.js 执行
+TypeError: Cannot read properties of undefined
 ```
 
-类型只服务于开发和构建阶段，通常不会保留在最终 JavaScript 中。因此，TypeScript 不能替代运行时数据校验。
-
-```ts
-type ApiUser = {
-  id: number
-  name: string
-}
-
-const response = await fetch('/api/user/1')
-const user = (await response.json()) as ApiUser
-```
-
-这里的 `as ApiUser` 只是告诉编译器“请相信我”，并没有检查服务器返回的数据。真实项目中，外部数据仍然需要运行时校验。
-
-### 两个世界：静态模型与运行时值
-
-理解 TypeScript 最重要的不是背类型语法，而是始终区分两个世界：
+问题的根源不是 `toFixed`，而是代码一直隐含地假设：
 
 ```text
-静态世界：源码中的类型、控制流、可赋值性
-                 ↓ 检查通过后擦除类型
-运行时世界：JavaScript 值、对象、网络数据、异常
+每一门课程都有 progress，而且 progress 一定是 number。
 ```
 
-类型系统回答的是：“如果调用方遵守这些声明，这个操作是否安全？”它不会替你发请求、转换字符串、冻结对象或捕获异常。`number | string` 也不是一个运行时容器；运行时仍只有某个具体值，联合类型只是编译器对当前可能性的描述。
+JavaScript 没有地方集中表达这个假设。TypeScript 让我们把它写进函数契约。
 
-### 可赋值性比“变量属于哪个类”更重要
+---
 
-TypeScript 主要采用结构化类型系统。一个值能否赋给目标类型，取决于它是否提供目标所要求的结构：
+## 第一部分：基础——先让常见代码安全起来
+
+### 基础一：TypeScript 仍然是 JavaScript
+
+TypeScript 不是在浏览器里运行的新语言。它是在 JavaScript 语法之上增加类型描述，并在代码运行前进行检查。
 
 ```ts
-type Named = { name: string }
-
-const account = { id: 1, name: 'Ada', role: 'admin' }
-const named: Named = account // account 至少满足 Named 所需结构
+const courseName: string = 'TypeScript 入门'
 ```
 
-这让普通 JavaScript 对象容易接入，但也意味着类型不是运行时品牌。若业务必须区分相同结构的 UserId 与 LessonId，需要额外的品牌类型或领域对象；外部数据仍要先验证。
+生成 JavaScript 后，`: string` 会被移除：
 
-### 控制流分析为什么能够收窄
-
-检查器不仅看声明，还沿分支追踪值的可能性：
-
-```ts
-function printLength(value: string | null) {
-  if (value === null) return
-  console.log(value.length)
-}
+```js
+const courseName = 'TypeScript 入门'
 ```
 
-`return` 之后，`null` 路径已经不可达，所以剩余路径中的 `value` 只能是 `string`。这就是控制流分析。好的 TypeScript 代码通常把真实的运行时判断写清楚，让检查器从代码事实推导类型，而不是用 `as` 跳过证明。
+可以先建立一个简单模型：
 
-## 5. 类型推断与类型标注
+```text
+.ts 源码
+  ↓ TypeScript 检查类型是否一致
+  ↓ 移除类型语法
+.js 代码
+  ↓ 浏览器或 Node.js 执行
+运行结果
+```
 
-### 类型推断
+因此，类型检查发生在运行前；网络失败、权限错误和真实接口数据仍然发生在运行时。
 
-TypeScript 能从初始值推断类型：
+### 基础二：先相信类型推断
+
+TypeScript 经常能从右侧的值推断类型：
 
 ```ts
-let courseName = 'TypeScript 入门'
+let title = 'TypeScript 入门'
 let completed = false
-
-courseName = 100
-// 不能将 number 赋值给 string。
+let lessonCount = 3
 ```
 
-这里不必重复写 `let courseName: string`。当类型一目了然时，优先使用推断。
-
-### 类型标注
-
-函数参数通常无法仅靠上下文推断，需要明确标注：
+把鼠标放到变量上，会看到它们分别被推断为 `string`、`boolean` 和 `number`。不需要机械重复：
 
 ```ts
-function calculateProgress(completed: number, total: number): number {
+// 可以工作，但这些标注没有提供额外信息。
+let title: string = 'TypeScript 入门'
+let completed: boolean = false
+```
+
+推断不是“没有类型”。相反，下面的赋值仍会被阻止：
+
+```ts
+let title = 'TypeScript 入门'
+title = 100
+// 错误：不能把 number 赋给 string。
+```
+
+可以先记住：
+
+- 局部、明显的值优先交给推断；
+- 函数参数、接口数据和公共模块边界更值得明确声明。
+
+### 基础三：函数签名就是输入输出契约
+
+JavaScript 函数不会说明参数应该是什么：
+
+```js
+function calculatePercentage(completed, total) {
+  return Math.round((completed / total) * 100)
+}
+```
+
+TypeScript 可以把约定写进函数签名：
+
+```ts
+function calculatePercentage(completed: number, total: number): number {
+  // 空列表没有完成比例，单独返回 0，避免产生 NaN。
   if (total === 0) return 0
   return Math.round((completed / total) * 100)
 }
-
-console.log(calculateProgress(3, 5)) // 60
 ```
 
-标注说明了函数契约：输入两个数字，返回一个数字。
+这里表达了三件事：
 
-## 6. 对象类型
+1. `completed` 必须是数字；
+2. `total` 必须是数字；
+3. 函数承诺返回数字。
 
-可以直接描述对象结构：
+调用错误会在运行前出现：
+
+```ts
+calculatePercentage('3', 5)
+// 错误：string 不能传给 number 参数。
+```
+
+返回类型有时也能推断。公共函数显式写出返回类型的价值，是防止以后重构时无意改变对外契约。
+
+### 基础四：对象类型描述我们真正需要的字段
+
+课程对象可以这样描述：
 
 ```ts
 type Lesson = {
   id: number
   title: string
   completed: boolean
-  summary?: string
 }
 
-const firstLesson: Lesson = {
+const lesson: Lesson = {
   id: 1,
   title: '从 JavaScript 到 TypeScript',
   completed: false
 }
 ```
 
-`summary?: string` 表示属性可以不存在；但如果存在，它必须是字符串。
+如果漏掉 `title`，或者把 `completed` 写成字符串，检查器会指出对象不满足 `Lesson`。
 
-数组类型可以写成：
+数组只是在元素类型后加 `[]`：
 
 ```ts
-const lessons: Lesson[] = [firstLesson]
+const lessons: Lesson[] = [lesson]
 ```
 
-## 7. 联合类型与类型收窄
+这一课先把对象类型理解成“使用这份数据至少需要满足的结构”。对象类型的组合、只读属性和函数类型会在下一课展开。
 
-联合类型（Union Type）表示一个值可能属于多个类型：
+### 基础五：可选字段表示“可能不存在”
+
+草稿课程可能没有进度：
 
 ```ts
-type LessonId = number | string
-
-function normalizeLessonId(id: LessonId): string {
-  if (typeof id === 'number') {
-    return `lesson-${id}`
-  }
-
-  return id.trim().toLowerCase()
+type Lesson = {
+  id: number
+  title: string
+  progress?: number
 }
 ```
 
-在判断之前，`id` 是 `number | string`，不能直接调用只属于字符串的 `trim`。经过 `typeof` 判断后，TypeScript 在不同分支中缩小了它的类型，这就是类型收窄。
+`progress?: number` 的意思不是“随便传什么都可以”，而是：
 
-对于多个状态，推荐使用可辨识联合类型（Discriminated Union）：
+```text
+要么没有 progress
+要么 progress 存在，并且它是 number
+```
+
+所以使用前必须处理缺失情况：
+
+```ts
+function formatProgress(lesson: Lesson): string {
+  if (lesson.progress === undefined) {
+    return '尚未开始'
+  }
+
+  // 通过判断后，这个分支中的 progress 已确定为 number。
+  return `${lesson.progress.toFixed(0)}%`
+}
+```
+
+这就是最基础的类型收窄：代码先做真实的运行时判断，TypeScript 再根据判断更新它对变量的认识。
+
+### 基础六：联合类型表达“几种可能之一”
+
+接口可能使用数字 ID，路由参数却是字符串：
+
+```ts
+type LessonId = number | string
+```
+
+竖线 `|` 表示这个值可能是 `number`，也可能是 `string`。在确定具体类型前，只能使用两者共有的能力。
+
+```ts
+function normalizeLessonId(id: LessonId): string {
+  if (typeof id === 'number') {
+    return String(id)
+  }
+
+  // number 分支已经返回，因此这里的 id 只可能是 string。
+  return id.trim()
+}
+```
+
+联合类型和收窄会在第三课系统学习；这里先理解“先表达可能性，再通过判断排除可能性”。
+
+### 基础七：`any` 与 `unknown` 的差别
+
+接口返回的数据在运行前并不可信。最省事的写法是 `any`：
+
+```ts
+function readTitle(value: any) {
+  return value.lesson.title.toUpperCase()
+}
+```
+
+但 `any` 基本关闭了后续类型检查，原来的 JavaScript 风险又回来了。
+
+`unknown` 同样表示“现在不知道它是什么”，区别是使用前必须判断：
+
+```ts
+function printValue(value: unknown): void {
+  if (typeof value === 'string') {
+    console.log(value.toUpperCase())
+    return
+  }
+
+  console.log('这不是字符串')
+}
+```
+
+可以把两者理解为：
+
+```text
+any：我不知道，但先别检查我
+unknown：我不知道，所以使用前必须确认
+```
+
+---
+
+## 第二部分：进阶——从局部类型走向真实项目边界
+
+### 进阶一：类型声明不会验证接口响应
+
+下面的代码看起来得到了 `Lesson`：
+
+```ts
+type Lesson = {
+  id: number
+  title: string
+}
+
+const response = await fetch('/api/lessons/1')
+const lesson = await response.json() as Lesson
+```
+
+但 `as Lesson` 只是在告诉检查器“请相信我”。它不会检查响应，也不会给缺失字段补默认值。
+
+如果服务器返回：
+
+```json
+{ "id": 1, "title": null }
+```
+
+运行时的 `title` 仍然是 `null`。因此外部数据的正确流程是：
+
+```text
+接口、localStorage、URL、postMessage
+              ↓
+            unknown
+              ↓ 运行时解析和校验
+        可信的领域类型
+              ↓
+       组件和业务函数使用
+```
+
+### 进阶二：严格模式让隐含假设显形
+
+新项目应尽早启用 `strict`：
+
+```json
+{
+  "compilerOptions": {
+    "strict": true
+  }
+}
+```
+
+严格模式不是代码格式检查。它会让参数、`null`、`undefined`、函数赋值等隐含假设得到更完整的检查。
+
+例如下面的函数明确承认标题可能缺失：
+
+```ts
+function normalizeTitle(title: string | null): string {
+  if (title === null) return '未命名课程'
+  return title.trim()
+}
+```
+
+关闭相关检查时，签名可能写着 `string`，实际却悄悄接收到 `null`。开启严格模式后，调用方和函数实现必须共同面对这个事实。
+
+### 进阶三：用一种状态代替多个冲突布尔值
+
+常见页面会同时保存：
+
+```ts
+let loading = false
+let error: string | null = null
+let lessons: Lesson[] = []
+```
+
+它们可能组合出矛盾状态，例如既 `loading` 又有 `error`。进阶做法是让状态只能是几种合法情况之一：
 
 ```ts
 type LoadState =
@@ -206,213 +361,157 @@ type LoadState =
   | { status: 'loading' }
   | { status: 'success'; lessons: Lesson[] }
   | { status: 'error'; message: string }
-
-function renderMessage(state: LoadState): string {
-  switch (state.status) {
-    case 'idle':
-      return '尚未加载'
-    case 'loading':
-      return '加载中…'
-    case 'success':
-      return `已加载 ${state.lessons.length} 节课程`
-    case 'error':
-      return `加载失败：${state.message}`
-  }
-}
 ```
 
-这比同时维护 `loading`、`error`、`data` 三个互相可能冲突的变量更可靠。
+现在 `success` 才能读取 `lessons`，`error` 才能读取 `message`。这叫可辨识联合；本课只建立直觉，第三课再解释完整写法。
 
-## 8. `type` 与 `interface`
+### 进阶四：已有 JavaScript 项目怎样迁移
 
-两者都能描述对象结构：
+不要从“给所有变量补类型”开始。更稳妥的顺序是：
 
-```ts
-interface UserProfile {
-  id: number
-  name: string
-}
+1. 建立独立、可重复执行的类型检查命令；
+2. 先描述接口响应、组件 Props、路由参数和共享状态；
+3. 外部数据先使用 `unknown`，不要一开始大面积使用 `any`；
+4. 局部变量尽量依靠推断；
+5. 按目录逐步收紧规则，并记录临时例外的清理计划。
 
-type UserSettings = {
-  theme: 'light' | 'dark'
-  notifications: boolean
-}
-```
+迁移的目标不是让代码里出现更多类型文字，而是让错误数据更难穿过关键边界。
 
-入门阶段可以遵循简单规则：
+---
 
-- 描述对象或类的公开契约时，`interface` 很自然。
-- 表示联合类型、元组或组合类型时使用 `type`。
-- 团队已有统一风格时，优先遵循团队规范。
-- 不要为了“选出唯一正确答案”而过度纠结；两者在普通对象场景中高度重叠。
+## 第三部分：原理——TypeScript 为什么能发现这些问题
 
-## 9. 严格模式
+### 原理一：静态类型世界与运行时世界
 
-新项目应该启用 `strict`：
-
-```json
-{
-  "compilerOptions": {
-    "strict": true,
-    "target": "ES2022",
-    "module": "ESNext"
-  }
-}
-```
-
-`strict` 会启用一组更严格的检查，其中最直观的是不再把 `null` 和 `undefined` 当成任意类型都能接受的值。
-
-```ts
-function printTitle(title: string | undefined): void {
-  if (title === undefined) {
-    console.log('未命名课程')
-    return
-  }
-
-  console.log(title.toUpperCase())
-}
-```
-
-不要用大量 `any` 或类型断言消除错误。错误通常在提示：数据边界还没有被描述清楚。
-
-### 严格模式不是“更挑剔的格式检查”
-
-`strict` 的价值是让调用方和实现方共同面对缺失信息。例如关闭 Null Check 时，`string` 实际可能接收 `null`，函数签名无法表达真实前置条件；开启后，调用方必须先处理缺失值，或者函数明确接受 `string | null`。
-
-严格模式不会保证程序完全正确。它缩小的是“声明与使用不一致”这一类错误空间，业务规则、并发、权限和外部数据仍需运行时设计。
-
-## 9.1 渐进迁移的正确顺序
-
-已有 JavaScript 项目不应先给每个变量补类型。更有效的顺序是：
-
-1. 建立可重复的类型检查命令，不改变运行时构建结果。
-2. 先描述模块入口、API DTO、组件 Props 和共享状态等边界。
-3. 对未知外部值使用 `unknown`，在边界解析成可信领域类型。
-4. 让局部变量依靠推断，只修复检查器暴露的真实不一致。
-5. 按目录逐步提高严格度并清理临时 `any`，避免永久债务。
-
-迁移目标不是“所有地方都有类型注解”，而是让错误数据无法悄悄穿过关键边界。
-
-## 10. 完整示例：学习进度统计
-
-新建 `progress.ts`：
-
-```ts
-type Lesson = {
-  id: number
-  title: string
-  completed: boolean
-}
-
-type ProgressSummary = {
-  total: number
-  completed: number
-  percentage: number
-}
-
-function summarizeProgress(lessons: Lesson[]): ProgressSummary {
-  const completed = lessons.filter((lesson) => lesson.completed).length
-  const percentage = lessons.length === 0
-    ? 0
-    : Math.round((completed / lessons.length) * 100)
-
-  return {
-    total: lessons.length,
-    completed,
-    percentage
-  }
-}
-
-const lessons: Lesson[] = [
-  { id: 1, title: '类型推断', completed: true },
-  { id: 2, title: '联合类型', completed: true },
-  { id: 3, title: '类型收窄', completed: false }
-]
-
-console.log(summarizeProgress(lessons))
-```
-
-预期输出：
+TypeScript 同时要求你理解两个世界：
 
 ```text
-{ total: 3, completed: 2, percentage: 67 }
+静态世界：类型、联合、可赋值性、控制流分析
+                    ↓ 类型擦除
+运行时世界：真实对象、网络响应、异常、DOM 和 JavaScript 值
 ```
 
-执行过程：
+`number | string` 不是运行时创建的特殊容器。运行时仍然只有一个具体值；联合类型只是检查器对“这个位置有哪些可能性”的描述。
 
-1. `Lesson[]` 保证数组中的每项都具有一致结构。
-2. `filter` 找出完成的课程。
-3. 空数组单独返回 `0`，避免出现无意义的除法结果。
-4. 返回值必须满足 `ProgressSummary`，缺少字段或字段类型错误都会被检查。
+这解释了为什么类型不能替代：
 
-## 11. 常见错误
+- 接口响应校验；
+- 用户输入解析；
+- 权限检查；
+- 网络错误处理；
+- 单元测试和端到端测试。
 
-### 把 `any` 当作逃生按钮
+### 原理二：TypeScript 主要比较结构
+
+TypeScript 通常关心一个值是否具有目标要求的结构，而不是它是否由某个类型“创建”：
 
 ```ts
-function handleData(data: any) {
-  return data.user.profile.name
+type Named = { name: string }
+
+const account = { id: 1, name: 'Ada', role: 'admin' }
+const named: Named = account
+```
+
+`account` 至少包含 `Named` 需要的 `name: string`，所以可以赋值。这个特性让现有 JavaScript 对象容易迁移到 TypeScript。
+
+代价是：两个业务含义不同但结构相同的值，默认可能互相兼容。后面的类型设计课程会讨论如何收紧这种边界。
+
+### 原理三：控制流分析沿代码路径排除可能性
+
+```ts
+function printLength(value: string | null): void {
+  if (value === null) return
+  console.log(value.length)
 }
 ```
 
-`any` 会关闭后续检查。类型未知时优先使用 `unknown`，并通过判断逐步收窄。
+检查器看到 `null` 分支已经 `return`，所以最后一行只剩 `string` 的可能性。这就是控制流分析。
 
-### 误以为类型断言会转换数据
+好的 TypeScript 代码通常通过真实判断证明类型，而不是连续使用 `as` 强迫检查器闭嘴。
+
+---
+
+## 完整示例：从接口数据到学习进度
+
+下面的完整示例把本课概念连起来：
+
+1. 接口响应先保存为 `unknown`；
+2. 类型守卫在运行时逐字段验证；
+3. 验证后得到可信的 `Lesson[]`；
+4. 业务函数依靠明确输入输出契约计算进度；
+5. 局部变量继续使用类型推断。
+
+<<< ../../../examples/typescript/from-javascript-to-typescript.ts
+
+第一次阅读时，不必立刻掌握 `value is Lesson` 的全部原理。先把它理解为：这个函数用真实判断向 TypeScript 证明了数据结构。类型守卫会在联合类型课程中进一步解释。
+
+## 常见错误：看到现象后怎样定位
+
+### 错误一：用 `any` 快速消除所有红线
+
+```text
+现象：编辑器不再报错
+真实结果：后续属性访问也不再受保护
+修复：边界使用 unknown，通过判断或解析函数收窄
+```
+
+### 错误二：以为类型断言会转换数据
 
 ```ts
 const value = '42' as unknown as number
-console.log(value + 1) // 运行结果仍然是 "421"
+console.log(value + 1) // 运行结果仍是字符串 "421"
 ```
 
-断言不会执行 `Number(value)`，也不会改变运行时的字符串。
+类型断言不会执行 `Number(value)`。需要数字时必须做真实转换和合法性检查。
 
-### 给所有变量重复标注显而易见的类型
+### 错误三：每个变量都写类型标注
 
-```ts
-const name: string = 'Ada'
-const count: number = 1
+```text
+现象：代码里的类型文字很多
+问题：信息重复，真正重要的函数和数据边界反而不突出
+修复：局部值使用推断，公共契约和不可信边界明确声明
 ```
 
-这些标注不是错误，但会增加噪声。让推断处理局部简单值，把明确类型用在函数边界、对象结构和公共 API 上。
+### 错误四：认为通过类型检查就不会出错
 
-## 12. 最佳实践
+TypeScript 只能检查它知道的类型假设。接口撒谎、断言错误、业务公式错误、竞态和权限问题都可能继续存在，因此仍需运行时校验和测试。
 
-- 新项目开启 `strict`，不要等项目变大后再集中修复。
-- 优先让类型表达业务状态，避免多个布尔值组合出非法状态。
-- 在接口响应、浏览器存储和用户输入等外部边界做运行时校验。
-- 函数保持单一职责，让输入输出类型容易理解。
-- 使用 `unknown` 表示真正未知的数据，缩小后再操作。
-- 类型名称表达业务含义，而不仅是数据形状。
+## 本节知识链
 
-## 13. 概念辨析与因果回顾
+### 第一次学习必须掌握
 
-### TypeScript 能完全消除运行时错误吗？
+- TypeScript 最终仍生成 JavaScript；
+- 类型推断不等于没有类型；
+- 函数参数和返回值构成契约；
+- 可选字段使用前需要判断；
+- `unknown` 比 `any` 更适合真正未知的数据；
+- `as` 不会转换或验证运行时值。
 
-不能。TypeScript 主要在编译阶段检查类型一致性，无法自动验证接口返回值、用户输入或第三方脚本等运行时数据，也无法消除业务逻辑、网络和资源错误。
+### 第二次阅读再理解
 
-### `any` 和 `unknown` 有什么区别？
+- 严格模式为什么让隐含假设显形；
+- 外部数据为什么要先验证再进入业务层；
+- 联合状态怎样排除非法组合；
+- JavaScript 项目为什么应先迁移边界。
 
-`any` 基本关闭类型检查，可以直接执行任意操作；`unknown` 表示值的类型未知，使用前必须通过判断或校验完成收窄，因此更安全。
+### 进阶阶段需要建立的原理
 
-### 什么是类型收窄？
+- 类型在生成 JavaScript 时会被擦除；
+- TypeScript 主要采用结构化类型系统；
+- 控制流分析会沿分支排除不可能类型。
 
-类型收窄是通过 `typeof`、`instanceof`、属性判断或可辨识字段等运行时条件，让 TypeScript 在某个代码分支中确定更具体类型的过程。
+## 下一课
 
-## 14. 本节总结
+下一节是[对象类型与函数类型](/frontend/typescript/object-and-function-types)。你会在本课 `Lesson` 和进度函数的基础上，继续学习：
 
-- TypeScript 在 JavaScript 之上增加静态类型检查。
-- 类型帮助我们描述并检查数据结构、输入输出和业务状态。
-- 类型信息通常在生成 JavaScript 时被移除，不等于运行时校验。
-- 局部简单值依靠推断，模块边界和公共契约使用明确类型。
-- 联合类型配合类型收窄，可以准确表达真实业务状态。
-- 新项目应尽早启用严格模式，并谨慎使用 `any` 和类型断言。
+- 对象的可选、只读和索引属性；
+- 函数参数、回调和重载；
+- 怎样设计既清楚又不啰嗦的公共契约。
 
-下一节建议：TypeScript 对象类型、函数类型与可选属性。
+## 参考资料
 
-## 15. 参考资料
-
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/handbook/intro.html)
-- [The Basics](https://www.typescriptlang.org/docs/handbook/2/basic-types.html)
-- [Everyday Types](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html)
-- [Narrowing](https://www.typescriptlang.org/docs/handbook/2/narrowing.html)
+- [TypeScript Handbook：Introduction](https://www.typescriptlang.org/docs/handbook/intro.html)
+- [TypeScript Handbook：The Basics](https://www.typescriptlang.org/docs/handbook/2/basic-types.html)
+- [TypeScript Handbook：Everyday Types](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html)
+- [TypeScript Handbook：Narrowing](https://www.typescriptlang.org/docs/handbook/2/narrowing.html)
 - [TSConfig：strict](https://www.typescriptlang.org/tsconfig/strict.html)
