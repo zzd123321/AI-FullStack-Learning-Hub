@@ -12,7 +12,8 @@ const AnalyticsPanel = defineAsyncComponent({
   delay: 150,
   timeout: 10_000,
   onError(_error, retry, fail, attempts) {
-    if (attempts <= 2) retry()
+    // 演示有限重试；生产环境还应只重试可恢复的网络错误。
+    if (attempts <= 2) globalThis.setTimeout(retry, attempts * 500)
     else fail()
   }
 })

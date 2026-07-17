@@ -23,9 +23,10 @@ export function createLessons(count: number): LessonRecord[] {
 export function filterLessons(
   lessons: readonly LessonRecord[],
   keyword: string
-): LessonRecord[] {
+): readonly LessonRecord[] {
   const normalized = keyword.trim().toLocaleLowerCase()
-  if (!normalized) return [...lessons]
+  // 没有筛选时保留数组身份；无意义的复制只会制造新的下游输入。
+  if (!normalized) return lessons
 
   return lessons.filter((lesson) =>
     lesson.title.toLocaleLowerCase().includes(normalized)
@@ -37,6 +38,7 @@ export function renameLesson(
   lessonId: string,
   title: string
 ): LessonRecord[] {
+  // 只替换真正变化的记录，其余对象保持引用稳定，子组件才能跳过更新。
   return lessons.map((lesson) =>
     lesson.id === lessonId ? { ...lesson, title } : lesson
   )
