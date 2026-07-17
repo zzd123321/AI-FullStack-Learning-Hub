@@ -1,68 +1,63 @@
-export {}
-
 interface Lesson {
-  readonly id: string
-  title: string
-  durationMinutes: number
+  readonly id: string;
+  readonly title: string;
+  readonly durationMinutes: number;
 }
 
 interface Page<Item> {
-  items: readonly Item[]
-  page: number
-  total: number
+  readonly items: readonly Item[];
+  readonly page: number;
+  readonly total: number;
 }
 
 interface ApiError {
-  code: string
-  message: string
+  readonly code: string;
+  readonly message: string;
 }
 
 type ApiResult<Data, ErrorData> =
   | { ok: true; data: Data }
-  | { ok: false; error: ErrorData }
+  | { ok: false; error: ErrorData };
 
+/** 只保留成功成员，并从它的 data 位置提取类型。 */
 type SuccessData<Result> =
   Result extends { ok: true; data: infer Data }
     ? Data
-    : never
+    : never;
 
+/** 只保留失败成员，并从它的 error 位置提取类型。 */
 type FailureData<Result> =
   Result extends { ok: false; error: infer ErrorData }
     ? ErrorData
-    : never
+    : never;
 
 type LearningEvent =
+  | { type: 'lesson.started'; payload: { lessonId: string } }
   | {
-      type: 'lesson.started'
-      payload: { lessonId: string }
+      type: 'lesson.completed';
+      payload: { lessonId: string; score: number };
     }
   | {
-      type: 'lesson.completed'
-      payload: { lessonId: string; score: number }
-    }
-  | {
-      type: 'lesson.failed'
-      payload: { lessonId: string; reason: string }
-    }
+      type: 'lesson.failed';
+      payload: { lessonId: string; reason: string };
+    };
 
+/** Extract 会从事件联合中筛出 type 匹配的成员。 */
 type EventOfType<
   Event extends { type: PropertyKey },
-  Type extends Event['type']
-> = Extract<Event, { type: Type }>
+  Type extends Event['type'],
+> = Extract<Event, { type: Type }>;
 
 type EventPayload<Event> =
   Event extends { payload: infer Payload }
     ? Payload
-    : never
+    : never;
 
-type LessonPageResult = ApiResult<Page<Lesson>, ApiError>
-type LoadedLessonPage = SuccessData<LessonPageResult>
-type LessonPageError = FailureData<LessonPageResult>
-type CompletedEvent = EventOfType<
-  LearningEvent,
-  'lesson.completed'
->
-type CompletedPayload = EventPayload<CompletedEvent>
+type LessonPageResult = ApiResult<Page<Lesson>, ApiError>;
+type LoadedLessonPage = SuccessData<LessonPageResult>;
+type LessonPageError = FailureData<LessonPageResult>;
+type CompletedEvent = EventOfType<LearningEvent, 'lesson.completed'>;
+type CompletedPayload = EventPayload<CompletedEvent>;
 
 async function loadLessonPage(): Promise<LessonPageResult> {
   return {
@@ -72,60 +67,56 @@ async function loadLessonPage(): Promise<LessonPageResult> {
         {
           id: 'ts-06',
           title: 'TypeScript 条件类型与 infer',
-          durationMinutes: 120
-        }
+          durationMinutes: 120,
+        },
       ],
       page: 1,
-      total: 1
-    }
-  }
+      total: 1,
+    },
+  };
 }
 
+/** 从真实函数签名派生最终异步结果，避免重复声明。 */
 type LoadLessonPageResult = Awaited<
   ReturnType<typeof loadLessonPage>
->
+>;
 
-function requireValue<Type>(
-  value: Type
-): NonNullable<Type> {
+function requireValue<Value>(value: Value): NonNullable<Value> {
   if (value === null || value === undefined) {
-    throw new TypeError('值不能为空')
+    throw new TypeError('值不能为空');
   }
 
-  return value
+  // 运行时判断已经排除了 null 和 undefined。
+  return value;
 }
 
 function describeEvent(event: LearningEvent): string {
   switch (event.type) {
     case 'lesson.started':
-      return `开始课程：${event.payload.lessonId}`
+      return `开始课程：${event.payload.lessonId}`;
     case 'lesson.completed':
-      return `完成课程：${event.payload.lessonId}，得分 ${event.payload.score}`
+      return `完成课程：${event.payload.lessonId}，得分 ${event.payload.score}`;
     case 'lesson.failed':
-      return `课程失败：${event.payload.reason}`
+      return `课程失败：${event.payload.reason}`;
   }
 }
 
 const completed: CompletedEvent = {
   type: 'lesson.completed',
-  payload: {
-    lessonId: 'ts-06',
-    score: 95
-  }
-}
+  payload: { lessonId: 'ts-06', score: 95 },
+};
 
-const completedPayload: CompletedPayload = completed.payload
-const result: LoadLessonPageResult = await loadLessonPage()
+const completedPayload: CompletedPayload = completed.payload;
+const result: LoadLessonPageResult = await loadLessonPage();
 
 if (result.ok) {
-  const page: LoadedLessonPage = result.data
-  const firstLesson = requireValue(page.items[0])
-
-  console.log('加载课程：', firstLesson.title)
+  const page: LoadedLessonPage = result.data;
+  const firstLesson = requireValue(page.items[0]);
+  console.log('加载课程：', firstLesson.title);
 } else {
-  const error: LessonPageError = result.error
-  console.error(`${error.code}：${error.message}`)
+  const error: LessonPageError = result.error;
+  console.error(`${error.code}：${error.message}`);
 }
 
-console.log(describeEvent(completed))
-console.log('完成得分：', completedPayload.score)
+console.log(describeEvent(completed));
+console.log('完成得分：', completedPayload.score);
