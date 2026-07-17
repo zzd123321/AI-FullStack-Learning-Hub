@@ -1,161 +1,158 @@
 ---
 title: TypeScript 对象类型与函数类型
-description: 系统掌握对象结构、属性修饰符、结构化类型、函数签名、回调、重载与严格函数检查
+description: 从课程保存功能出发，掌握对象字段、可选与只读属性、函数输入输出、回调契约和结构化类型
 outline: deep
 ---
 
 # TypeScript 对象类型与函数类型
 
-> 适用环境：TypeScript 7.0.2、Node.js 22 或更高版本。本文涉及的核心语法同样适用于 TypeScript 5.9 和 6.x。
+[上一课：从 JavaScript 到 TypeScript](/frontend/typescript/from-javascript-to-typescript)解决了一个总体问题：TypeScript 能把代码中的隐含假设写成可检查的契约。
 
-## 1. 学习目标
+这一课只专注两类最常见的契约：
 
-完成本节后，你应该能够：
+```text
+对象类型：一份数据应该包含什么
+函数类型：一段代码接收什么，又返回什么
+```
 
-- 使用匿名对象类型、`type` 和 `interface` 描述业务对象。
-- 正确理解必填属性、可选属性、`readonly` 属性和索引签名。
-- 解释 TypeScript 的结构化类型系统（Structural Type System）。
-- 理解对象字面量的多余属性检查（Excess Property Check）。
-- 使用函数类型表达式描述参数、返回值和回调函数。
-- 正确设计可选参数、默认参数、剩余参数和回调参数。
-- 区分 `void`、`undefined`、`never`、`unknown` 和 `Function`。
-- 判断应该使用联合类型还是函数重载（Function Overload）。
-- 理解 `strictFunctionTypes` 解决的安全问题。
-- 为一个真实的课程仓库设计对象类型和函数契约。
+前端项目的大部分类型最终都会落到这两件事上。接口响应、Vue Props、React Props 和 Store State 都是对象；事件处理器、请求函数、数组回调和组件事件都是函数。
 
-## 2. 前置知识
+我们会围绕“创建并查询课程”逐步建立这些契约，而不是一次罗列所有对象和函数高级语法。
 
-学习本节前，建议已经理解：
+## 本课与前后课程的关系
 
-- JavaScript 对象、数组、函数和回调函数。
-- TypeScript 类型推断、类型标注和联合类型。
-- `strict` 模式的基本作用。
-- `undefined` 与属性不存在的区别。
+```text
+上一课：类型推断、unknown 与运行时边界
+                    ↓
+本课：准确描述对象和函数
+                    ↓
+下一课：当一个值存在多种可能时，使用联合类型和收窄
+                    ↓
+后续：用泛型复用对象与函数契约
+```
 
-如果这些概念还不熟悉，可以先复习[从 JavaScript 到 TypeScript](/frontend/typescript/from-javascript-to-typescript)。
+学完本课，你应该能够：
 
-## 3. 为什么对象类型和函数类型如此重要
+- 用对象类型描述必填、可选和只读字段；
+- 根据数据生命周期拆分实体、创建输入和展示输出；
+- 理解 `type` 与 `interface` 的常用选择，不陷入无意义争论；
+- 为函数参数、返回值和回调建立清楚契约；
+- 正确设计可选参数、默认参数和回调参数；
+- 解释结构化类型与对象字面量多余属性检查；
+- 使用只读参数表达函数不会修改调用方数据；
+- 识别 `Function`、错误可选回调参数和直接修改输入等常见问题。
 
-一个应用的代码大致在做两件事：
+## 从一个没有契约的保存函数开始
 
-1. 保存和传递数据。
-2. 使用函数处理数据。
+JavaScript 中可以这样保存课程：
 
-对象类型负责描述“数据应该长什么样”，函数类型负责描述“数据如何进入、如何被处理、最后返回什么”。
-
-以课程保存接口为例：
-
-```ts
+```js
 function saveLesson(input) {
-  // input 有哪些字段？
-  // title 能否为空？
-  // durationMinutes 是字符串还是数字？
-  // 函数会返回课程，还是只返回 id？
+  return {
+    id: crypto.randomUUID(),
+    title: input.title.trim(),
+    durationMinutes: input.durationMinutes,
+    tags: input.tags || []
+  }
 }
 ```
 
-没有类型时，这些信息只能存在于文档、注释或开发者记忆中。加入类型后，我们可以把约定变成编译器能够检查的契约：
+代码没有回答以下问题：
+
+- `input` 必须有哪些字段？
+- `title` 能不能是 `null`？
+- `tags` 是字符串还是数组？
+- 调用方是否需要提前传 `id`？
+- 返回对象一定包含哪些字段？
+
+TypeScript 先把输入和结果分别命名：
 
 ```ts
 interface CreateLessonInput {
   title: string
   durationMinutes: number
+  tags?: readonly string[]
 }
 
 interface Lesson {
   readonly id: string
   title: string
   durationMinutes: number
+  tags: readonly string[]
 }
 
-type SaveLesson = (input: CreateLessonInput) => Lesson
+function saveLesson(input: CreateLessonInput): Lesson {
+  return {
+    id: crypto.randomUUID(),
+    title: input.title.trim(),
+    durationMinutes: input.durationMinutes,
+    tags: input.tags ? [...input.tags] : []
+  }
+}
 ```
 
-这里同时建立了两种边界：
+这里有一个很重要的设计决定：没有为了省事让输入和返回值都使用 `Lesson`。
 
-- 对象边界：课程输入和课程实体分别包含什么。
-- 行为边界：保存函数接收什么、返回什么。
+创建课程时还没有 `id`，所以 `CreateLessonInput` 不应该要求调用方伪造它。类型名称不只是描述对象长什么样，也应该表达它处于哪个业务阶段。
 
-## 4. 描述对象的三种方式
+---
 
-### 4.1 匿名对象类型
+## 描述对象需要哪些字段
 
-对象结构简单并且只使用一次时，可以直接写在参数位置：
+### 一次性使用的对象可以直接写在参数旁边
+
+结构很短，并且只使用一次时，可以使用匿名对象类型：
 
 ```ts
-function printLesson(lesson: { title: string; durationMinutes: number }) {
+function printLesson(
+  lesson: { title: string; durationMinutes: number }
+): void {
   console.log(`${lesson.title}：${lesson.durationMinutes} 分钟`)
 }
 ```
 
-优点是就地可读，缺点是重复使用时会产生重复代码。
-
-### 4.2 使用 `interface`
+它的优势是不用跳到其他地方查类型。重复出现后再命名：
 
 ```ts
-interface Lesson {
+interface LessonSummary {
   title: string
   durationMinutes: number
 }
 
-function printLesson(lesson: Lesson): void {
+function printLesson(lesson: LessonSummary): void {
   console.log(`${lesson.title}：${lesson.durationMinutes} 分钟`)
 }
 ```
 
-`interface` 主要用于描述对象、类实例和可扩展的公开契约。
+不要把“所有对象都必须先建一个 interface”当作规范。类型是否命名，取决于它有没有独立含义、是否复用，以及名字能否增加理解。
 
-### 4.3 使用 `type`
-
-```ts
-type Lesson = {
-  title: string
-  durationMinutes: number
-}
-```
-
-在普通对象场景中，`type` 和 `interface` 能完成大量相同工作。不要把选择它们变成无意义的争论。
-
-可以先遵循以下工程规则：
-
-- 面向对象的公开契约、组件 Props 或希望扩展的对象结构：优先考虑 `interface`。
-- 联合类型、交叉类型、元组、函数类型和类型运算：使用 `type`。
-- 团队已经有统一规范：遵循团队规范。
-
-它们的重要差异之一是接口可以声明合并（Declaration Merging）：
-
-```ts
-interface LessonMeta {
-  author: string
-}
-
-interface LessonMeta {
-  updatedAt: Date
-}
-
-// 最终同时需要 author 和 updatedAt。
-const meta: LessonMeta = {
-  author: 'Ada',
-  updatedAt: new Date()
-}
-```
-
-类型别名不能以同名方式重复声明。这种合并能力常用于扩展第三方库声明，但普通业务代码中不应依赖大量隐式合并。
-
-## 5. 属性修饰符
-
-### 5.1 必填属性
+### 必填字段表达最低契约
 
 ```ts
 interface Lesson {
+  id: string
   title: string
   durationMinutes: number
 }
 ```
 
-创建 `Lesson` 时，两个字段都必须存在并满足对应类型。
+赋给 `Lesson` 的对象必须至少包含这些字段，并且类型匹配：
 
-### 5.2 可选属性 `?`
+```ts
+const lesson: Lesson = {
+  id: 'ts-02',
+  title: '对象类型与函数类型',
+  durationMinutes: 90
+}
+```
+
+漏掉 `durationMinutes` 或把它写成字符串，都会在运行前得到提示。
+
+对象类型不会自动验证业务规则。`durationMinutes: number` 仍然允许 `-10` 和 `NaN`。类型负责描述数据形状，正数、范围和标题非空等规则仍需业务校验。
+
+### 可选字段表示属性可能不存在
+
+不是每门课程都有简介：
 
 ```ts
 interface Lesson {
@@ -164,7 +161,14 @@ interface Lesson {
 }
 ```
 
-`summary?: string` 表示这个属性可以不存在。读取时，它的类型是 `string | undefined`：
+`summary?: string` 表示：
+
+```text
+属性可以不存在
+如果存在，它必须是 string
+```
+
+因此读取时得到 `string | undefined`：
 
 ```ts
 function getSummary(lesson: Lesson): string {
@@ -172,31 +176,63 @@ function getSummary(lesson: Lesson): string {
 }
 ```
 
-可选属性并不等同于“属性一定存在，但值可以是 `undefined`”。开启 `exactOptionalPropertyTypes` 后，区别会更加严格：
+不要直接调用字符串方法：
 
 ```ts
-interface Lesson {
+function printSummary(lesson: Lesson): void {
+  console.log(lesson.summary.toUpperCase())
+  // 错误：summary 可能不存在。
+}
+```
+
+可以先判断、使用可选链，或者通过空值合并提供默认值。
+
+### “属性不存在”与“值是 undefined”可能不是一回事
+
+JavaScript 中下面两个对象并不完全相同：
+
+```ts
+const first = {}
+const second = { summary: undefined }
+
+console.log('summary' in first)  // false
+console.log('summary' in second) // true
+```
+
+开启 `exactOptionalPropertyTypes` 后，TypeScript 会更严格地区分它们：
+
+```ts
+interface LessonDraft {
   summary?: string
 }
 
-const first: Lesson = {} // 正确：属性不存在
-const second: Lesson = { summary: '类型系统' } // 正确
+const first: LessonDraft = {}
+const second: LessonDraft = { summary: '课程简介' }
 
-const third: Lesson = { summary: undefined }
-// 开启 exactOptionalPropertyTypes 后报错。
+const third: LessonDraft = { summary: undefined }
+// 开启 exactOptionalPropertyTypes 后不允许。
 ```
 
-如果业务确实允许显式写入 `undefined`，需要写成：
+如果业务明确允许属性存在且值为 `undefined`，可以写成：
 
 ```ts
-interface Lesson {
+interface LessonDraft {
   summary?: string | undefined
 }
 ```
 
-这在 PATCH 请求、表单状态和对象序列化中尤其重要，因为“未提供字段”和“主动清空字段”经常代表不同业务含义。
+这种区别在 PATCH 请求中尤其重要：
 
-### 5.3 只读属性 `readonly`
+```text
+没有 summary 字段      → 不修改原简介
+summary 明确为 null     → 清空简介
+```
+
+具体协议可能不同，但类型必须忠实表达协议，不能随意把“未提供”和“清空”混成一件事。
+
+### `readonly` 表达不应通过当前契约修改
+
+课程 ID 一旦生成就不应随意修改：
 
 ```ts
 interface Lesson {
@@ -205,19 +241,16 @@ interface Lesson {
 }
 
 const lesson: Lesson = {
-  id: 'lesson-1',
+  id: 'ts-02',
   title: '对象类型'
 }
 
-lesson.title = '函数类型' // 正确
-lesson.id = 'lesson-2' // 类型错误
+lesson.title = '对象类型与函数类型'
+lesson.id = 'another-id'
+// 错误：id 是只读属性。
 ```
 
-`readonly` 有三个边界需要记住：
-
-1. 它主要是编译阶段的约束，不会自动冻结运行时对象。
-2. 它默认是浅层的，不会递归保护嵌套对象。
-3. 它约束通过当前类型访问属性的方式，不一定代表底层对象永远不可修改。
+`readonly` 是 TypeScript 的编译期约束，不会自动执行 `Object.freeze()`。它还是浅层的：
 
 ```ts
 interface Course {
@@ -230,266 +263,129 @@ const course: Course = {
   metadata: { views: 0 }
 }
 
-course.metadata = { views: 1 } // 类型错误
-course.metadata.views += 1 // 正确，因为 readonly 只修饰 metadata 引用
+course.metadata = { views: 1 }
+// 错误：不能替换 metadata。
+
+course.metadata.views += 1
+// 允许：内部的 views 没有 readonly。
 ```
 
-需要保护数组内容时，可以使用 `readonly T[]`：
+数组也可以提供只读视图：
 
 ```ts
-interface Lesson {
-  tags: readonly string[]
-}
-
 function printTags(tags: readonly string[]): void {
-  console.log(tags.join(', '))
-  tags.push('new') // 类型错误
+  console.log(tags.join('、'))
+  tags.push('新增标签')
+  // 错误：函数承诺不通过这个参数修改数组。
 }
 ```
 
-## 6. 索引签名：属性名暂时未知
+只读参数的价值是表达所有权：数组由调用方拥有，当前函数只读取它。
 
-如果对象的键在开发时无法全部列出，但值遵循统一规则，可以使用索引签名（Index Signature）：
+### `interface` 和 `type` 先用简单规则选择
+
+两者都能描述普通对象：
 
 ```ts
-interface LessonProgressMap {
+interface LessonByInterface {
+  title: string
+}
+
+type LessonByType = {
+  title: string
+}
+```
+
+在普通业务对象场景中，它们高度重叠。当前阶段使用下面的规则就足够：
+
+- 对象、组件 Props、服务接口等公开对象契约，使用 `interface` 很自然；
+- 联合类型、函数类型、元组和类型运算通常使用 `type`；
+- 团队已有统一约定时，优先保持一致；
+- 不要仅为了从 `type` 改成 `interface` 而重构稳定代码。
+
+`interface` 支持声明合并，`type` 能表达更多非对象类型。这些差异在库类型扩展和高级类型课程中才会真正影响设计，本课不展开声明合并技巧。
+
+### 属性名无法提前列完时使用索引类型
+
+课程进度以课程 ID 为键：
+
+```ts
+type ProgressByLessonId = Record<string, number>
+
+const progress: ProgressByLessonId = {
+  'ts-01': 100,
+  'ts-02': 40
+}
+```
+
+等价的索引签名写法是：
+
+```ts
+interface ProgressByLessonId {
   [lessonId: string]: number
 }
-
-const progress: LessonProgressMap = {
-  'lesson-1': 100,
-  'lesson-2': 40
-}
 ```
 
-也可以写成：
+它表示任意字符串键对应数字，但不保证某个具体键一定存在。开启 `noUncheckedIndexedAccess` 后：
 
 ```ts
-type LessonProgressMap = Record<string, number>
+const current = progress['not-found']
+// number | undefined
 ```
 
-使用索引签名时，显式声明的同类属性也必须符合索引值类型：
+读取后要处理缺失情况：
 
 ```ts
-interface Scores {
-  [name: string]: number
-  total: number
-  label: string // 类型错误：string 不符合 number
-}
+const current = progress[lessonId] ?? 0
 ```
 
-不要在键集合已知时滥用 `Record<string, T>`。它会让任意字符串看起来都合法，拼写错误也更难发现。
-
-键集合固定时，优先使用字面量联合：
+如果键集合是固定的，就不要使用宽泛的 `string`：
 
 ```ts
-type Difficulty = 'beginner' | 'intermediate' | 'advanced'
-type DifficultyLabels = Record<Difficulty, string>
+type Level = 'beginner' | 'intermediate' | 'advanced'
+type LevelLabels = Record<Level, string>
 
-const labels: DifficultyLabels = {
+const labels: LevelLabels = {
   beginner: '入门',
   intermediate: '进阶',
   advanced: '高级'
 }
 ```
 
-## 7. 结构化类型系统
+以后增加一个 `Level` 时，编译器会要求标签表同步补齐。
 
-TypeScript 主要根据对象实际拥有的成员判断兼容性，而不是要求对象显式声明“实现了某个类型”。这叫结构化类型（Structural Typing），也常被形容为“只看形状”。
+---
 
-```ts
-interface Titled {
-  title: string
-}
+## 函数类型描述输入、输出和调用责任
 
-const lesson = {
-  title: '对象类型',
-  durationMinutes: 60
-}
-
-function printTitle(value: Titled): void {
-  console.log(value.title)
-}
-
-printTitle(lesson) // 正确：lesson 至少拥有 title: string
-```
-
-这与 Java 中的名义类型系统（Nominal Type System）不同。Java 类通常需要明确 `implements` 某个接口；TypeScript 更关注值是否满足所需结构。
-
-结构化类型的好处是非常适合 JavaScript 生态中的对象字面量、模块和回调函数；代价是“名字不同但结构相同”的类型可能互相兼容。
-
-## 8. 多余属性检查不是精确对象类型
-
-下面的直接调用会报错：
+### 函数签名就是调用契约
 
 ```ts
-interface LessonTitle {
-  title: string
-}
-
-function printTitle(lesson: LessonTitle): void {
-  console.log(lesson.title)
-}
-
-printTitle({
-  title: '函数类型',
-  durationMinutes: 60
-  // 错误：对象字面量包含未知属性 durationMinutes。
-})
-```
-
-但是先保存到变量后可以通过：
-
-```ts
-const lesson = {
-  title: '函数类型',
-  durationMinutes: 60
-}
-
-printTitle(lesson) // 正确
-```
-
-原因不是 TypeScript 前后矛盾，而是它会对“新鲜的对象字面量”执行额外的拼写和属性检查；变量则按照结构兼容规则检查。
-
-所以 `LessonTitle` 的含义是“至少具有 `title: string`”，不是“只能拥有 title”。如果业务要求运行时拒绝额外字段，需要使用专门的运行时校验方案。
-
-## 9. 扩展和组合对象类型
-
-### 9.1 接口继承
-
-```ts
-interface Entity {
-  readonly id: string
-  createdAt: Date
-}
-
-interface Lesson extends Entity {
-  title: string
+function formatLesson(
+  title: string,
   durationMinutes: number
-}
-```
-
-接口还可以扩展多个接口：
-
-```ts
-interface Searchable {
-  keywords: readonly string[]
-}
-
-interface SearchableLesson extends Entity, Searchable {
-  title: string
-}
-```
-
-### 9.2 交叉类型
-
-```ts
-type Entity = {
-  readonly id: string
-  createdAt: Date
-}
-
-type LessonContent = {
-  title: string
-  durationMinutes: number
-}
-
-type Lesson = Entity & LessonContent
-```
-
-交叉类型 `A & B` 表示一个值同时满足 A 和 B。
-
-如果同名属性无法兼容，交叉结果可能出现无法使用的 `never`：
-
-```ts
-type A = { id: string }
-type B = { id: number }
-type Impossible = A & B
-
-// Impossible['id'] 是 string & number，也就是 never。
-```
-
-因此组合类型时要主动检查同名属性，而不是机械地使用 `&`。
-
-## 10. 函数类型表达式
-
-描述函数最直接的方式是函数类型表达式（Function Type Expression）：
-
-```ts
-type FormatLesson = (title: string, durationMinutes: number) => string
-
-const formatLesson: FormatLesson = (title, durationMinutes) => {
+): string {
   return `${title}：${durationMinutes} 分钟`
 }
 ```
 
-类型 `(title: string, durationMinutes: number) => string` 表示：
+签名说明：
 
-- 第一个参数必须是字符串。
-- 第二个参数必须是数字。
-- 返回值必须是字符串。
+```text
+输入：string、number
+输出：string
+```
 
-参数名称用于提高可读性，判断函数兼容性时主要考虑位置和类型，而不是参数名字。
-
-### 10.1 上下文类型推断
-
-当函数表达式被赋给一个已知函数类型时，参数类型可以从上下文推断：
+函数参数通常需要明确标注，因为函数实现不能猜到未来调用方会传什么。返回类型常常可以推断：
 
 ```ts
-type LessonPredicate = (lesson: Lesson) => boolean
-
-const isLongLesson: LessonPredicate = (lesson) => {
-  // lesson 被推断为 Lesson。
-  return lesson.durationMinutes >= 60
+function double(value: number) {
+  return value * 2
 }
+// 推断返回 number。
 ```
 
-这种能力叫上下文类型（Contextual Typing）。不要在类型已经明确的两边重复标注所有内容。
-
-## 11. 调用签名和带属性的函数
-
-JavaScript 函数本身也是对象，可以拥有属性。普通箭头形式无法同时描述调用方式和额外属性，这时可以使用调用签名（Call Signature）：
-
-```ts
-interface LessonFormatter {
-  (lesson: Lesson): string
-  locale: string
-}
-
-const formatter = ((lesson: Lesson) => lesson.title) as LessonFormatter
-formatter.locale = 'zh-CN'
-```
-
-调用签名使用 `:` 分隔返回类型：
-
-```ts
-(lesson: Lesson): string
-```
-
-而函数类型表达式使用箭头：
-
-```ts
-(lesson: Lesson) => string
-```
-
-这种“可调用对象”在插件系统、验证器和带配置的工具函数中比较常见，普通业务函数不需要刻意设计成这种形式。
-
-## 12. 返回类型：什么时候写，什么时候推断
-
-局部小函数可以依靠推断：
-
-```ts
-const double = (value: number) => value * 2
-// 推断为 (value: number) => number
-```
-
-以下场景建议明确标注返回类型：
-
-- 导出的公共函数。
-- 服务层、数据访问层等重要边界。
-- 递归函数。
-- 希望限制实现细节泄漏的函数。
-- 返回对象结构复杂，错误返回值可能被推断成联合类型的函数。
+导出的公共函数、服务层函数和重要领域边界建议显式写返回类型。这样实现重构时，不容易无意扩大对外契约：
 
 ```ts
 interface LessonSummary {
@@ -505,52 +401,39 @@ function toSummary(lesson: Lesson): LessonSummary {
 }
 ```
 
-明确返回 `LessonSummary` 后，实现不会意外把内部字段暴露成公共契约。
+### 函数本身也可以成为一种类型
 
-## 13. 可选参数、默认参数和剩余参数
-
-### 13.1 可选参数
+筛选函数接收课程并返回布尔值：
 
 ```ts
-function formatTitle(title: string, prefix?: string): string {
-  return prefix ? `${prefix}：${title}` : title
+type LessonPredicate = (
+  lesson: Readonly<Lesson>,
+  index: number
+) => boolean
+```
+
+使用它描述变量或参数：
+
+```ts
+const isLongLesson: LessonPredicate = (lesson) => {
+  return lesson.durationMinutes >= 60
 }
 ```
 
-在函数体内，`prefix` 的类型是 `string | undefined`。
+`lesson` 不需要重复标注，TypeScript 会从 `LessonPredicate` 推断它的类型。这叫上下文类型推断。
 
-必填参数不能放在可选参数后面：
-
-```ts
-function bad(optional?: string, required: number) {}
-// 错误：必填参数不能跟在可选参数后面。
-```
-
-### 13.2 默认参数
+函数类型中的参数名称只帮助阅读：
 
 ```ts
-function formatTitle(title: string, prefix = '课程'): string {
-  return `${prefix}：${title}`
-}
+type First = (lesson: Lesson) => boolean
+type Second = (item: Lesson) => boolean
 ```
 
-调用方可以省略 `prefix`，函数体内它已经是 `string`，不需要再次处理 `undefined`。
+`lesson` 和 `item` 名称不同，不会因此变成不兼容类型；真正决定契约的是参数位置、参数类型和返回类型。
 
-### 13.3 剩余参数
+### 回调参数由调用回调的一方决定
 
-```ts
-function addTags(lessonId: string, ...tags: string[]): void {
-  console.log(lessonId, tags)
-}
-
-addTags('lesson-1', 'typescript', '函数')
-```
-
-剩余参数必须是数组或元组类型，并放在参数列表最后。
-
-## 14. 回调参数最容易出现的误区
-
-假设我们声明一个遍历函数：
+设计一个遍历函数：
 
 ```ts
 function forEachLesson(
@@ -569,122 +452,116 @@ forEachLesson(lessons, (lesson) => {
 })
 ```
 
-不要为了允许调用方省略 `index`，把它写成可选参数：
+JavaScript 本来就允许函数忽略额外参数，因此不需要把 `index` 标记为可选。
+
+错误设计：
 
 ```ts
 callback: (lesson: Lesson, index?: number) => void
 ```
 
-这句话真正表达的是：“实现 `forEachLesson` 的人可能不传 index。”于是调用方使用 `index` 时必须处理 `undefined`。
+它表达的是“调用回调的人可能不传 index”。于是回调实现使用 `index` 前必须处理 `undefined`。
 
-> 设计回调类型时，只有当调用回调的一方确实可能不传某个参数，才把它标记为可选。
+判断回调参数是否可选，应站在调用者这一侧：这个函数真的会在某些路径省略参数吗？如果永远传，就不应该写 `?`。
 
-## 15. `void`、`undefined`、`never`、`unknown` 和 `Function`
+### 可选参数、默认参数解决不同问题
 
-### 15.1 `void`
+可选参数在函数体内可能是 `undefined`：
 
-`void` 表示调用者不应使用函数的返回结果：
+```ts
+function formatTitle(title: string, prefix?: string): string {
+  return prefix === undefined
+    ? title
+    : `${prefix}：${title}`
+}
+```
+
+默认参数让函数体始终得到具体值：
+
+```ts
+function formatTitle(title: string, prefix = '课程'): string {
+  return `${prefix}：${title}`
+}
+```
+
+如果缺省时存在自然默认值，默认参数通常更简单。如果“没有传”本身具有业务含义，就保留可选参数并明确判断。
+
+必填参数不能放在可选参数后面，因为调用位置会变得含糊：
+
+```ts
+function invalid(prefix?: string, title: string): string {
+  return `${prefix}${title}`
+}
+```
+
+参数很多时，不要继续增加位置参数，改用一个命名对象：
+
+```ts
+interface FormatLessonOptions {
+  title: string
+  durationMinutes: number
+  prefix?: string
+  uppercase?: boolean
+}
+
+function formatLesson(options: FormatLessonOptions): string {
+  // 每个参数的含义在调用处都清楚可见。
+  const label = `${options.prefix ?? '课程'}：${options.title}`
+  const result = `${label}（${options.durationMinutes} 分钟）`
+
+  return options.uppercase ? result.toUpperCase() : result
+}
+```
+
+### 剩余参数接住数量不固定的输入
+
+```ts
+function addTags(lessonId: string, ...tags: string[]): void {
+  console.log(lessonId, tags)
+}
+
+addTags('ts-02', 'typescript', '函数类型')
+```
+
+函数体中的 `tags` 是数组。剩余参数必须放在最后，并使用数组或元组类型。
+
+### `void` 表示调用方不使用返回结果
 
 ```ts
 type Logger = (message: string) => void
 ```
 
-JavaScript 中未显式返回值的函数运行时会返回 `undefined`，但 TypeScript 中 `void` 和 `undefined` 不是同一个概念。
-
-有一个重要规则：一个实际返回值的函数可以赋给返回 `void` 的回调类型，返回值会被忽略。
+它主要表达调用方不依赖返回结果，而不等同于“运行时绝对只能返回 `undefined`”。例如：
 
 ```ts
-const numbers: number[] = []
+const values: number[] = []
 
-;[1, 2, 3].forEach((value) => numbers.push(value))
-// push 返回 number，但 forEach 忽略这个返回值。
+;[1, 2, 3].forEach((value) => values.push(value))
 ```
 
-但是函数实现如果被显式声明为 `(): void`，就不能主动返回一个值：
+`push` 运行时返回数组长度，但 `forEach` 的回调结果被忽略，所以这种写法可以赋给返回 `void` 的回调位置。
+
+如果函数实现本身显式写了 `(): void`，就不能主动返回业务值：
 
 ```ts
-function log(): void {
-  return true // 类型错误
-}
-```
-
-### 15.2 `undefined`
-
-`undefined` 是一个实际值和实际类型。返回 `undefined` 的函数可以明确写成：
-
-```ts
-function findNothing(): undefined {
-  return undefined
+function log(message: string): void {
+  console.log(message)
+  return true
+  // 错误：显式 void 实现不应返回值。
 }
 ```
 
-### 15.3 `never`
+`never` 表示永远不能正常返回，`unknown` 表示值暂时未知。它们会分别在联合类型和边界设计中继续学习，不要把它们和 `void` 当成同一组“没有值”的类型。
 
-`never` 表示函数永远无法正常返回，或者某个联合类型已经没有剩余情况：
+### 不要用全局 `Function` 逃避签名设计
 
 ```ts
-function fail(message: string): never {
-  throw new Error(message)
+function run(callback: Function): void {
+  callback('意外参数', 123)
 }
 ```
 
-它也可以用于穷尽性检查：
-
-```ts
-type LessonStatus = 'draft' | 'published' | 'archived'
-
-function assertNever(value: never): never {
-  throw new Error(`未知状态：${String(value)}`)
-}
-
-function getStatusLabel(status: LessonStatus): string {
-  switch (status) {
-    case 'draft':
-      return '草稿'
-    case 'published':
-      return '已发布'
-    case 'archived':
-      return '已归档'
-    default:
-      return assertNever(status)
-  }
-}
-```
-
-以后向 `LessonStatus` 增加新状态但忘记处理时，编译器会在 `assertNever` 处提示。
-
-### 15.4 `unknown`
-
-`unknown` 表示类型暂时未知，使用前必须检查：
-
-```ts
-function parseJson(text: string): unknown {
-  return JSON.parse(text)
-}
-
-const value = parseJson('{"title":"TypeScript"}')
-
-if (
-  typeof value === 'object' &&
-  value !== null &&
-  'title' in value &&
-  typeof value.title === 'string'
-) {
-  console.log(value.title)
-}
-```
-
-外部接口、JSON、浏览器存储和用户输入都属于典型的未知边界。
-
-### 15.5 不要使用全局 `Function` 类型
-
-```ts
-function run(callback: Function) {
-  callback('unexpected', 123) // 几乎失去参数和返回值检查
-}
-```
-
-应该描述真实调用方式：
+`Function` 几乎没有描述参数和返回值，调用约束已经丢失。应该写出真实调用方式：
 
 ```ts
 function run(callback: () => void): void {
@@ -692,318 +569,290 @@ function run(callback: () => void): void {
 }
 ```
 
-如果函数参数和返回值真的完全未知，可以根据目的使用更明确的类型：
+带参数时同样明确：
 
 ```ts
-type UnknownFunction = (...args: never[]) => unknown
-```
-
-但普通业务接口应尽可能描述具体签名。
-
-## 16. 联合类型与函数重载
-
-如果多种输入采用相同处理方式并返回相同类型，优先使用联合类型：
-
-```ts
-function getLength(value: string | readonly unknown[]): number {
-  return value.length
+function selectLesson(
+  lessonId: string,
+  onSelected: (lessonId: string) => void
+): void {
+  onSelected(lessonId)
 }
 ```
 
-不要无意义地写成两个重载：
+### 回调必须能够处理调用方承诺的全部输入
+
+假设一个处理器契约允许字符串或数字：
 
 ```ts
-function getLength(value: string): number
-function getLength(value: readonly unknown[]): number
+type Handler = (value: string | number) => void
 ```
 
-当参数组合不同，或者输入类型与返回类型存在明确对应关系时，重载才更有价值：
+只会处理字符串的函数不能放到这里：
 
 ```ts
-interface Lesson {
-  id: string
-  title: string
-}
-
-function normalizeLesson(input: string): string
-function normalizeLesson(input: Lesson): Lesson
-function normalizeLesson(input: string | Lesson): string | Lesson {
-  if (typeof input === 'string') {
-    return input.trim()
-  }
-
-  return {
-    ...input,
-    title: input.title.trim()
-  }
-}
-```
-
-重载有三个关键规则：
-
-1. 对外可调用的是重载签名。
-2. 实现签名必须兼容所有重载。
-3. 调用方不能直接依赖只存在于实现签名中的调用方式。
-
-重载过多通常意味着 API 设计过于复杂，可以考虑拆分函数或使用可辨识联合类型。
-
-## 17. 函数兼容性与 `strictFunctionTypes`
-
-设想一个函数可能接收字符串或数字：
-
-```ts
-type StringOrNumberHandler = (value: string | number) => void
-
 const stringOnly = (value: string): void => {
   console.log(value.toLowerCase())
 }
 
-const handler: StringOrNumberHandler = stringOnly
+const handler: Handler = stringOnly
+// strictFunctionTypes 下错误。
 ```
 
-这个赋值是不安全的，因为之后可以调用 `handler(10)`，而 `stringOnly` 无法处理数字。
-
-启用 `strictFunctionTypes` 后，这类函数属性赋值会被拒绝。它已包含在 `strict` 中。
-
-需要注意：由于历史兼容原因，这项严格检查主要应用于函数属性语法，而不完全应用于方法语法：
+原因可以从真实调用推导：
 
 ```ts
-interface FunctionProperty {
-  handle: (value: string | number) => void
-}
-
-interface MethodSyntax {
-  handle(value: string | number): void
-}
+handler(10)
 ```
 
-设计回调、事件处理器和策略对象时，理解这种差异有助于避免把过窄的处理函数放到更宽的调用位置。
+`Handler` 承诺数字合法，但 `stringOnly` 无法处理数字。开启 `strict` 时，`strictFunctionTypes` 会检查常见函数属性和回调位置，阻止这种过窄实现。
 
-## 18. 完整项目示例：内存课程仓库
+这里不必先记“逆变”术语。只需检查一个问题：调用方按照目标类型传入任何合法值时，这个具体函数都能处理吗？
 
-本节提供了一份可直接编译运行的示例：
+---
+
+## TypeScript 为什么允许“字段更多”的对象
+
+### 它主要比较结构，而不是类型名称
+
+```ts
+interface Titled {
+  title: string
+}
+
+const lesson = {
+  id: 'ts-02',
+  title: '对象类型与函数类型',
+  durationMinutes: 90
+}
+
+function printTitle(value: Titled): void {
+  console.log(value.title)
+}
+
+printTitle(lesson)
+```
+
+`lesson` 没有声明“实现 Titled”，但它至少拥有 `title: string`，所以可以传入。
+
+这叫结构化类型系统。它很适合 JavaScript 对象，因为已有对象不需要继承某个类或显式实现接口，就能满足一个较小契约。
+
+`Titled` 的含义更接近：
 
 ```text
-examples/typescript/object-and-function-types.ts
+我只要求调用时至少能安全读取 title: string
 ```
+
+而不是：
+
+```text
+对象只能拥有 title，不能有其他字段
+```
+
+### 新对象字面量会接受额外的拼写检查
+
+直接传对象字面量时会得到不同提示：
+
+```ts
+printTitle({
+  title: '对象类型',
+  durationMinutes: 90
+  // 错误：当前目标类型没有 durationMinutes。
+})
+```
+
+先保存到变量后，按照普通结构兼容规则检查：
+
+```ts
+const lesson = {
+  title: '对象类型',
+  durationMinutes: 90
+}
+
+printTitle(lesson)
+```
+
+这不是前后矛盾。TypeScript 会对新创建的对象字面量额外执行多余属性检查，用来发现拼错字段或传错配置。
+
+不要用中间变量或类型断言故意绕过提示。先问自己：
+
+- 目标类型是否漏写了合法字段？
+- 调用方是否传入了错误配置？
+- 这个函数是否应该接收一个更合适的命名类型？
+
+多余属性检查也不是运行时白名单。接口数据是否允许额外字段，仍由运行时解析器和协议决定。
+
+---
+
+## 用不同对象类型表达数据生命周期
+
+一个常见反模式是建立一个包含所有可选字段的万能类型：
+
+```ts
+interface LessonData {
+  id?: string
+  title?: string
+  summary?: string
+  durationMinutes?: number
+  displayLabel?: string
+}
+```
+
+它可以表示几乎任何对象，却不能保证任何业务阶段的数据完整。
+
+更清楚的做法是按生命周期拆分：
+
+```ts
+interface CreateLessonInput {
+  title: string
+  summary?: string
+  durationMinutes: number
+}
+
+interface Lesson {
+  readonly id: string
+  title: string
+  summary?: string
+  durationMinutes: number
+}
+
+interface LessonSummary {
+  readonly id: string
+  readonly label: string
+}
+```
+
+三种类型回答不同问题：
+
+| 类型 | 表达的阶段 | 关键特征 |
+| --- | --- | --- |
+| `CreateLessonInput` | 创建前的用户输入 | 没有服务端 ID |
+| `Lesson` | 已存在的课程实体 | ID 必填且只读 |
+| `LessonSummary` | 列表展示结果 | 只包含界面需要的数据 |
+
+以后学习工具类型时，会使用 `Pick`、`Omit`、`Partial` 等从已有类型生成变体。但在掌握这些工具前，先学会识别不同业务含义更重要。类型复用不能以模糊数据阶段为代价。
+
+## 完整示例：内存课程仓库
+
+这一课保留一个完整示例，因为对象契约和函数契约只有组合起来，才能清楚展示调用方、仓库和返回值之间的数据所有权。
+
+示例包含：
+
+- `Lesson`、`CreateLessonInput` 和 `LessonSummary` 三种数据阶段；
+- `LessonPredicate` 回调类型；
+- `LessonRepository` 行为契约；
+- 只读输入、对象复制和明确返回类型；
+- `exactOptionalPropertyTypes` 下正确处理可选简介。
 
 <<< ../../../examples/typescript/object-and-function-types.ts
 
-运行环境：
-
-```text
-Node.js >= 22
-TypeScript 7.0.2
-strict: true
-exactOptionalPropertyTypes: true
-noUncheckedIndexedAccess: true
-```
-
-运行命令：
+运行：
 
 ```bash
 npm run example:ts:object-functions
 ```
 
-示例定义了：
-
-- `Lesson`：课程实体对象。
-- `CreateLessonInput`：新建课程的输入对象。
-- `LessonPredicate`：课程筛选回调。
-- `LessonMapper`：课程映射回调。
-- `LessonRepository`：仓库行为契约。
-- `assertNever`：状态穷尽性检查。
-
-核心仓库类型：
-
-```ts
-interface LessonRepository {
-  getAll: () => readonly Lesson[]
-  findById: (id: string) => Lesson | undefined
-  save: (input: CreateLessonInput) => Lesson
-}
-```
-
-这里使用函数属性而不是方法语法，让 `strictFunctionTypes` 能更严格地检查函数参数。
-
-预期输出的主要内容：
+预期主要输出：
 
 ```text
 新建课程： TypeScript 对象类型与函数类型
-可学习课程数： 1
+长课程数量： 2
 课程摘要： [...]
 ```
 
-### 执行过程
+### 按数据流阅读示例
 
-1. `createLessonRepository` 接收只读课程数组，避免修改调用方数组。
-2. 仓库内部复制初始对象和标签数组，建立自己的可变状态。
-3. `save` 接收 `CreateLessonInput`，生成只读 id 和默认草稿状态。
-4. `summary` 不存在时不向结果对象写入该属性，以符合 `exactOptionalPropertyTypes`。
-5. `getAll` 和 `findById` 返回对象及标签数组的副本，避免调用方直接修改仓库内部状态。
-6. `selectLessons` 使用 `LessonPredicate` 约束回调参数。
-7. `mapLessons` 把课程实体转换成展示摘要。
-8. `getStatusLabel` 使用 `never` 保证所有状态都被处理。
-
-> [!WARNING]
-> 示例中的对象复制仍然是浅复制。真实项目如果包含深层可变对象，需要设计更清晰的不可变数据边界，而不是误以为展开运算符等于深拷贝。
-
-## 19. 常见错误
-
-### 19.1 使用 `Object`、`{}` 表示普通对象
-
-```ts
-function handle(value: Object) {}
-function handleOther(value: {}) {}
+```text
+CreateLessonInput
+        ↓ repository.save
+生成 id、整理字段
+        ↓
+仓库内部 Lesson
+        ↓ cloneLesson
+调用方得到 Lesson 副本
+        ↓ toSummary
+LessonSummary
 ```
 
-`Object`、`object` 和 `{}` 含义不同。通常应该描述具体业务结构；只想排除原始类型时才考虑小写 `object`。
+为什么要返回副本？因为 `readonly` 只是当前类型访问路径上的编译期约束。仓库若直接暴露内部对象，调用方仍可能通过其他可变类型或 JavaScript 代码修改它。
 
-### 19.2 把可选属性当成必定存在
+示例中的复制是浅复制，因此 `tags` 数组需要单独复制。若对象包含更深层结构，应重新设计所有权或使用专门的不可变策略，不能把对象展开误认为通用深拷贝。
 
-```ts
-interface Lesson {
-  summary?: string
-}
+## 常见问题：从错误信息回到契约
 
-function print(lesson: Lesson): void {
-  console.log(lesson.summary.toUpperCase())
-  // summary 可能是 undefined。
-}
+### “Property ... is missing”
+
+```text
+含义：目标类型要求一个必填字段，但当前对象没有提供
+检查：字段应当必填，还是业务上确实允许缺失？
+不要：为了消除错误，机械地给所有字段加 ?
 ```
 
-需要使用条件判断、可选链或空值合并：
+### “Object is possibly undefined”
 
-```ts
-console.log(lesson.summary?.toUpperCase() ?? '暂无简介')
+```text
+含义：正在读取可选属性或可能不存在的索引结果
+选择：先判断、提供默认值，或修改上游契约使它真正必填
 ```
 
-### 19.3 误以为 `readonly` 等于运行时冻结
+### “Cannot assign to ... because it is a read-only property”
 
-`readonly` 会被编译器检查，但不会自动调用 `Object.freeze`，也不会递归冻结嵌套对象。
-
-### 19.4 给回调参数错误地添加 `?`
-
-可选回调参数表示调用方可能收不到该参数，不是表示实现函数可以少写一个形参。
-
-### 19.5 使用 `Function` 或大量 `any`
-
-这会让函数边界失去主要价值。应描述真实参数与返回值，未知边界优先使用 `unknown`。
-
-### 19.6 依靠类型断言绕过对象错误
-
-```ts
-const lesson = apiData as Lesson
+```text
+检查：当前函数是不是数据所有者？
+如果需要更新：创建新对象，或把修改操作交给拥有者
+不要：立刻用类型断言移除 readonly
 ```
 
-断言不验证运行时数据。外部数据需要真正的运行时校验。
+### 对象明明字段更多，却不能直接传入
 
-### 19.7 把多余属性检查当成精确类型
+新对象字面量会执行多余属性检查。检查字段是否拼错、目标类型是否错误，或者先建立真正符合调用目的的对象。不要把“先存变量就能通过”当作修复方案。
 
-TypeScript 的对象类型通常描述“至少需要哪些属性”，不是运行时白名单。
+### 回调明明可以少写参数，为什么类型里不能写 `?`
 
-### 19.8 重载签名与实现签名不兼容
+实现函数可以忽略调用方传来的额外参数；类型里的可选参数却表示调用方可能不传。两者描述的是不同责任。
 
-实现必须能够处理所有重载输入，并返回所有重载允许的结果；实现签名本身不会自动成为对外可调用签名。
+### 为什么不能直接修改函数收到的数组
 
-## 20. 工程最佳实践
-
-- 为领域对象、接口请求和模块边界命名类型，局部一次性对象可以使用匿名类型。
-- 区分实体类型、创建输入、更新输入和展示输出，不要用一个超大接口覆盖所有场景。
-- id、创建时间等不应由调用方随意修改的字段使用 `readonly` 表达意图。
-- 对外部数据使用 `unknown` 加运行时校验，不要直接断言为业务类型。
-- 回调函数只把真正可能缺失的参数标记为可选。
-- 公共函数显式标注返回类型，避免实现细节意外扩大 API。
-- 能用联合参数清晰表达时，不使用重载。
-- 开启 `strict`；需要严格区分缺失属性和显式 `undefined` 时，再开启 `exactOptionalPropertyTypes`。
-- 对固定键集合使用字面量联合配合 `Record`，避免宽泛的字符串索引。
-- 让函数接收只读数组，除非它的职责就是修改传入数组。
-- 使用 `never` 为状态机和可辨识联合类型建立穷尽性检查。
-
-## 21. 与 Java、Vue 的联系
-
-### 与 Java 接口对比
-
-Java 接口通常依赖显式实现关系，TypeScript 接口主要依赖结构兼容。一个对象不需要写 `implements Lesson`，只要结构满足 `Lesson` 就可以使用。
-
-### 与 Vue 组件 Props 对比
-
-Vue 3 中的组件 Props 本质上也是对象契约：
+如果参数类型是 `readonly Lesson[]`，函数已经承诺只读取调用方数据。需要排序或添加时创建新数组：
 
 ```ts
-interface Props {
-  lesson: Lesson
-  selected?: boolean
-  onOpen: (id: string) => void
-}
+const sorted = [...lessons].sort(compareLessons)
 ```
 
-这里同时包含对象类型和函数类型。本节是后续学习 Vue 3 TypeScript 组件设计的直接基础。
+### 类型正确，为什么负数时长仍能保存
 
-### 与后端 DTO 对比
+`number` 只描述 JavaScript 数字类型，不表达“有限正整数”。业务范围仍需运行时校验。类型系统和业务校验解决不同层次的问题。
 
-`CreateLessonInput` 类似 Java 后端中的创建请求 DTO；`Lesson` 类似领域实体或响应模型。前后端都应该区分不同数据生命周期，而不是让一个模型承担所有职责。
+## 本课应形成的设计习惯
 
-## 22. 概念辨析与因果回顾
+- 对象类型表达业务阶段，不只是字段集合；
+- 创建输入、持久化实体和展示结果不必共用一个万能类型；
+- 真正可能缺失的字段才使用 `?`；
+- `readonly` 用来表达读取边界和所有权，不冒充运行时冻结；
+- 参数较多时使用命名对象，避免难以阅读的位置参数；
+- 公共函数明确输入输出，局部实现充分使用推断；
+- 回调参数由真正调用回调的一方定义；
+- 接收数组但不修改时使用只读数组；
+- 遇到多余属性提示先检查契约，不用断言压掉；
+- 外部 JSON 仍从 `unknown` 开始验证，接口声明不会自动校验数据。
 
-### `type` 和 `interface` 有什么区别？
+## 下一课
 
-两者都能描述对象结构。`interface` 支持声明合并并自然地表达可扩展对象契约；`type` 能表示联合、交叉、元组、函数以及类型运算。普通对象场景中两者高度重叠，应结合团队规范和表达目的选择。
+下一节是[联合类型、交叉类型与类型收窄](/frontend/typescript/unions-intersections-and-narrowing)。它会处理本课暂时没有展开的问题：
 
-### TypeScript 为什么允许属性更多的对象赋给属性较少的类型？
+- 一个值可能是多种类型时怎样安全使用；
+- `null`、成功、失败和加载状态怎样形成合法状态模型；
+- TypeScript 怎样沿 `typeof`、属性判断和分支收窄类型；
+- 交叉类型怎样组合契约，以及冲突属性为什么可能得到 `never`；
+- 如何使用穷尽性检查发现遗漏状态。
 
-因为 TypeScript 使用结构化类型系统。目标类型要求的成员只要存在且类型兼容，额外成员通常不影响兼容性；但新鲜对象字面量会额外执行多余属性检查，以帮助发现拼写错误。
+函数重载也会在理解联合类型与收窄后更容易判断：如果多个输入采用同一种处理并返回同一类型，通常使用联合参数；只有调用形式和返回对应关系确实不同，才考虑重载。
 
-### `readonly` 能否保证对象运行时不可变？
+## 参考资料
 
-不能。它主要是编译阶段、当前访问路径上的浅层约束。运行时冻结需要 `Object.freeze` 等机制，深层不可变还需要递归类型和相应运行时策略。
-
-### `void` 与 `undefined` 有什么区别？
-
-`undefined` 是一个实际值和类型；函数类型中的 `void` 主要表示调用者不使用返回结果。一个实际返回值的函数可以在某些情况下赋给返回 `void` 的回调类型，其返回值会被忽略。
-
-### 什么时候使用函数重载？
-
-当不同参数组合具有明确、不同的调用方式，尤其输入类型与返回类型存在对应关系时可以使用重载。如果只是接受几个类型并返回同一种类型，通常优先使用联合参数。
-
-### `strictFunctionTypes` 解决什么问题？
-
-它阻止把只能处理更窄输入的函数赋给可能接收更宽输入的函数位置，避免调用时传入实现无法处理的值。由于历史兼容，它对函数属性语法的检查比方法语法更严格。
-
-### 为什么外部 JSON 不能直接断言为接口类型？
-
-接口和类型别名在运行时通常不存在，断言也不会验证数据。外部 JSON 可能缺字段、类型错误或包含恶意内容，需要运行时校验后才能进入可信业务区域。
-
-## 23. 本节总结
-
-- 对象类型描述数据结构，函数类型描述行为契约。
-- `interface` 和 `type` 在对象场景中大量重叠，但扩展能力和表达范围不同。
-- 可选属性表示属性可能不存在；`exactOptionalPropertyTypes` 会严格区分缺失与显式 `undefined`。
-- `readonly` 是浅层的编译时约束，不等于运行时冻结。
-- TypeScript 使用结构化类型系统，兼容性主要取决于成员形状。
-- 对象字面量会执行额外的多余属性检查，但这不是精确对象类型。
-- 函数类型应该准确描述调用方会收到的参数和可使用的返回值。
-- 回调参数只有在调用者真的可能不传时才标记为可选。
-- `void`、`undefined`、`never` 和 `unknown` 各自表达不同语义。
-- 联合类型能清晰解决问题时优先于重载。
-- `strictFunctionTypes` 能阻止一部分不安全的函数赋值。
-
-## 24. 下一步学习
-
-下一节建议学习：**TypeScript 联合类型、交叉类型与类型收窄进阶**。
-
-学完后，你将能够：
-
-- 用可辨识联合类型表达完整业务状态。
-- 使用 `in`、`typeof`、`instanceof` 和类型谓词收窄类型。
-- 使用 `never` 检查状态处理是否完整。
-- 为 Vue 组件异步状态和后端接口结果建立安全模型。
-
-## 25. 参考资料
-
+- [TypeScript Handbook：Everyday Types](https://www.typescriptlang.org/docs/handbook/2/everyday-types.html)
 - [TypeScript Handbook：Object Types](https://www.typescriptlang.org/docs/handbook/2/objects.html)
 - [TypeScript Handbook：More on Functions](https://www.typescriptlang.org/docs/handbook/2/functions.html)
-- [TypeScript Handbook：Type Compatibility](https://www.typescriptlang.org/docs/handbook/type-compatibility.html)
-- [TSConfig：strictFunctionTypes](https://www.typescriptlang.org/tsconfig/strictFunctionTypes.html)
 - [TSConfig：exactOptionalPropertyTypes](https://www.typescriptlang.org/tsconfig/exactOptionalPropertyTypes.html)
 - [TSConfig：noUncheckedIndexedAccess](https://www.typescriptlang.org/tsconfig/noUncheckedIndexedAccess.html)
+- [TSConfig：strictFunctionTypes](https://www.typescriptlang.org/tsconfig/strictFunctionTypes.html)
