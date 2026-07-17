@@ -1,359 +1,560 @@
 ---
 title: Vue 3 Composition API 与组件类型设计
-description: 从 Vue 2 Options API 迁移到 script setup、响应式组合与类型安全组件契约
+description: 从 Vue 2 的课程编辑器出发，循序渐进理解 script setup、ref、reactive、computed、Props、Emits 和组合式逻辑
+outline: deep
 ---
 
 # Vue 3 Composition API 与组件类型设计
 
-> 适用环境：Vue 3.5+、TypeScript 7.x、Vite、`@vue/language-tools` 2.1+。你已经有 Vue 2 经验，因此本节不重复模板与指令基础，而是集中讲迁移思维、类型边界和工程实践。
+你已经写过几年 Vue 2，`data`、`computed`、`methods` 和 `watch` 应该都不陌生。学习 Vue 3 时，最容易走进的误区是把 Composition API 当成一张 API 替换表：
 
-## 1. 学习目标
+```text
+data      → ref / reactive
+computed  → computed()
+methods   → 普通函数
+mounted   → onMounted()
+```
 
-完成本节后，你应该能够：
+这些对应关系没有错，却没有解释 Composition API 为什么存在。
 
-- 理解 Composition API 解决的是逻辑组织与复用问题，不只是新语法。
-- 理解 `<script setup>` 的编译模型和顶层绑定暴露规则。
-- 正确选择 `ref()`、`reactive()` 和 `computed()`。
-- 避免响应式对象解构、替换和类型声明中的常见错误。
-- 使用类型式 `defineProps()` 与默认值设计 Props。
-- 使用 `defineEmits()` 建立事件名与载荷契约。
-- 使用 `defineModel()` 描述组件 `v-model`。
-- 使用 `defineSlots()`、`useTemplateRef()` 与 `defineExpose()`。
-- 区分 `watch()`、`watchEffect()` 和计算属性。
-- 把副作用清理放进正确的组件生命周期。
-- 设计职责清晰、可复用、可测试的组合式函数。
+这节课会一直围绕“课程编辑器”展开。我们先看 Vue 2 组件为什么会越来越难维护，再用 Vue 3 重新组织同一份业务逻辑。重点不是背新函数，而是建立一条连贯主线：
 
-## 2. 前置知识
+```text
+业务状态 → 派生状态 → 用户操作 → 组件边界 → 可复用逻辑
+```
 
-建议先掌握：
+> 第一次阅读先完成基础部分和完整示例。进阶部分用于处理真实项目中的边界，原理部分用于解释这些 API 为什么这样工作。
 
-- Vue 2 Options API、Props、事件、`v-model` 与生命周期。
-- TypeScript 对象、联合、泛型和模块边界。
-- JavaScript 闭包、异步函数与事件循环基础。
+## 本课在学习路线中的位置
 
-上一节：[TypeScript 工程配置与模块边界](/frontend/typescript/project-configuration-and-module-boundaries)
+```text
+Vue 2 Options API 经验
+          ↓
+本课：用 Composition API 组织一个完整组件
+          ↓
+下一课：深入响应式追踪与副作用管理
+          ↓
+后续：组件通信、Pinia、路由、表单与测试
+```
 
-## 3. 从 Options API 到 Composition API
+学完本课，你应该能够：
 
-Vue 2 常按选项类别组织代码：
+- 解释 Composition API 改变的是逻辑组织方式，而不只是语法；
+- 使用 `<script setup>` 编写 TypeScript 单文件组件；
+- 根据状态的使用方式选择 `ref`、`reactive` 和 `computed`；
+- 使用类型式 Props 和 Emits 建立清楚的父子组件契约；
+- 把 Props 复制为本地草稿，而不是直接修改父组件数据；
+- 判断一段逻辑应该留在组件中，还是提取成组合式函数；
+- 初步解释 `ref`、Proxy 和依赖追踪之间的关系。
+
+## 从一个 Vue 2 组件开始
+
+假设课程编辑器包含三个功能：
+
+1. 编辑标题和时长；
+2. 根据表单内容计算校验错误；
+3. 保存时把草稿交给父组件。
+
+在 Options API 中，逻辑通常按 API 类型分开放置：
 
 ```js
 export default {
-  data() {},
-  computed: {},
-  watch: {},
-  methods: {},
-  mounted() {}
-}
-```
+  props: {
+    lesson: Object
+  },
 
-一个业务功能可能散落在五个选项中。Composition API 允许按业务能力组织：
+  data() {
+    return {
+      draft: {
+        title: this.lesson.title,
+        durationMinutes: this.lesson.durationMinutes
+      },
+      saving: false
+    }
+  },
 
-```ts
-const lessonDraft = useLessonDraft()
-const autosave = useAutosave(lessonDraft)
-const permissions = useLessonPermissions()
-```
+  computed: {
+    errors() {
+      // 表单校验逻辑
+    }
+  },
 
-核心变化不是“把 `data` 改成 `ref`”，而是把状态、派生值、副作用和操作聚合在同一个逻辑单元中。
-
-## 4. Composition API 不会淘汰 Options API
-
-Vue 3 同时支持两种 API。Options API 仍适合：
-
-- 逻辑简单的组件。
-- 维护稳定的 Vue 2 风格团队代码。
-- 不需要复杂逻辑复用的页面。
-
-Composition API 更适合：
-
-- 同一业务能力涉及多个状态与生命周期。
-- 逻辑需要跨组件复用。
-- TypeScript 推断和模块组织要求较高。
-- 大型组件需要按功能拆分，而不是按选项拆分。
-
-迁移不必一次性重写全部组件，但同一组件内应保持可理解的组织方式。
-
-## 5. `setup()` 的执行时机
-
-组件每创建一个实例，`setup()` 逻辑会执行一次。闭包中的局部状态属于当前组件实例：
-
-```ts
-export default {
-  setup() {
-    const count = ref(0)
-    return { count }
+  methods: {
+    async save() {
+      // 保存逻辑
+    }
   }
 }
 ```
 
-模块顶层状态则会被所有组件实例共享：
+小组件没有明显问题。可是加入自动保存、权限、键盘快捷键和离开页面确认后，同一个功能会散落在 `data`、`computed`、`watch`、`methods` 和生命周期中。
+
+Composition API 允许我们按“业务能力”把相关代码放在一起：
 
 ```ts
-const sharedCount = ref(0)
+const draft = reactive(/* 表单状态 */)
+const errors = computed(/* 表单校验 */)
 
-export function useSharedCount() {
-  return { sharedCount }
+function save() {
+  // 保存操作
 }
 ```
 
-将状态移到模块顶层前，必须明确它是否应成为单例；SSR 中还需避免跨请求共享用户数据。
+以后还可以继续提取：
 
-## 6. 什么是 `<script setup>`
+```ts
+const { draft, errors, save } = useLessonDraft(lesson)
+```
+
+这才是核心变化：从“代码属于哪一种 Vue 选项”，转向“代码共同完成哪一种业务能力”。
+
+---
+
+## 第一部分：基础——完成一个可工作的组件
+
+### `<script setup>` 是更简洁的 `setup`
+
+最小的 Vue 3 单文件组件可以这样写：
 
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue'
 
 const count = ref(0)
+
+function increment(): void {
+  count.value++
+}
 </script>
 
 <template>
-  <button @click="count++">{{ count }}</button>
+  <button @click="increment">
+    点击次数：{{ count }}
+  </button>
 </template>
 ```
 
-`<script setup>` 是单文件组件的编译期语法糖。顶层变量、函数和导入可以直接在模板中使用，不需要手写 `return`。
+这里先注意三个事实：
 
-它的内容仍会进入组件的 `setup()` 作用域，而不是只执行一次的普通模块初始化代码。
+- `lang="ts"` 让脚本区域使用 TypeScript；
+- 脚本顶层声明的变量和函数可以直接在模板中使用；
+- 不需要再写 `components`、`methods`，也不需要手动 `return`。
 
-## 7. 编译宏不是普通导入
+`<script setup>` 不是浏览器原生语法。Vue 的单文件组件编译器会把它转换成组件的 `setup()` 逻辑。
 
-以下 API 是编译宏：
+可以先把它理解为：
 
-- `defineProps()`
-- `defineEmits()`
-- `defineModel()`
-- `defineSlots()`
-- `defineExpose()`
-- `withDefaults()`
+```text
+<script setup> 顶层代码
+            ↓ Vue 编译器转换
+组件每次创建实例时执行的 setup 逻辑
+```
 
-在 `<script setup>` 中通常不需要从 `vue` 导入。编译器会识别并转换它们。
+### 用 `ref` 保存一个值
 
-宏参数会被提升到模块作用域，因此不能随意引用仅在 `setup` 局部创建的变量。把宏当普通运行时函数理解，会造成错误的执行时机假设。
+Vue 必须知道状态何时变化，才能更新依赖它的模板。普通变量做不到这一点：
 
-## 8. `ref()`：单值与可替换值
+```ts
+let count = 0
+
+function increment() {
+  count++
+  // JavaScript 值变了，但 Vue 没有收到响应式通知。
+}
+```
+
+使用 `ref` 后，Vue 会得到一个可以追踪的容器：
 
 ```ts
 const count = ref(0)
-// Ref<number>
-
-const selectedId = ref<string | null>(null)
 ```
 
-在脚本中通过 `.value` 读写：
+TypeScript 会根据初始值推断它是 `Ref<number>`。在脚本中通过 `.value` 访问：
 
 ```ts
 count.value++
-selectedId.value = 'lesson-1'
 ```
 
-在模板中，顶层 ref 会自动解包：
+在模板中，顶层 ref 会自动解包，因此写 `count`，不是 `count.value`：
 
 ```vue
 <p>{{ count }}</p>
 ```
 
-`ref` 适合原始值、需要整体替换的对象、异步结果和可空引用。
+为什么脚本和模板写法不同？脚本是普通 JavaScript，需要明确访问容器里的值；模板由 Vue 编译，可以替我们完成常见的解包。
 
-## 9. 不要忘记 `ref` 的可空状态
+`ref` 很适合独立状态：
 
 ```ts
-const lesson = ref<Lesson | null>(null)
+const saving = ref(false)
+const selectedId = ref<string | null>(null)
+const message = ref('')
 ```
 
-加载完成前它确实可能为空。不要通过不真实的断言消除：
+### 用 `reactive` 组织一组相关字段
+
+表单中的标题、时长和发布状态经常一起操作，可以放在一个响应式对象中：
 
 ```ts
-// 不推荐
-const lesson = ref<Lesson>({} as Lesson)
-```
-
-更可靠的方式是保留 `null`，在模板使用条件渲染，在脚本使用守卫或可选链。
-
-如果泛型没有初始值：
-
-```ts
-const page = ref<number>()
-// Ref<number | undefined>
-```
-
-## 10. `reactive()`：对象状态
-
-```ts
-const form = reactive({
+const draft = reactive({
   title: '',
   durationMinutes: 60,
   published: false
 })
 ```
 
-读取和修改属性不需要 `.value`：
+读写属性时不需要 `.value`：
 
 ```ts
-form.title = 'Vue 3 Composition API'
+draft.title = 'Vue 3 Composition API'
+draft.durationMinutes = 120
 ```
 
-`reactive()` 返回 Proxy，并对嵌套对象进行深层响应式转换。它适合多个字段经常一起操作、对象身份保持稳定的状态。
+`reactive()` 返回一个 Proxy。对属性的读取和修改会经过这个 Proxy，Vue 因而能够追踪哪些代码读取了哪些属性，以及属性何时变化。
 
-## 11. 优先让 `reactive()` 推断
+第一次学习可以使用这条简单规则：
+
+```text
+独立的单个值                  → ref
+会作为一个整体替换的对象        → ref
+按属性修改的一组稳定对象字段     → reactive
+```
+
+这不是绝对语法规则，而是帮助代码表达状态使用方式。
+
+### 用 `computed` 表达派生状态
+
+表单是否有效，可以由表单字段计算出来：
 
 ```ts
-interface LessonForm {
+const valid = computed(() =>
+  draft.title.trim().length > 0
+  && draft.durationMinutes > 0
+)
+```
+
+`valid` 不应该再用一个 `ref(false)` 单独维护。否则修改表单后还必须记得同步它，应用里就出现了两份事实来源。
+
+可以这样区分：
+
+```text
+用户或程序直接修改的事实      → ref / reactive
+能从已有事实计算出来的结果     → computed
+```
+
+计算属性的 getter 应尽量保持纯粹：读取状态并返回结果，不在里面发送请求、修改其他状态或操作 DOM。
+
+在脚本中读取计算结果仍需 `.value`：
+
+```ts
+if (valid.value) {
+  console.log('可以保存')
+}
+```
+
+模板中同样会自动解包：
+
+```vue
+<button :disabled="!valid">保存</button>
+```
+
+### `methods` 变成普通函数
+
+Composition API 不需要专门的 `methods` 选项：
+
+```ts
+function resetDraft(): void {
+  draft.title = ''
+  draft.durationMinutes = 60
+  draft.published = false
+}
+```
+
+普通函数可以直接读取同一 `setup` 作用域中的状态。这依靠的是 JavaScript 闭包，不再依赖组件实例上的 `this`。
+
+这带来两个直接变化：
+
+- 不需要担心 `this` 指向；
+- 函数依赖哪些状态，可以从词法作用域中看出来。
+
+### Props 是父组件给出的输入
+
+课程编辑器需要父组件传入课程：
+
+```ts
+interface Lesson {
+  readonly id: string
+  readonly title: string
+  readonly durationMinutes: number
+  readonly published: boolean
+}
+
+const props = defineProps<{
+  lesson: Lesson
+}>()
+```
+
+`defineProps` 建立组件的输入契约。父组件漏传 `lesson`，或者字段类型不匹配，模板类型工具就能够发现问题。
+
+Props 的数据所有权属于父组件。不要这样修改：
+
+```ts
+// 不应该：子组件绕过父组件直接修改它拥有的数据。
+props.lesson.title = '新标题'
+```
+
+即使嵌套对象在 JavaScript 运行时可能允许修改，这种做法仍会让数据来源难以追踪。
+
+编辑器通常创建本地草稿：
+
+```ts
+const draft = reactive({
+  title: props.lesson.title,
+  durationMinutes: props.lesson.durationMinutes,
+  published: props.lesson.published
+})
+```
+
+现在用户编辑的是子组件拥有的草稿，不是父组件的原对象。
+
+### Emits 把用户意图交回父组件
+
+保存时，子组件通过事件提交草稿：
+
+```ts
+interface LessonDraft {
   title: string
   durationMinutes: number
   published: boolean
 }
 
-const form: LessonForm = reactive({
-  title: '',
-  durationMinutes: 60,
-  published: false
-})
+const emit = defineEmits<{
+  save: [draft: LessonDraft]
+}>()
+
+function submit(): void {
+  emit('save', {
+    title: draft.title.trim(),
+    durationMinutes: draft.durationMinutes,
+    published: draft.published
+  })
+}
 ```
 
-通常直接从初始对象推断即可。Vue 官方不建议给 `reactive<SomeType>()` 直接传泛型，因为返回类型还包含嵌套 ref 解包规则，与泛型输入不完全相同。
+这里的类型声明同时约束：
 
-需要约束形状时，可以给变量标注接口或让初始化表达式使用 `satisfies`。
+- 事件名必须是 `save`；
+- 事件必须带一个参数；
+- 参数必须满足 `LessonDraft`。
 
-## 12. 不要整体替换 `reactive` 对象
+父组件接收事件，再决定如何更新自己的数据：
+
+```vue
+<LessonEditor :lesson="lesson" @save="handleSave" />
+```
+
+形成了一条清楚的数据流：
+
+```text
+父组件拥有 lesson
+      ↓ Props
+子组件创建并编辑 draft
+      ↓ save 事件
+父组件决定怎样更新 lesson
+```
+
+这就是常说的“Props 向下，事件向上”。它的价值不是口号，而是让状态所有权和修改入口容易定位。
+
+---
+
+## 第二部分：进阶——处理真实项目中的边界
+
+### `ref` 和 `reactive` 不是按数据类型二选一
+
+常见说法是“基本类型用 `ref`，对象用 `reactive`”。它适合作为入门提示，但并不完整，因为对象也可以放进 ref：
 
 ```ts
-let form = reactive({ title: '' })
+const lesson = ref<Lesson | null>(null)
 
-// 不推荐：旧 Proxy 的订阅关系被丢弃
-form = reactive({ title: '新标题' })
+// 请求完成后整体替换。
+lesson.value = loadedLesson
 ```
 
-更可靠的选择：
+更可靠的问题是：这个状态怎样变化？
 
-- 使用 `Object.assign(form, next)` 更新同一 Proxy。
-- 如果业务经常整体替换对象，使用 `ref<Form>(initial)`。
+| 状态使用方式 | 更自然的选择 |
+| --- | --- |
+| 独立的字符串、数字、布尔值 | `ref` |
+| 加载前为空、加载后整体替换 | `ref<T \| null>` |
+| 保存后用新对象替换旧对象 | `ref<T>` |
+| 表单字段长期按属性修改 | `reactive` |
+| 需要作为组合式函数返回值安全解构 | 通常返回多个 ref |
 
-选择依据是状态身份，而不是对象有几个字段。
+团队一致性也很重要。不要仅为了证明某种 API 更高级而混用。
 
-## 13. 解构会丢失响应式连接
+### 不要用空断言伪造“已经加载”
+
+接口请求完成前，课程确实不存在：
+
+```ts
+const lesson = ref<Lesson | null>(null)
+```
+
+不要伪造一个类型正确但业务无效的对象：
+
+```ts
+// 不推荐：运行时仍是一个缺少字段的空对象。
+const lesson = ref<Lesson>({} as Lesson)
+```
+
+保留 `null` 后，模板使用条件渲染：
+
+```vue
+<LessonEditor v-if="lesson" :lesson="lesson" />
+<p v-else>正在加载课程…</p>
+```
+
+类型在这里迫使界面正视真实的加载状态。
+
+### 不要整体替换 `reactive` 变量
+
+下面的写法会让变量指向一个新的 Proxy：
+
+```ts
+let draft = reactive({ title: '' })
+
+// 不推荐：依赖旧 Proxy 的代码不会自动改为追踪新对象。
+draft = reactive({ title: '新标题' })
+```
+
+如果对象身份应该稳定，可以保留 Proxy，只更新属性：
+
+```ts
+Object.assign(draft, nextDraft)
+```
+
+如果业务天然需要整体替换，开始时就用 ref：
+
+```ts
+const draft = ref<LessonDraft>(initialDraft)
+draft.value = nextDraft
+```
+
+选择 API 的依据仍然是状态变化方式。
+
+### 普通解构可能切断 `reactive` 属性连接
 
 ```ts
 const state = reactive({ count: 0 })
 const { count } = state
 ```
 
-此处 `count` 是普通数字，不会随 `state.count` 更新。需要将属性转为 ref 时：
+此时 `count` 只是解构那一刻得到的普通数字。以后修改 `state.count`，这个局部常量不会改变。
+
+原因不是“解构语法不支持 Vue”，而是响应式追踪发生在 Proxy 的属性访问上。解构完成后，后续代码不再访问 `state.count`。
+
+优先保留来源：
+
+```ts
+const doubled = computed(() => state.count * 2)
+```
+
+确实需要把属性变成独立 ref 时，可以使用 `toRef` 或 `toRefs`：
 
 ```ts
 const { count } = toRefs(state)
+count.value++
 ```
 
-或直接在计算和模板中使用 `state.count`。不要为了少写前缀破坏响应式来源的可读性。
+### Props 草稿还需要考虑重新同步
 
-## 14. Props 解构是一个特殊情况
-
-Vue 3.5 中，`<script setup>` 对 `defineProps()` 的响应式解构提供编译支持：
-
-```ts
-interface Props {
-  title: string
-  pageSize?: number
-}
-
-const {
-  title,
-  pageSize = 20
-} = defineProps<Props>()
-```
-
-这里的 `title` 由编译器保持响应式。它不是说所有 `reactive()` 对象都能安全普通解构，也不是旧版本 Vue 的通用行为。
-
-团队需要明确最低 Vue 与语言工具版本，避免不同开发环境产生不同理解。
-
-## 15. `computed()`：声明派生状态
-
-```ts
-const isValid = computed(() =>
-  form.title.trim().length > 0 &&
-  form.durationMinutes > 0
-)
-```
-
-计算属性会追踪 getter 读取的响应式依赖，并缓存结果。它应尽量保持纯粹：
-
-- 不发送请求。
-- 不修改其他状态。
-- 不操作 DOM。
-- 不依赖不可预测的外部可变值。
-
-类型通常可从返回值推断；复杂公共 API 可以显式写 `computed<boolean>()`。
-
-## 16. 可写计算属性
-
-```ts
-const fullName = computed({
-  get: () => `${firstName.value} ${lastName.value}`,
-  set: value => {
-    const [first = '', last = ''] = value.split(' ')
-    firstName.value = first
-    lastName.value = last
-  }
-})
-```
-
-可写计算适合双向适配已有状态，不应成为隐藏复杂写操作的通道。涉及校验、异步保存或多个领域动作时，显式方法更清晰。
-
-## 17. `watch()`：明确来源与前后值
+本课示例只编辑一门固定课程，因此初始化时复制一次 Props 就足够。如果父组件可能在同一个编辑器实例中切换课程，本地草稿还要跟随新的 Props 重置。
 
 ```ts
 watch(
-  () => form.title,
-  (title, previousTitle) => {
-    console.log(previousTitle, '->', title)
+  () => props.lesson,
+  (lesson) => {
+    Object.assign(draft, {
+      title: lesson.title,
+      durationMinutes: lesson.durationMinutes,
+      published: lesson.published
+    })
   }
 )
 ```
 
-监听 `reactive` 属性时要传 getter，不能直接传当下的普通值：
+但这会引出新的产品问题：切换课程时，如果当前草稿尚未保存怎么办？直接覆盖可能丢失用户输入。
 
-```ts
-// 错误思路：form.title 在调用时只是 string
-// watch(form.title, callback)
+因此监听只是技术机制，真正要先确定的是业务规则：
+
+```text
+没有未保存修改 → 可以重置草稿
+存在未保存修改 → 确认、阻止切换或暂存草稿
 ```
 
-`watch` 适合来源明确、需要新旧值、需要控制首次执行或深度的副作用。
+`watch`、清理时机和异步竞态会在下一课系统展开。
 
-## 18. `watchEffect()`：自动收集依赖
+### 什么时候提取组合式函数
 
-```ts
-watchEffect(() => {
-  document.title = `${form.title} - 编辑课程`
-})
-```
+不要看到三行 Composition API 就立即抽取 `useSomething`。先判断这些代码是否形成一个独立能力：
 
-同步执行期间读取的响应式值会成为依赖。它适合依赖关系与副作用代码紧密、无需旧值的场景。
+- 状态、派生状态和操作是否共同解决一个问题？
+- 是否会在多个组件复用？
+- 提取后输入和输出是否更清楚？
+- 是否可以不依赖组件模板单独测试？
 
-如果副作用读取很多状态或执行异步逻辑，自动依赖可能变得难以审查，此时 `watch` 更明确。
-
-## 19. 异步监听必须处理过期结果
-
-用户快速切换课程时，旧请求可能晚于新请求返回。监听清理函数可以取消或忽略过期任务：
+例如，课程草稿逻辑可以逐步形成：
 
 ```ts
-watch(selectedId, async (id, _oldId, onCleanup) => {
-  if (!id) return
-
-  const controller = new AbortController()
-  onCleanup(() => controller.abort())
-
-  await fetch(`/api/lessons/${id}`, {
-    signal: controller.signal
+export function useLessonDraft(source: Lesson) {
+  const draft = reactive({
+    title: source.title,
+    durationMinutes: source.durationMinutes,
+    published: source.published
   })
-})
+
+  const errors = computed(() => validateLessonDraft(draft))
+
+  function createSnapshot(): LessonDraft {
+    return {
+      title: draft.title.trim(),
+      durationMinutes: draft.durationMinutes,
+      published: draft.published
+    }
+  }
+
+  return { draft, errors, createSnapshot }
+}
 ```
 
-仅依靠“最后一次赋值”可能造成竞态条件。类型正确不能代替并发控制。
+组合式函数与 Mixins 的关键差别是显式性：
 
-## 20. 生命周期钩子
+```text
+Mixins：状态从组件选项合并进来，来源和命名冲突可能不明显
+组合式函数：依赖通过参数进入，能力通过返回值离开
+```
+
+提取边界应是 `useLessonDraft`、`useAutosave` 这样的业务能力，而不是 `useComputedLogic`、`useMountedLogic` 这样的 API 分类。
+
+### 副作用必须有生命周期
+
+派生状态只计算结果，副作用会改变组件之外的世界，例如：
+
+- 修改 `document.title`；
+- 注册窗口事件；
+- 启动定时器；
+- 请求接口；
+- 订阅 WebSocket。
+
+注册外部资源后通常要清理：
 
 ```ts
+import { onBeforeUnmount, onMounted } from 'vue'
+
+function handleOnline(): void {
+  console.log('网络已恢复')
+}
+
 onMounted(() => {
   window.addEventListener('online', handleOnline)
 })
@@ -363,432 +564,257 @@ onBeforeUnmount(() => {
 })
 ```
 
-生命周期注册应在 `setup` 的同步阶段完成，让 Vue 能把钩子关联到当前组件实例。
+组件卸载会停止 Vue 自己关联的响应式监听，但 Vue 无法猜出所有第三方资源应该怎样释放。清理是创建副作用时就要一起设计的责任。
 
-定时器、事件监听、观察器和外部订阅必须清理。组件卸载并不会自动了解所有第三方副作用。
+---
 
-## 21. 类型式 Props
+## 第三部分：原理——Composition API 为什么这样工作
+
+### `setup` 逻辑属于组件实例
+
+`<script setup>` 中的代码会被编译进组件的 `setup()`。每创建一个组件实例，相关逻辑就执行一次：
+
+```vue
+<Counter />
+<Counter />
+```
+
+两个 `Counter` 各自得到自己的 `count`，因为两个组件实例分别执行了 `ref(0)`。
+
+而模块顶层导出的状态是另一回事：
 
 ```ts
-interface Props {
-  lesson: Lesson
-  readonly?: boolean
-  autosaveDelay?: number
-}
+// shared-counter.ts
+const count = ref(0)
 
+export function useSharedCounter() {
+  return { count }
+}
+```
+
+这里的 `count` 在模块加载时创建，所有调用方共享同一个 ref。它可能正是全局状态的需要，也可能是意外的数据泄漏。SSR 中还要特别避免跨请求共享用户数据。
+
+判断状态放在哪里，本质是在决定它的生命周期和所有者。
+
+### 响应式系统建立“读取者与状态”的联系
+
+可以先用一个简化模型理解：
+
+```text
+computed / 组件渲染开始执行
+              ↓
+读取 ref.value 或 reactive 属性
+              ↓
+Vue 记录“谁读取了谁”
+              ↓
+相应值以后发生变化
+              ↓
+Vue 通知相关计算或组件重新执行
+```
+
+真实实现会处理调度、批处理、嵌套 effect 和清理等更多细节，但主线就是“读取时收集依赖，写入时触发依赖”。
+
+这解释了几个常见现象：
+
+- 普通变量变化不会更新模板，因为它没有进入响应式追踪；
+- `computed` 只会依赖 getter 实际读取到的响应式值；
+- 解构 `reactive` 属性后，后续读取不再经过 Proxy；
+- 没有在当前执行路径读取的状态，不会凭空成为依赖。
+
+下一课会深入 Proxy、effect、调度时机和监听清理。
+
+### `ref` 用容器追踪值，`reactive` 用 Proxy 追踪属性
+
+原始值本身不能被 Proxy 拦截。Vue 用带有 `.value` 的对象包装它：
+
+```text
+ref(0)
+  ↓
+{ value: 0 }  ← 概念模型，不是完整内部实现
+```
+
+读取和设置 `.value` 时，Vue 可以进行依赖追踪和触发更新。
+
+对象则可以使用 Proxy 拦截属性访问：
+
+```text
+原始对象 ← reactive() → 响应式 Proxy
+                         ↑
+                  组件代码应操作它
+```
+
+所以 `reactive(raw) !== raw`。在需要依赖对象身份的 Map、Set 或第三方库边界中，要清楚自己保存的是原始对象还是 Proxy。
+
+### 编译宏不是普通运行时函数
+
+`defineProps` 和 `defineEmits` 在 `<script setup>` 中是编译宏：
+
+```ts
 const props = defineProps<Props>()
+const emit = defineEmits<Emits>()
 ```
 
-类型式声明简洁并有良好推断。编译器会尝试生成等价的运行时 Props 声明。
+通常不需要从 `vue` 导入它们。SFC 编译器会识别这些调用，并生成对应的组件选项和运行时代码。
 
-不能同时向同一个 `defineProps()` 传运行时对象和类型泛型。整个 Props 对象使用需要完整类型分析的复杂条件类型时，AST 转换仍有限制；单个属性类型可以更复杂。
-
-## 22. Props 是只读输入
-
-```ts
-// 不应修改父组件输入
-// props.lesson.title = '新标题'
-```
-
-顶层 Props 是只读的，但嵌套对象仍可能被 JavaScript 修改。子组件不应利用这一点改变父级所有权状态。
-
-编辑器组件通常：
-
-1. 从 Props 创建本地草稿。
-2. 用户修改草稿。
-3. 保存时通过事件提交新值。
-
-这比直接双向修改复杂对象更容易追踪。
-
-## 23. Props 默认值
-
-Vue 3.5 可使用响应式 Props 解构：
-
-```ts
-const {
-  readonly = false,
-  autosaveDelay = 800
-} = defineProps<Props>()
-```
-
-也可以使用：
-
-```ts
-const props = withDefaults(defineProps<Props>(), {
-  readonly: false,
-  autosaveDelay: 800
-})
-```
-
-旧式默认值中，可变数组和对象应使用工厂函数，避免组件实例共享同一引用。团队应统一项目版本下的推荐写法。
-
-## 24. 类型式 Emits
-
-推荐使用具名元组表达事件载荷：
-
-```ts
-const emit = defineEmits<{
-  save: [lesson: LessonDraft]
-  cancel: []
-  invalid: [errors: readonly string[]]
-}>()
-```
-
-```ts
-emit('save', draft)
-emit('cancel')
-```
-
-事件名、参数数量和类型都会检查。事件是组件公共 API，应使用业务语义，而不是把内部所有点击原样向上传播。
-
-## 25. 运行时 Emits 校验
-
-运行时声明可以提供校验函数：
-
-```ts
-const emit = defineEmits({
-  save: (lesson: LessonDraft) =>
-    lesson.title.trim().length > 0
-})
-```
-
-类型式声明主要提供编译期约束。来自表单、接口或外部 JavaScript 的值仍需运行时验证，不能把 TypeScript 类型当作输入校验器。
-
-## 26. `defineModel()` 与组件 `v-model`
-
-```ts
-const title = defineModel<string>('title', {
-  required: true
-})
-```
-
-它声明名为 `title` 的 model prop 与对应 `update:title` 事件。模板中可直接：
-
-```vue
-<input v-model="title" />
-```
-
-父组件使用：
-
-```vue
-<LessonEditor v-model:title="title" />
-```
-
-`defineModel()` 是 Vue 3.4+ 编译宏。它适合真正的双向组件值，不应把所有 Props 都改造成 model。
-
-## 27. Model 默认值的同步风险
-
-如果子组件 model 有默认值，而父组件传入的 ref 初始为 `undefined`，父子初值可能暂时不同步。公共组件应优先：
-
-- 明确 `required`。
-- 让父组件初始化值。
-- 或清晰记录默认值与同步行为。
-
-双向绑定减少模板样板，但没有消除状态所有权问题。
-
-## 28. 类型式 Slots
-
-```ts
-defineSlots<{
-  default(props: {
-    lesson: Lesson
-    dirty: boolean
-  }): unknown
-  actions(props: {
-    save(): void
-    saving: boolean
-  }): unknown
-}>()
-```
-
-Slots 是父组件提供的渲染函数。为 Slot Props 建立类型，可以让父组件模板获得正确提示。
-
-Slot 内容仍在父组件作用域求值；子组件只负责提供 slot props，不会获得父组件的局部变量。
-
-## 29. DOM 事件类型
-
-```ts
-function handleInput(event: Event) {
-  const input = event.currentTarget as HTMLInputElement
-  form.title = input.value
-}
-```
-
-`EventTarget` 本身没有 `value`。优先使用 `currentTarget` 表达监听器绑定元素，并在边界处做受控断言。
-
-模板中简单的 `v-model` 通常比手写输入事件更直接；复杂解析与校验才需要独立处理器。
-
-## 30. 模板引用
-
-Vue 3.5 与当前语言工具可推断静态模板引用，也可显式指定：
-
-```ts
-const titleInput = useTemplateRef<HTMLInputElement>('titleInput')
-
-onMounted(() => {
-  titleInput.value?.focus()
-})
-```
-
-模板：
-
-```vue
-<input ref="titleInput" />
-```
-
-挂载前或被 `v-if` 移除后，元素引用可能为 `null`，因此需要可选链或守卫。
-
-## 31. 组件引用与 `defineExpose()`
-
-`<script setup>` 组件默认是封闭的。只在确有命令式需求时暴露最小接口：
-
-```ts
-function focusTitle() {
-  titleInput.value?.focus()
-}
-
-defineExpose({ focusTitle })
-```
-
-父组件可通过组件模板引用调用该方法。不要暴露整个内部表单或大量方法，否则会破坏组件封装。
-
-## 32. 组合式函数的基本形态
-
-组合式函数通常以 `use` 开头，并在同步调用阶段注册响应式依赖和生命周期：
-
-```ts
-export function useOnlineStatus() {
-  const online = ref(navigator.onLine)
-
-  const update = () => {
-    online.value = navigator.onLine
-  }
-
-  onMounted(() => window.addEventListener('online', update))
-  onBeforeUnmount(() => window.removeEventListener('online', update))
-
-  return { online: readonly(online) }
-}
-```
-
-只读返回值能限制调用方绕过组合式函数提供的操作直接修改状态。
-
-## 33. 组合式函数输入
-
-如果输入可能是普通值、ref 或 getter，可以使用 Vue 提供的标准归一化工具，而不是自行发明联合处理：
-
-```ts
-function useLesson(id: MaybeRefOrGetter<string>) {
-  watchEffect(() => {
-    const currentId = toValue(id)
-    // 根据 currentId 加载
-  })
-}
-```
-
-公共组合式函数应明确：
-
-- 输入是否响应式。
-- 何时开始副作用。
-- 如何取消。
-- 返回状态是否允许外部修改。
-- 错误如何表达。
-
-## 34. 组合式函数返回 ref
-
-推荐返回包含多个 ref 的普通对象：
-
-```ts
-return {
-  data,
-  error,
-  loading,
-  reload
-}
-```
-
-调用方可以安全解构，ref 仍保持响应式：
-
-```ts
-const { data, loading } = useLesson(id)
-```
-
-如果直接返回 `reactive` 对象，普通解构会失去响应式连接。返回策略是 API 设计的一部分。
-
-## 35. 不要按生命周期机械拆组合式函数
-
-以下拆分缺少业务内聚：
+因此要区分两类 API：
 
 ```text
-useMountedLogic()
-useWatchLogic()
-useComputedLogic()
+ref、reactive、computed  → 从 vue 导入的运行时 API
+defineProps、defineEmits → 由 SFC 编译器识别的编译宏
 ```
 
-更好的边界是：
+类型式声明主要帮助编译器和开发工具建立契约。它不等于运行时验证：如果 Props 最终来自不可信接口，接口数据仍应在进入组件树之前解析和校验。
+
+### 单向数据流让修改路径可以追踪
+
+Props 只读不是为了增加样板代码，而是为了避免同一份状态被多个组件任意修改。
+
+如果父子组件都直接改同一个对象，看到标题变化时很难回答：
+
+- 是父组件请求完成后更新的？
+- 是编辑器输入修改的？
+- 是另一个兄弟组件修改的？
+- 是监听器自动同步的？
+
+使用 Props 和事件后，所有权更加明确：
 
 ```text
-useLessonDraft()
-useAutosave()
-useKeyboardShortcuts()
+状态保存在父组件
+    ↓ 提供当前值
+子组件展示并产生用户意图
+    ↓ 发送事件
+父组件处理意图并更新状态
 ```
 
-每个组合式函数内部可以包含自己的状态、计算、监听和清理。组织单位是能力，不是 API 类别。
+组件双向绑定 `v-model` 只是对 prop 与 `update:*` 事件的简写，没有消除状态所有权。它会在组件通信课程中详细学习。
 
-## 36. 完整示例：课程编辑器
+---
 
-页面直接导入完整 Vue 单文件组件源码。
+## 完整示例：课程编辑器
 
-### 编辑器组件
+下面的示例只组合本课已经解释过的概念，不再为了展示 API 而额外加入 Slots、模板引用和自动保存。
 
-```text
-examples/frontend/vue3-composition/LessonEditor.vue
-```
+### 子组件：编辑本地草稿
+
+`LessonEditor` 负责：
+
+1. 接收父组件的课程；
+2. 创建本地响应式草稿；
+3. 用计算属性产生错误信息和修改状态；
+4. 保存时发送普通对象快照。
 
 <<< ../../../examples/frontend/vue3-composition/LessonEditor.vue
 
-### 父级工作区
+### 父组件：拥有并更新课程
 
-```text
-examples/frontend/vue3-composition/LessonWorkspace.vue
-```
+`LessonWorkspace` 负责保存真正的课程数据，并处理编辑器发出的 `save` 事件。
 
 <<< ../../../examples/frontend/vue3-composition/LessonWorkspace.vue
 
-示例包含：
+阅读完整示例时，可以按这条路线追踪数据：
 
-1. 类型式 Props、Emits 与 Slots。
-2. 命名 `v-model`。
-3. `reactive` 本地草稿和 `computed` 校验。
-4. `watch` 同步 Props 并调度自动保存。
-5. 定时器清理与异步保存状态。
-6. `useTemplateRef` 和最小 `defineExpose` 接口。
-7. 父组件对数据所有权和保存结果的管理。
+```text
+LessonWorkspace.lesson
+          ↓ :lesson
+LessonEditor.props.lesson
+          ↓ 初始化
+LessonEditor.draft
+          ↓ 用户编辑、computed 校验
+emit('save', snapshot)
+          ↓ @save
+LessonWorkspace.handleSave
+          ↓
+替换 LessonWorkspace.lesson
+```
 
-## 37. 常见迁移错误
+注意示例中的注释主要解释“为什么这样设计”，而不是逐行翻译语法。
 
-### 把所有 `data` 字段机械改成 `ref`
+## 常见问题：从现象定位原因
 
-先按业务能力重新分组，再选择 `ref` 或 `reactive`。
+### 修改了变量，模板却没有更新
 
-### 把组合式函数当 Mixins
+```text
+检查：变量是不是普通 let，而不是 ref / reactive？
+检查：是否把 reactive 属性普通解构成了独立值？
+检查：模板读取的是否真是被修改的那份状态？
+```
 
-组合式函数使用显式参数和返回值，不应依赖隐式 `this`、同名合并和神秘覆盖顺序。
+### 脚本中的 ref 得到的不是实际值
 
-### 在 `setup` 中寻找 `this`
+```text
+原因：ref 是响应式容器
+脚本：使用 state.value
+模板：顶层 ref 通常会自动解包，使用 state
+```
 
-Composition API 通过闭包访问局部绑定，不使用 Options API 组件实例 `this`。
+### 父组件数据在没有事件时发生变化
 
-### 修改 Props 或嵌套 Props
+```text
+检查：子组件是否修改了 Props 的嵌套对象？
+修复：创建本地草稿，通过事件提交快照
+```
 
-Props 属于父组件。编辑应使用本地草稿、事件或明确的 model 契约。
+### `computed` 里的代码造成重复请求或循环更新
 
-### 普通解构 `reactive` 对象
+```text
+原因：把副作用放进了派生计算
+修复：computed 只返回结果；请求和外部修改交给明确操作或 watch
+```
 
-会拿到非响应式当前值。使用对象属性、`toRef()` 或 `toRefs()`。
+### 组件里出现很多 `.value`
 
-### 用 `watch` 维护可计算状态
+`.value` 本身不是问题。先看状态是否组织得当，不要为了消除 `.value` 把所有状态塞进一个巨大 `reactive` 对象。清楚的所有权比少写几个字符更重要。
 
-能由现有状态纯粹推导的值优先使用 `computed`，避免双重事实来源。
+### 抽出组合式函数后更难理解
 
-### 忘记清理副作用
+如果调用方必须同时阅读五个文件才能知道状态从哪里来，抽象可能过早。先保持业务逻辑内聚，等能力边界和复用需求稳定后再提取。
 
-定时器、DOM 监听、网络请求和第三方订阅都应有清理策略。
+## 本节知识链
 
-### 过度使用 `defineExpose`
+### 第一次学习必须掌握
 
-组件引用形成命令式耦合。优先 Props、Events、Slots 和 model。
+- `<script setup>` 顶层绑定可以直接用于模板；
+- `ref` 在脚本使用 `.value`，模板会处理常见解包；
+- `reactive` 适合按属性修改的对象状态；
+- `computed` 表达从现有状态推导出来的结果；
+- Composition API 中的操作就是普通函数；
+- Props 属于父组件，子组件通过事件提交意图。
 
-## 38. 工程最佳实践
+### 第二次阅读再理解
 
-- 按业务能力组织组件逻辑，而不是按 API 类型排列代码。
-- 保持 Props 向下、事件向上的数据流。
-- 原始值和可替换对象用 `ref`，稳定对象状态可用 `reactive`。
-- 派生状态使用纯 `computed`，副作用使用 `watch` 或 `watchEffect`。
-- 异步监听处理取消、过期结果和卸载清理。
-- Props、Emits、Slots 与 Model 都视为公共组件 API。
-- 类型式宏保持简单，复杂领域类型放入独立模块。
-- 模板引用和暴露方法保持最小。
-- 组合式函数返回 ref 与明确操作，避免隐式共享可变状态。
-- 外部数据仍从 `unknown` 经过运行时验证。
-- SFC 使用 `vue-tsc` 与当前 Vue 语言工具检查，而不是只依赖转译成功。
+- `ref` 与 `reactive` 应根据状态变化方式选择；
+- `reactive` 变量不应随意整体替换；
+- 普通解构为什么可能切断 Proxy 属性访问；
+- 本地 Props 草稿在来源切换时需要业务同步策略；
+- 组合式函数应按业务能力提取。
 
-## 39. 与 Vue 2 的关键对照
+### 进阶阶段需要建立的原理
 
-| Vue 2 常见方式 | Vue 3 Composition API |
-| --- | --- |
-| `data()` | `ref()` / `reactive()` |
-| `computed` 选项 | `computed()` |
-| `watch` 选项 | `watch()` / `watchEffect()` |
-| `methods` | 普通函数 |
-| `mounted` | `onMounted()` |
-| `beforeDestroy` | `onBeforeUnmount()` |
-| Mixins | 组合式函数 |
-| `this.$emit` | `defineEmits()` 返回的 `emit` |
-| `model` 配置 | `defineModel()` 或 prop + emit |
+- `setup` 状态与模块单例状态具有不同生命周期；
+- 响应式系统在读取时收集依赖，在写入时触发更新；
+- `ref` 通过容器属性追踪值，`reactive` 通过 Proxy 追踪属性；
+- `defineProps` 和 `defineEmits` 是编译宏；
+- 单向数据流的核心是明确状态所有权和修改路径。
 
-对照表帮助定位 API，但不应据此逐行翻译旧组件。真正的迁移收益来自重新划分逻辑边界。
+## 下一课
 
-## 40. 概念辨析与因果回顾
+下一节是[响应式原理与副作用管理](/frontend/vue3/reactivity-and-effect-management)。它会沿着本课留下的问题继续深入：
 
-### `ref` 和 `reactive` 如何选择？
+- Proxy、ref 与 effect 如何建立依赖关系；
+- `computed` 为什么能够缓存；
+- `watch` 和 `watchEffect` 应该怎样选择；
+- 异步请求如何取消过期结果；
+- 深层、浅层和只读响应式分别解决什么问题。
 
-`ref` 适合原始值、可空值和需要整体替换的对象；`reactive` 适合身份稳定、按属性修改的对象状态。团队一致性与 API 边界同样重要。
+Slots、`v-model`、依赖注入和模板引用会放在后续的[组件通信、依赖注入与可复用组件](/frontend/vue3/component-communication-and-reusable-components)中系统学习，不在第一课集中堆叠。
 
-### 为什么解构 `reactive` 会丢失响应式？
+## 参考资料
 
-响应式追踪发生在 Proxy 属性访问上。普通解构只复制当前属性值，之后不再经过 Proxy。
-
-### `computed` 与 `watch` 有什么区别？
-
-`computed` 声明并缓存派生值，应保持纯粹；`watch` 在来源变化后执行副作用，可获得新旧值并控制执行策略。
-
-### `defineProps` 是运行时函数吗？
-
-在 `<script setup>` 中它是编译宏，会被 SFC 编译器处理，不需要普通导入。
-
-### `defineModel` 做了什么？
-
-它声明 model prop 和对应 `update:*` 事件，并返回可在组件内读写的 ref。
-
-### 组合式函数与 Mixins 有何区别？
-
-组合式函数依赖和返回值显式、来源可追踪、命名冲突可由局部变量解决；Mixins 通过组件选项隐式合并。
-
-## 41. 本节总结
-
-- Composition API 按业务能力组织状态、派生值、副作用和操作。
-- `<script setup>` 是编译期语法，顶层绑定可直接用于模板。
-- `ref` 在脚本中使用 `.value`，模板顶层会自动解包。
-- `reactive` 返回 Proxy，普通解构和整体替换会破坏连接。
-- `computed` 用于纯派生状态，`watch` 和 `watchEffect` 用于副作用。
-- Props 是只读输入，编辑场景应使用本地草稿或明确 model。
-- 类型式 Emits 用具名元组表达事件载荷。
-- `defineModel`、`defineSlots`、`useTemplateRef` 改善组件契约与工具提示。
-- 生命周期副作用必须清理，异步监听必须处理竞态。
-- 组合式函数以业务能力为边界，并明确响应式输入和状态所有权。
-- Vue 类型不能代替接口数据和用户输入的运行时验证。
-
-## 42. 下一步学习
-
-下一节建议学习：**Vue 3 响应式原理与副作用管理**。
-
-届时将深入：
-
-- Proxy、依赖收集和触发更新的核心模型。
-- `ref` 的包装与自动解包边界。
-- 深层、浅层响应式和 `readonly`。
-- `watch` 的刷新时机、深度与清理机制。
-- 响应式身份、性能与第三方状态集成。
-
-## 43. 参考资料
-
-- [Vue 官方指南：TypeScript with Composition API](https://vuejs.org/guide/typescript/composition-api.html)
-- [Vue API：`<script setup>`](https://vuejs.org/api/sfc-script-setup.html)
 - [Vue 官方指南：Composition API FAQ](https://vuejs.org/guide/extras/composition-api-faq.html)
 - [Vue 官方指南：Reactivity Fundamentals](https://vuejs.org/guide/essentials/reactivity-fundamentals.html)
 - [Vue 官方指南：Computed Properties](https://vuejs.org/guide/essentials/computed.html)
-- [Vue 官方指南：Watchers](https://vuejs.org/guide/essentials/watchers.html)
+- [Vue 官方指南：TypeScript with Composition API](https://vuejs.org/guide/typescript/composition-api.html)
+- [Vue 官方 API：`<script setup>`](https://vuejs.org/api/sfc-script-setup.html)
+- [Vue 官方指南：Props](https://vuejs.org/guide/components/props.html)
+- [Vue 官方指南：Component Events](https://vuejs.org/guide/components/events.html)
 - [Vue 官方指南：Composables](https://vuejs.org/guide/reusability/composables.html)
-- [Vue 官方指南：Component `v-model`](https://vuejs.org/guide/components/v-model.html)
-- [Vue 官方指南：Slots](https://vuejs.org/guide/components/slots.html)

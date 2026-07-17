@@ -1,241 +1,134 @@
 <script setup lang="ts">
-import {
-  computed,
-  onBeforeUnmount,
-  reactive,
-  ref,
-  useTemplateRef,
-  watch
-} from 'vue'
+import { computed, reactive } from 'vue'
 
+/** 父组件传入的课程。id 由服务端生成，编辑器不应修改它。 */
 interface Lesson {
   readonly id: string
-  title: string
-  durationMinutes: number
-  published: boolean
+  readonly title: string
+  readonly durationMinutes: number
+  readonly published: boolean
 }
 
+/** 用户真正可以编辑并提交的字段。 */
 interface LessonDraft {
   title: string
   durationMinutes: number
   published: boolean
 }
 
-interface Props {
+/** Props 是父组件给编辑器的只读输入。 */
+const props = defineProps<{
   lesson: Lesson
-  readonly?: boolean
-  autosaveDelay?: number
-}
+}>()
 
-const props = withDefaults(defineProps<Props>(), {
-  readonly: false,
-  autosaveDelay: 800
-})
-
+/**
+ * 子组件不直接修改 props.lesson，而是通过 save 事件提交一份新草稿。
+ * 具名元组让事件名和事件参数都能得到类型检查。
+ */
 const emit = defineEmits<{
-  save: [lesson: LessonDraft]
-  cancel: []
-  invalid: [errors: readonly string[]]
+  save: [draft: LessonDraft]
 }>()
 
-defineSlots<{
-  header(props: {
-    lessonId: string
-    dirty: boolean
-  }): unknown
-  actions(props: {
-    save(): Promise<void>
-    saving: boolean
-    valid: boolean
-  }): unknown
-}>()
-
-const titleModel = defineModel<string>('title', {
-  required: true
-})
-
-const titleInput = useTemplateRef<HTMLInputElement>('titleInput')
-const saving = ref(false)
-const lastSavedAt = ref<Date | null>(null)
-
-const form: LessonDraft = reactive({
+/**
+ * 表单的三个字段经常一起读取和修改，因此放进一个 reactive 对象。
+ * 这里只复制可编辑字段，避免意外修改父组件拥有的课程对象。
+ */
+const draft: LessonDraft = reactive({
   title: props.lesson.title,
   durationMinutes: props.lesson.durationMinutes,
   published: props.lesson.published
 })
 
-const errors = computed<readonly string[]>(() => {
+/** 错误信息完全由表单状态计算出来，不需要再维护一份可变状态。 */
+const errors = computed(() => {
   const result: string[] = []
 
-  if (!form.title.trim()) {
-    result.push('标题不能为空')
+  if (draft.title.trim().length === 0) {
+    result.push('课程标题不能为空')
   }
 
-  if (form.durationMinutes <= 0) {
+  if (!Number.isFinite(draft.durationMinutes) || draft.durationMinutes <= 0) {
     result.push('课程时长必须大于 0')
   }
 
   return result
 })
 
-const valid = computed(() => errors.value.length === 0)
-
+/** 是否修改过同样属于派生状态。 */
 const dirty = computed(() =>
-  form.title !== props.lesson.title ||
-  form.durationMinutes !== props.lesson.durationMinutes ||
-  form.published !== props.lesson.published
+  draft.title !== props.lesson.title
+  || draft.durationMinutes !== props.lesson.durationMinutes
+  || draft.published !== props.lesson.published
 )
 
-watch(
-  () => props.lesson,
-  lesson => {
-    Object.assign(form, {
-      title: lesson.title,
-      durationMinutes: lesson.durationMinutes,
-      published: lesson.published
-    })
-  }
-)
+function submit(): void {
+  // 模板已经会禁用无效按钮，但函数本身仍要守住边界。
+  if (errors.value.length > 0 || !dirty.value) return
 
-watch(
-  () => form.title,
-  title => {
-    titleModel.value = title
-  }
-)
-
-let autosaveTimer: ReturnType<typeof setTimeout> | undefined
-
-function clearAutosave(): void {
-  if (autosaveTimer !== undefined) {
-    clearTimeout(autosaveTimer)
-    autosaveTimer = undefined
-  }
+  // 发送普通对象快照，避免父组件拿到编辑器内部的响应式 Proxy。
+  emit('save', {
+    title: draft.title.trim(),
+    durationMinutes: draft.durationMinutes,
+    published: draft.published
+  })
 }
-
-async function save(): Promise<void> {
-  clearAutosave()
-
-  if (!valid.value) {
-    emit('invalid', errors.value)
-    return
-  }
-
-  saving.value = true
-
-  try {
-    emit('save', { ...form })
-    lastSavedAt.value = new Date()
-  } finally {
-    saving.value = false
-  }
-}
-
-watch(
-  [
-    () => form.title,
-    () => form.durationMinutes,
-    () => form.published
-  ],
-  () => {
-    clearAutosave()
-
-    if (props.readonly || !dirty.value || !valid.value) {
-      return
-    }
-
-    autosaveTimer = setTimeout(() => {
-      void save()
-    }, props.autosaveDelay)
-  }
-)
-
-function focusTitle(): void {
-  titleInput.value?.focus()
-}
-
-defineExpose({ focusTitle })
-
-onBeforeUnmount(clearAutosave)
 </script>
 
 <template>
-  <section class="lesson-editor">
-    <slot
-      name="header"
-      :lesson-id="lesson.id"
-      :dirty="dirty"
-    >
-      <h2>编辑课程</h2>
-    </slot>
-
+  <form class="lesson-editor" @submit.prevent="submit">
     <label>
-      标题
-      <input
-        ref="titleInput"
-        v-model.trim="form.title"
-        :disabled="readonly"
-      />
+      课程标题
+      <input v-model="draft.title" />
     </label>
 
     <label>
-      时长（分钟）
+      课程时长（分钟）
       <input
-        v-model.number="form.durationMinutes"
+        v-model.number="draft.durationMinutes"
         type="number"
         min="1"
-        :disabled="readonly"
       />
     </label>
 
-    <label>
-      <input
-        v-model="form.published"
-        type="checkbox"
-        :disabled="readonly"
-      />
-      已发布
+    <label class="checkbox-row">
+      <input v-model="draft.published" type="checkbox" />
+      立即发布
     </label>
 
-    <ul v-if="errors.length" aria-live="polite">
+    <!-- aria-live 让辅助技术在校验结果变化时读出信息。 -->
+    <ul v-if="errors.length" class="errors" aria-live="polite">
       <li v-for="error in errors" :key="error">
         {{ error }}
       </li>
     </ul>
 
-    <p v-if="lastSavedAt">
-      最近保存：{{ lastSavedAt.toLocaleTimeString() }}
-    </p>
-
-    <slot
-      name="actions"
-      :save="save"
-      :saving="saving"
-      :valid="valid"
+    <button
+      type="submit"
+      :disabled="errors.length > 0 || !dirty"
     >
-      <button
-        type="button"
-        :disabled="readonly || saving || !dirty"
-        @click="save"
-      >
-        {{ saving ? '保存中…' : '保存' }}
-      </button>
-      <button type="button" @click="emit('cancel')">
-        取消
-      </button>
-    </slot>
-  </section>
+      保存课程
+    </button>
+  </form>
 </template>
 
 <style scoped>
 .lesson-editor {
   display: grid;
   gap: 1rem;
-  max-width: 36rem;
+  max-width: 32rem;
 }
 
 label {
   display: grid;
   gap: 0.35rem;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+}
+
+.errors {
+  color: #b42318;
 }
 </style>
