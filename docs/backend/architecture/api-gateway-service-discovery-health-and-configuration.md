@@ -16,6 +16,102 @@ outline: deep
 
 > Kubernetes 部分依据当前官方 Service、EndpointSlice 与 probe 文档。EndpointSlice 自 Kubernetes 1.21 为 stable；文中不假设某个云负载均衡或 gateway 厂商的默认行为。
 
+## 先画你自己的请求路径
+
+初学者看到下面这些词，很容易以为每个词都对应一台必须购买或部署的产品：
+
+```text
+DNS → CDN → WAF → Load Balancer → Ingress → Gateway → Service → Mesh → Pod
+```
+
+实际上一个产品可能同时承担多个逻辑角色，小系统也可能只有 DNS、一个反向代理和应用。学习重点不是背拓扑，而是对一次请求逐层回答：
+
+| 问题 | 必须有明确答案 |
+| --- | --- |
+| `api.example.com` 解析到哪里 | DNS 记录和缓存 TTL |
+| TLS 在哪里终止 | 边缘 LB、Gateway 还是应用 |
+| `/api/orders` 由谁匹配 | 哪个 L7 组件及其路由优先级 |
+| bearer token 由谁第一次验证 | Gateway 或应用，以及后端是否复验 |
+| `X-User-Id` 由谁写入 | 只能是可信身份边界，外部同名 header 必须删除 |
+| 多个实例中选哪一个 | Service discovery / load balancer |
+| 哪些实例可以接流量 | readiness 状态，而不是“进程存在” |
+| timeout 与 retry 在哪里执行 | 必须避免多层重复放大 |
+
+如果一个框无法回答任何独有问题，它可能只是重复组件；如果一个问题有三个框都回答，规则可能互相叠加。
+
+## 一次请求怎样从“不可信”变成“内部可用”
+
+假设公网客户端发送：
+
+```http
+GET /api/orders/o-100 HTTP/1.1
+Host: api.example.com
+Authorization: Bearer ey...
+X-User-Id: admin
+X-Forwarded-For: 127.0.0.1
+```
+
+最后两个 header 都来自客户端，不能因为名字像内部字段就相信。正确的边界处理是：
+
+```text
+Gateway 收到公网连接
+  → 记录真正的直接 peer address
+  → 删除外部传入的身份与转发 header
+  → 验证 token 的签名、issuer、audience 和 expiry
+  → 从已验证 claims 得到 user-42 / tenant-7
+  → 写入受信内部身份上下文
+  → 选择一个 ready 的 orders 实例
+  → 在明确 deadline 内转发
+```
+
+后端收到 `X-User-Id: user-42` 时，还必须知道请求只能从可信 Gateway/mesh 进入；否则攻击者绕过 Gateway 直连服务，仍可自行构造该 header。
+
+### 转发链为什么要从右向左判断
+
+若请求经过两个受信代理：
+
+```text
+client 203.0.113.10
+  → edge proxy 10.0.0.5
+  → gateway 10.0.0.8
+```
+
+转发链可能是：
+
+```http
+X-Forwarded-For: 203.0.113.10, 10.0.0.5
+```
+
+Gateway 从自己直接连接的 peer 开始，向左跳过已配置的可信代理，遇到第一个不可信地址才把它视为客户端。若直接 peer 本身不可信，整条外部 header 都不能作为安全依据。
+
+## 实例为什么会“活着但不能接请求”
+
+应用进程启动并不等于已经准备好：
+
+```text
+JVM/Python 进程已启动
+  → 配置仍在加载
+  → connection pool 尚未建立
+  → 模型权重仍在加载
+  → warm-up 尚未完成
+```
+
+这时 liveness 可以成功，因为进程能响应；readiness 应失败，因为它还不能安全处理业务。部署平台只把 ready endpoint 加入可选集合：
+
+```text
+readiness false
+  → endpoint 从流量选择中移除
+  → 已有进程不一定被重启
+
+liveness 持续失败
+  → 平台认为进程无法自行恢复
+  → 才考虑重启
+```
+
+把下游短暂故障塞进 liveness，可能导致所有健康应用一起重启；把 readiness 永远写成固定 200，又会把流量送给尚未初始化或正在停机的实例。
+
+第一次学习到这里已经足够：画清路径、建立身份信任链、只选择 ready 实例。DNS 缓存、EndpointSlice、动态配置和负载均衡算法是这条主线的后续细化。
+
 ## 1. 一次外部请求可能经过哪些层
 
 ```mermaid

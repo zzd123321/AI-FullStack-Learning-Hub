@@ -14,6 +14,142 @@ API 一旦被浏览器、移动端、合作方、CLI 或另一个服务使用，
 
 > 规范基准：HTTP Semantics RFC 9110、HTTP Caching RFC 9111、PATCH RFC 5789、额外状态码 RFC 6585、Problem Details RFC 9457。当前 OpenAPI 最新发布版为 3.2.0；FastAPI 0.139.x 生成 OpenAPI 3.1.0，选择规范版本时还要核对目标生成器和 gateway 的支持范围。
 
+## 先别背状态码：从“保存一本书”开始
+
+假设 Vue 页面上只有一个表单：书名、价格和“保存”按钮。第一次写后端时，你很可能设计出这样的接口：
+
+```http
+POST /saveBook HTTP/1.1
+Content-Type: application/json
+
+{"name":"Java 入门","price":59.9}
+```
+
+```json
+{"success":true,"data":{"id":"book-1001"}}
+```
+
+在本机点一次按钮，它完全能工作。问题不是它“不能运行”，而是合同没有回答真实系统迟早会遇到的问题：
+
+1. 浏览器等了 3 秒后超时，但后端其实已经保存成功。前端重试会不会多出第二本书？
+2. 用户甲和用户乙都打开编辑页。甲先保存，乙随后用旧页面保存，甲的修改会不会被静默覆盖？
+3. 价格是负数时，前端怎样知道具体哪个字段错了？它应该解析中文错误消息吗？
+4. 创建成功后，新资源的标准地址是什么？代理、SDK 和测试只能从自定义 `data.id` 猜吗？
+5. 将来字段增加、分页方式改变，旧版前端还能否继续工作？
+
+这就是本课所有概念的共同起点。`201`、`Location`、幂等键、ETag、Problem Details 和 cursor 不是互不相干的“最佳实践清单”，而是在回答上面五个具体问题。
+
+### 第一步：先把成功结果表达完整
+
+```http
+POST /api/v1/books HTTP/1.1
+Content-Type: application/json
+
+{"name":"Java 入门","price":"59.90"}
+```
+
+```http
+HTTP/1.1 201 Created
+Location: /api/v1/books/book-1001
+Content-Type: application/json
+
+{"id":"book-1001","name":"Java 入门","price":"59.90","version":1}
+```
+
+这里暂时只增加两个语义：
+
+- `201 Created` 明确表示这次操作产生了新资源；
+- `Location` 告诉调用方新资源在哪里，不要求它理解 ID 如何拼接 URI。
+
+这时还不需要分页、缓存或版本协商。第一步的目标只是让一次成功创建成为完整 HTTP 合同。
+
+### 第二步：再让失败可以由程序处理
+
+如果价格为负数，不要仍返回 200 再让前端检查 `success=false`。HTTP status 先说明失败类别，稳定的错误结构再说明具体问题：
+
+```http
+HTTP/1.1 422 Unprocessable Content
+Content-Type: application/problem+json
+
+{
+  "type":"https://api.example.test/problems/validation-error",
+  "title":"Request validation failed",
+  "status":422,
+  "errors":[
+    {"field":"price","code":"greater_than_or_equal","minimum":"0"}
+  ]
+}
+```
+
+前端按 `type`、`field` 和 `code` 分支，而不是判断 `message.includes('价格')`。自然语言可以翻译，机器标识必须稳定。
+
+### 第三步：出现重试后，再引入幂等键
+
+网络超时只说明客户端没收到响应，不说明服务端没有执行。前端为“一次点击保存”生成一个键，超时重试时复用它：
+
+```http
+Idempotency-Key: create-book-7f7d...
+```
+
+服务端保存的不只是这个 key，还要保存“请求指纹 + 首次结果”：
+
+```text
+第一次看到 key
+  → 原子地创建书籍并记录 key、请求指纹和响应
+
+再次看到相同 key + 相同指纹
+  → 不再创建，回放第一次结果
+
+再次看到相同 key + 不同指纹
+  → 409 Conflict，说明调用方错误复用了 key
+```
+
+因此幂等不是 Controller 里加一个 header 参数，也不是“发现 key 就直接返回成功”。它是一条需要存储唯一性和原子提交支持的业务合同。
+
+### 第四步：出现多人编辑后，再引入条件更新
+
+读取资源时，服务端返回当前表示的验证标识：
+
+```http
+ETag: "1"
+```
+
+编辑页保存时带回它：
+
+```http
+PATCH /api/v1/books/book-1001 HTTP/1.1
+If-Match: "1"
+Content-Type: application/merge-patch+json
+
+{"price":"69.90"}
+```
+
+服务端只有在当前版本仍是 `"1"` 时才更新。若甲已经把版本改成 `"2"`，乙的旧页面得到 `412 Precondition Failed`，而不是覆盖甲的结果。
+
+因果链是：
+
+```text
+读取时获得版本
+  → 用户基于该版本编辑
+  → 写入时声明 If-Match
+  → 服务端比较当前版本
+  → 相同才写入并产生新版本；不同则拒绝旧写入
+```
+
+ETag 不会自动合并两个人的修改。它只把原本静默发生的 lost update 变成调用方可以看见并处理的冲突。
+
+## 第一遍和第二遍分别学什么
+
+本课内容很多，不应该第一次从头背到尾：
+
+| 阅读轮次 | 先掌握 | 暂时只需知道存在 |
+| --- | --- | --- |
+| 第一遍 | method、URI、常用 status、请求/响应 body、稳定错误结构 | OpenAPI 版本兼容、复杂 PATCH media type |
+| 做出第一个 API 后 | 幂等键、ETag/`If-Match`、cursor pagination | 高级缓存协商和跨版本迁移策略 |
+| 进入生产前 | 权限、敏感信息、限流错误、契约测试、可观测性 | 面向外部合作方的长期废弃流程 |
+
+后面的章节是在精确解释刚才这条演进过程。阅读每个术语时，都把它放回“它防止哪一种具体错误”这个问题中。
+
 ## 1. API 合同包含整个 HTTP message
 
 合同不只是 JSON body。一次交互包括：

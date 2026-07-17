@@ -18,6 +18,94 @@ outline: deep
 
 > 示例环境为 Python 3.11+。2PC 部分依据 PostgreSQL 18 与 Java `XAResource` 官方资料；Saga 模式边界参考公开模式文档。示例是 durable workflow 的可测试模型，不是生产工作流引擎。
 
+## 先判断这是不是 Saga 问题
+
+看到“订单、库存、支付”三个名词，不代表立刻需要 Saga。先看状态由谁拥有：
+
+### 情况 A：一个应用、一个数据库
+
+```text
+OrderService
+  └─ 同一个 PostgreSQL
+      ├─ orders
+      └─ inventory_reservations
+```
+
+如果两个写入可以放进一个本地 transaction，就先使用数据库 transaction。引入 Saga 不会让本地原子性更好，只会增加中间状态、重试和补偿。
+
+### 情况 B：库存和支付由独立系统拥有
+
+```text
+Order Service → Order DB
+Inventory Service → Inventory DB
+Payment Provider → 外部支付状态
+```
+
+订单服务无权直接提交另外两个系统的数据库。一次下单现在包含三个独立提交点，任何两个提交点之间都可能崩溃。这才是本课要解决的问题。
+
+判断标准不是“表有几张”，而是一次业务写是否跨越多个**独立提交与恢复边界**。
+
+## 把一次下单写成可以停住的步骤
+
+先不要写一大段嵌套 `try/catch`，先列出每一步成功后留下的事实：
+
+| 步骤 | 本地成功事实 | 后续失败时可做什么 | 能否完全撤销 |
+| --- | --- | --- | --- |
+| 预留库存 | reservation `R-1` 有效 | 释放 `R-1` | 通常可以，但释放也可能失败 |
+| 扣款 | payment `P-1` captured | 发起 refund | 退款是新交易，可能有手续费和延迟 |
+| 创建物流单 | shipment `S-1` created | 取消物流单 | 已出库后可能无法取消 |
+
+有了这张表，Saga 状态才不是抽象枚举：
+
+```text
+NEW
+  → 库存预留成功，保存 INVENTORY_RESERVED + reservationId
+  → 支付成功，保存 PAYMENT_CAPTURED + paymentId
+  → 物流成功，保存 COMPLETED + shipmentId
+```
+
+每个箭头都包含两件事：调用参与者，以及持久化协调者已经观察到的结果。只调用不保存，进程重启后就不知道是否要重做；只提前保存“成功”，又可能在远程调用失败时记录了不存在的事实。
+
+## 用一个崩溃窗口理解“幂等步骤”
+
+```mermaid
+sequenceDiagram
+    participant O as Saga orchestrator
+    participant P as Payment service
+    participant S as Saga store
+    O->>P: capture(operation-42)
+    P->>P: 扣款成功并记录 operation-42
+    P-->>O: success
+    O--xS: 保存 PAYMENT_CAPTURED 前崩溃
+    Note over O: 重启后仍只看到 INVENTORY_RESERVED
+    O->>P: 再次 capture(operation-42)
+    P-->>O: 返回第一次扣款结果，不重复扣款
+    O->>S: 保存 PAYMENT_CAPTURED
+```
+
+协调者不能从旧状态判断第一次扣款是否发生，所以必须允许重发同一个 operation id。支付服务也不能只说“POST 默认不幂等”，而应把 operation id 与首次结果作为业务合同保存。
+
+这和上一课的 consumer 幂等是同一类不确定性：成功发生后，确认或状态保存之前崩溃，调用方无法区分“没执行”和“执行了但结果丢失”。
+
+## 补偿要按业务事实理解
+
+数据库 rollback 会让未提交变化像从未发生。Saga 补偿则是在已经提交之后增加新的事实：
+
+```text
+PaymentCaptured(amount=100)
+RefundRequested(amount=100)
+RefundCompleted(amount=100)
+```
+
+审计中仍能看到扣款与退款，用户也可能在一段时间内看到“已扣款、退款处理中”。所以 API 不应该只返回模糊的 `failed`，而应允许表达：
+
+- `PROCESSING`：流程仍在推进；
+- `COMPENSATING`：核心目标失败，正在抵消已完成步骤；
+- `COMPENSATED`：补偿已完成，但历史事实仍存在；
+- `MANUAL_INTERVENTION`：自动恢复无法继续，需要人工处理。
+
+第一次学习 Saga，只要能为自己的流程写出“成功事实、补偿动作、幂等 operation id、人工接管状态”四列，就比背完 orchestration/choreography 定义更重要。
+
 ## 1. 先区分三个一致性范围
 
 ### 单资源本地事务

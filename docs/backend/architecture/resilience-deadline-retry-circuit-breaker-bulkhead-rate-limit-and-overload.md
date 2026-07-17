@@ -24,6 +24,91 @@ outline: deep
 
 > 示例环境为 Python 3.11+，使用手动时钟稳定验证时间边界。协议语义依据 RFC 9110/6585 与 gRPC 官方 deadline/retry 指南；框架实现需按实际 Resilience4j、Spring、gRPC 或 proxy 版本核对。
 
+## 先救一个请求，不要先堆七种组件
+
+假设前端允许“生成学习报告”最多等待 2 秒：
+
+```text
+浏览器 → Report API → Profile Service
+                    → Progress Service
+                    → AI Summary Service
+```
+
+最初代码若给三个下游各 2 秒 timeout，最坏等待不是 2 秒，而可能接近 6 秒，还没计算连接池排队和自身处理时间。若每层再重试 3 次，实际调用数和等待时间会继续放大。
+
+正确起点是先分配一个端到端预算：
+
+```text
+用户总预算：2000 ms
+入口解析与鉴权预留：100 ms
+Profile：最多 200 ms
+Progress：最多 400 ms
+AI Summary：使用剩余预算，但预留 100 ms 组装响应
+```
+
+这不是要求把数字写死在文档里，而是说明每个局部 timeout 必须服从同一个用户等待目标。
+
+## 一个 2 秒请求的预算怎样递减
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant R as Report API
+    participant P as Profile
+    participant A as AI Summary
+    C->>R: request, deadline=12:00:02.000
+    Note over R: 解析和鉴权用掉 120ms
+    R->>P: timeout <= 剩余 1880ms 中的局部上限
+    P-->>R: 180ms 后成功
+    Note over R: 现在约剩 1700ms
+    R->>A: 传播剩余 deadline
+    A-->>R: 1400ms 后成功
+    Note over R: 留约 300ms 组装并发送
+    R-->>C: response before deadline
+```
+
+如果 Profile 已经耗掉 1.5 秒，就不能仍给 AI 一个全新的 2 秒。deadline 的意义是让下游知道“这份结果在什么时候之后对调用方已经没有价值”。
+
+## 先区分三种失败，再决定是否重试
+
+| 失败 | 立即重试是否可能变好 | 额外条件 |
+| --- | --- | --- |
+| 参数校验失败、无权限 | 通常不会 | 应修改请求或权限，不重试 |
+| 连接瞬时重置、明确短暂 503 | 可能 | 操作可安全重放，且总 deadline 仍有预算 |
+| 调用超时、写操作结果未知 | 不确定 | 先查询状态或依赖幂等键，不能盲目再写 |
+
+重试不是“更可靠”按钮。它用更多请求换取一次短暂故障恢复的机会，因此必须同时回答：
+
+```text
+什么错误可重试？
+操作是否幂等？
+最多总共尝试几次？
+每次之间等多久？
+剩余 deadline 是否还够？
+谁负责重试，避免每一层都重试？
+```
+
+最后一个问题尤其重要。浏览器、Gateway、Java 服务和 Python client 若各自尝试 3 次，一次用户请求最坏可放大为：
+
+```text
+3 × 3 × 3 = 27 次最底层调用
+```
+
+## 保护机制各自守住什么边界
+
+不要把它们记成同一组“容错组件”：
+
+| 机制 | 直接限制的东西 | 它不负责什么 |
+| --- | --- | --- |
+| deadline/timeout | 单个请求愿意等待的时间 | 不限制同时有多少请求 |
+| retry budget | 额外尝试次数和流量 | 不让永久错误变成成功 |
+| circuit breaker | 对已知持续故障依赖的调用 | 不替代单次 timeout |
+| bulkhead | 一个依赖可占用的并发资源 | 不控制长期每秒配额 |
+| rate limit | 时间窗口内的请求速率/配额 | 不直接限制慢请求占用时间 |
+| load shedding | 过载时接纳哪些请求 | 不增加系统实际容量 |
+
+推荐的学习与落地顺序是：先有 deadline 和有限资源，再根据真实错误率决定 retry；观察到持续故障撞击时才加 breaker；观察到一个依赖拖垮所有资源时加 bulkhead；容量不足时做限流和主动拒绝。
+
 ## 1. 慢为什么会变成级联故障
 
 假设服务有 100 个 worker，每个请求通常占 50ms：

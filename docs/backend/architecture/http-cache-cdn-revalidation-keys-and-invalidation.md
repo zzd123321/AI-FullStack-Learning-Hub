@@ -23,6 +23,115 @@ outline: deep
 
 > 本课规范基准是 RFC 9110 与 RFC 9111。这里实现的是 HTTP 缓存合同，不会把某家 CDN 的 purge API 当成 HTTP 标准。
 
+## 先跟踪同一份响应的一生
+
+缓存术语很多，但第一次学习只需要盯住 `/api/catalog` 的四次请求。假设源站返回：
+
+```http
+HTTP/1.1 200 OK
+Cache-Control: public, max-age=30
+ETag: "catalog-v1"
+Content-Type: application/json
+
+{"version":1,"products":[...]}
+```
+
+### 第一次：没有副本，只能访问源站
+
+```text
+浏览器发 GET
+  → 浏览器 cache 没有副本
+  → CDN 也没有副本
+  → 源站查询并生成 JSON
+  → CDN 和浏览器按规则保存响应
+```
+
+用户看到 `200` 和完整 body。此时缓存不是另一个“数据真相”，它只保存源站刚刚给出的 HTTP 响应。
+
+### 第二次：仍在 30 秒内，直接复用
+
+```text
+浏览器准备发 GET
+  → 发现本地副本仍 fresh
+  → 直接把副本交给页面
+  → CDN、源站和数据库都没有收到请求
+```
+
+这一步最容易被忽略：浏览器 cache 命中时，你的 Controller 根本不会执行。前端看到数据，不代表后端刚处理了一次请求。
+
+### 第三次：超过 30 秒，先问“变了吗”
+
+过期只表示缓存不能再自行保证副本新鲜，不表示内容真的改变。缓存可以发送：
+
+```http
+GET /api/catalog HTTP/1.1
+If-None-Match: "catalog-v1"
+```
+
+若源站仍是 v1：
+
+```http
+HTTP/1.1 304 Not Modified
+ETag: "catalog-v1"
+Cache-Control: public, max-age=30
+```
+
+因果链是：
+
+```text
+副本 stale
+  → 带旧 ETag 请求源站验证
+  → 源站比较当前 representation
+  → 没变化，返回没有普通 body 的 304
+  → 缓存继续使用原来的 JSON，并更新缓存元数据
+```
+
+所以 304 不是“接口没有数据”，而是“数据仍在你已有的副本里，不必再传一次”。浏览器开发者工具可能把复用后的内容展示给你，但网络上传输的响应并没有完整 JSON body。
+
+### 第四次：源数据已变，取得新表示
+
+若目录已经变成 v2，旧 ETag 不匹配，源站返回：
+
+```http
+HTTP/1.1 200 OK
+Cache-Control: public, max-age=30
+ETag: "catalog-v2"
+Content-Type: application/json
+
+{"version":2,"products":[...]}
+```
+
+缓存用 v2 替换旧副本，新的 30 秒新鲜期从这次响应开始计算。
+
+### 这四次请求对应哪些概念
+
+| 观察到的行为 | 本课术语 | 它回答的问题 |
+| --- | --- | --- |
+| 第一次必须去源站 | cache miss | 当前缓存有没有可用副本 |
+| 30 秒内直接使用 | fresh / reuse | 能否不联系源站直接回答 |
+| 30 秒后带 ETag 询问 | stale / validation | 旧副本还能否继续使用 |
+| 返回 304 | not modified | 能否省下重复 response body |
+| 内容变化返回 v2 | new representation | 怎样替换旧副本 |
+
+后面出现的 `private`、`shared`、`Vary`、CDN 和 purge，都是在这条基本生命周期上增加“谁能保存”“不同用户是否能共用”“怎样区分多个版本”和“怎样提前失效”。
+
+## 前端开发者先做一个观念转换
+
+Vue Query、Pinia 或组件内变量保存的是 JavaScript 数据；HTTP cache 保存的是带 status、headers 和 body 的网络响应。二者可能同时存在：
+
+```text
+组件先命中 Vue Query
+  → 根本不调用 fetch
+
+Vue Query 决定重新 fetch
+  → 浏览器 HTTP cache 仍可能直接复用响应
+
+浏览器需要访问网络
+  → CDN 仍可能命中，源站依然收不到请求
+```
+
+因此排查“为什么后端日志没有请求”时，要从最靠近组件的一层向外检查，而不是只清 Redis 或只重启 API。
+
 ## 1. 先看没有缓存时，系统重复做了什么
 
 ```mermaid

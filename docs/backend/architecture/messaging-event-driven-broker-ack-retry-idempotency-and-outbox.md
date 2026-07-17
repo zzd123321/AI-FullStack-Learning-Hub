@@ -18,6 +18,87 @@ outline: deep
 
 > 规范与产品基准：RabbitMQ 官方 reliability/acknowledgement 文档、Apache Kafka 4.3 文档与 CloudEvents 1.0.2 规范。教学模型使用 Python 3.11+，不冒充任何具体 broker 的完整实现。
 
+## 先只异步一件事：订单成功后发邮件
+
+不要一开始就同时想 Kafka、RabbitMQ、partition、consumer group、exactly-once 和 Saga。先看最小需求：订单已经创建，邮件可以晚几秒发送，但不能因为邮件服务暂时故障让订单消失。
+
+纯同步代码可能是：
+
+```text
+createOrder()
+  → 保存订单
+  → 调用邮件服务
+  → 邮件成功后向用户返回
+```
+
+这段代码把两个不同承诺绑在一起：
+
+- 创建订单是用户正在等待的核心结果；
+- 发邮件是订单成功后的后续通知，可以延迟和重试。
+
+如果邮件接口超时，订单可能已经保存，程序却不知道应该向用户返回成功还是失败。把通知改成消息后，订单服务的承诺变为：
+
+```text
+原子地保存订单 + 记录“订单已创建，等待发布”
+  → 向用户确认订单已接受
+  → relay 稍后把事件发布给 broker
+  → 邮件 consumer 收到事件并发送邮件
+```
+
+异步没有让步骤减少，反而多了 broker 和 relay。它的价值是把用户必须等待的核心提交，与可以独立重试的邮件处理分开。
+
+## 一条消息的责任怎样转移
+
+把消息想成一件需要签收的包裹。只有下一方明确接管，上一方才能停止负责：
+
+| 当前阶段 | 谁还负有责任 | 什么才算完成 |
+| --- | --- | --- |
+| 业务事务尚未提交 | producer 应用 | 订单和 outbox 一起提交 |
+| 已有 outbox、broker 尚未确认 | relay | broker confirm / 产品定义的持久接管信号 |
+| broker 已接管、consumer 尚未 ack | broker | 按投递策略保留或重投 |
+| consumer 正在处理 | consumer + broker | 业务副作用提交后 consumer ack |
+| consumer 已 ack | consumer 自己的业务系统 | 这次 delivery 生命周期结束 |
+
+“代码已经调用 `publish()`”不等于 broker 接管；“consumer 函数已经收到参数”也不等于邮件发送成功。确认点放错位置，会产生无法重试的消息丢失。
+
+## 为什么可靠投递天然可能重复
+
+看一个无法消除的不确定窗口：
+
+```mermaid
+sequenceDiagram
+    participant B as Broker
+    participant C as Email consumer
+    participant E as Email provider
+    B->>C: delivery event-42
+    C->>E: send email
+    E-->>C: success
+    C--xB: ack 在网络中丢失
+    B->>C: redeliver event-42
+```
+
+broker 只看到 ack 缺失，无法证明 consumer 是否完成副作用。为了不丢消息，它必须允许重投。于是系统在“可能丢失”和“可能重复”之间选择后者，再由 consumer 用稳定 event id 把重复变成无害：
+
+```text
+开始本地事务
+  → 尝试插入 processed_event(event-42)
+  → 已存在：说明处理过，直接结束
+  → 不存在：执行邮件记录/业务副作用
+  → processed_event 与副作用一起提交
+  → 提交成功后 ack
+```
+
+如果幂等标记先提交、邮件记录后失败，就会错误跳过重试；如果邮件记录先提交、幂等标记后失败，重试又可能重复。因此“检查 event id”本身还不够，标记与本地副作用需要一个原子边界。
+
+## 第一次阅读只抓住四句话
+
+1. 异步改变等待与故障耦合，不会让工作和失败消失。
+2. broker confirm 与 consumer ack 是两段不同的责任转移。
+3. at-least-once 意味着必须把重复当正常输入。
+4. 数据库提交与 publish 之间需要 outbox 一类可靠连接。
+
+等这四句能够用上面的邮件故事解释后，再进入 topic、consumer group、顺序、schema 演进和死信。否则术语越多，越容易把产品特性误当成端到端保证。
+
 ## 1. 同步与异步改变的是依赖时间
 
 同步调用：
