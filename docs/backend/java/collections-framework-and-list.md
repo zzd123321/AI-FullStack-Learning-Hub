@@ -22,6 +22,28 @@ ArrayList<E> 是最常用的一种具体实现
 
 业务方法通常声明接收 `List<E>`，创建数据时再选择 `ArrayList<E>`。第一次学习优先掌握创建、`add`、遍历和防御性副本；视图、迭代器并发修改与复杂度细节留到第二遍。
 
+## 真正难点不是 add，而是谁能修改
+
+假设控制器把请求中的列表交给 `StudyPlan`。如果对象直接保存调用方传入的可变列表，调用方之后一次 `clear()` 就能绕过 `StudyPlan` 的规则改变内部状态。集合 API 的工程问题因此是**所有权**，不只是增删方法。
+
+```java
+final class StudyPlan {
+    private final List<String> tasks;
+
+    StudyPlan(List<String> tasks) {
+        this.tasks = List.copyOf(tasks); // 复制并拒绝 null 元素，切断外部修改
+    }
+
+    List<String> tasks() {
+        return tasks; // 保存的本来就是不可修改快照
+    }
+}
+```
+
+需要区分四件外表相似的事：可变 `ArrayList` 可以改；`Collections.unmodifiableList(original)` 是原列表的只读视图，原列表变化仍会透过来；`List.copyOf(original)` 通常得到与后续修改隔离的不可修改快照；`subList` 是共享底层状态的范围视图。选择时先问“是否需要观察原数据后续变化”，不要只问“调用者能否调用 add”。
+
+JavaScript 的数组既承担列表又承担许多动态容器职责；Java 用 `List<E>` 明确元素类型，并把接口与实现分开。方法参数优先写 `List<E>`，只有真正依赖 `ArrayList` 特有行为时才暴露实现类。
+
 ## 1. 学习目标
 
 完成本节后，你应该能够：

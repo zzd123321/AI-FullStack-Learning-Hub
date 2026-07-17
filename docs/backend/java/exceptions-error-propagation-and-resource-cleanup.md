@@ -25,6 +25,29 @@ outline: deep
 
 第一次学习先掌握 `throw`、`try/catch` 和“不要丢失原始 cause”。受检异常的设计取舍、suppressed exception 等细节可以第二遍再读。
 
+## 一次文件失败应该在哪一层变成什么
+
+以读取学习记录为例，三层知道的信息不同：
+
+```text
+Files.readString：知道操作系统读取失败，抛 IOException
+ProgressFileReader：知道这是“读取哪份学习进度”失败，包装业务上下文并保留 cause
+main / HTTP 入口：知道怎样向人或客户端表达失败，记录一次完整异常链
+```
+
+底层不应该擅自打印“系统错误”后返回空字符串，因为上层会把空内容当成成功；中间层也不应 `catch (Exception)` 后只抛一个没有 cause 的新异常，否则原始路径、权限等证据会丢失。最外层通常是把异常转换为退出码或 HTTP 响应的边界，而不是每层都打印一次相同堆栈。
+
+资源清理还有第二条失败路径：业务读取可能失败，关闭文件也可能失败。try-with-resources 会保留主体异常，并把关闭异常放进 `getSuppressed()`，避免清理失败遮住最初原因：
+
+```text
+打开资源 → 执行业务
+  ├─ 成功 → 自动 close；close 失败成为主异常
+  └─ 失败 A → 自动 close；close 又失败 B
+                    最终抛 A，B 作为 suppressed 保留
+```
+
+这比 JavaScript 的普通 `try/finally` 多了一套标准资源协议：实现 `AutoCloseable` 的对象可以直接参加 try-with-resources，关闭顺序与异常保留规则由语言保证。
+
 ## 1. 学习目标
 
 完成本节后，你应该能够：

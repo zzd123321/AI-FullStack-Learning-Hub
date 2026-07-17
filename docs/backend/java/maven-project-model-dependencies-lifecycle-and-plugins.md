@@ -24,6 +24,22 @@ outline: deep
 
 先会读坐标、依赖、标准目录和 `mvn test/package`。effective POM、依赖调解、插件管理、多模块 reactor 与可复现构建属于项目复杂后再深入的内容。
 
+## 从一台全新的机器看 Maven 做了什么
+
+执行 `mvn test` 时，Maven 不是“智能地扫描项目后猜测怎么构建”。它读取当前 POM，与父 POM 和 Super POM 合并成 effective POM，再按生命周期找到绑定到各阶段的插件目标。依赖缺失时，先从远程仓库下载到本地仓库；之后构建可以复用已校验的本地文件。
+
+```text
+pom.xml + 父级默认配置
+  → effective POM
+  → validate → compile → test
+  → 各阶段调用对应插件 goal
+  → 插件读取 src/main、src/test 与依赖 classpath
+```
+
+这里有两种容易混淆的“下载”：项目依赖会进入应用的编译或运行 classpath；构建插件是 Maven 执行构建动作所需的工具，不会因为写在 `<plugin>` 中就成为应用运行依赖。JavaScript 开发者可以粗略把 dependency 类比 npm 包、plugin 类比构建工具插件，但 Maven 还有固定生命周期和依赖 scope，不能一一等同。
+
+`mvn package` 会先走过前面的阶段，所以包含编译和测试；直接调用某个插件 goal 则不一定执行完整生命周期。CI 应从干净检出开始使用 Wrapper 和锁定的插件/依赖版本，验证“别人机器也能重建”，而不只是本机仓库碰巧已有某个文件。
+
 ## 1. 学习目标
 
 完成本节后，你应该能够：

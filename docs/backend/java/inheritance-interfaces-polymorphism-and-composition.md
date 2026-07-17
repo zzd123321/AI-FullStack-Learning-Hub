@@ -22,6 +22,27 @@ NotificationService 只认识 NotificationChannel
 
 第一次学习请先抓住三个动作：接口声明“能做什么”，具体类实现“具体怎么做”，业务对象通过组合持有接口。抽象类、静态隐藏和构造顺序属于第二层细节，不应挡住这条主线。
 
+## 一次多态调用是怎样决定实现的
+
+```java
+NotificationChannel channel = new EmailChannel();
+channel.send("课程已更新");
+```
+
+编译器先看变量的声明类型 `NotificationChannel`，确认接口确实允许调用 `send`；运行时再看引用实际指向的 `EmailChannel` 对象，执行它重写后的实现。这就是动态分派：**能不能调用由编译时类型检查，调用哪份实例实现由运行时对象决定。**
+
+这不表示所有成员都“多态”。字段和 `static` 方法按编译时类型选择，构造方法也不会被重写。业务扩展点通常应放在实例方法里，而不是依赖同名字段或静态方法制造看似多态的效果。
+
+接口与组合配合后，通知业务只负责“何时发送”：
+
+```text
+NotificationService
+  → 调用 channel.send
+  → EmailChannel / SmsChannel 各自处理协议细节
+```
+
+只有当 `EmailChannel` 真能在所有接口承诺的场景替代 `NotificationChannel` 时，它才是良好子类型。若某个实现总在合法调用上抛“不支持”，说明接口可能过宽。JavaScript 的鸭子类型更关注对象当下有没有某个方法；Java 接口会在编译期明确这份能力合同。
+
 ## 1. 学习目标
 
 完成本节后，你应该能够：

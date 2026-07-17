@@ -22,6 +22,24 @@ List 保存数据
 
 第一次学习先会读写简单的 `filter → map → toList`，并知道 Stream 不是新集合。函数式接口组合、复杂 `collect`、并行 Stream 和 Optional 的全部组合属于第二层内容。
 
+## 一条 Stream 在什么时候真正工作
+
+下面两行建立管道时，通常还没有遍历任何元素：
+
+```java
+Stream<String> pipeline = names.stream()
+        .filter(name -> !name.isBlank()) // 声明筛选规则
+        .map(String::trim);               // 声明转换规则
+
+List<String> result = pipeline.toList();  // 终止操作触发一次遍历
+```
+
+运行时不是先生成一份完整的 filter 中间列表、再生成一份 map 列表。对于第一个元素，Stream 可以依次完成筛选和转换，再处理下一个元素；短路操作甚至可能提前停止。这就是惰性带来的组合能力，也是为什么 Stream 只能消费一次。
+
+Lambda 表示行为，不表示“自动异步”。上面的所有阶段默认仍在调用线程执行。把日志、数据库写入等副作用塞进 `map` 会让重试、并行和调试都更难，数据转换尽量保持纯粹，把副作用放在清楚的边界。
+
+`Optional<T>` 只表达“这里可能有一个 T，也可能没有”，不是所有字段的通用包装，更不是异常替代品。JavaScript 常用 `undefined`/`null` 和可选链；Optional 让返回方在类型上公开缺失可能性，但调用方仍需决定默认值、跳过还是抛出业务异常。
+
 ## 1. 学习目标
 
 完成本节后，你应该能够：

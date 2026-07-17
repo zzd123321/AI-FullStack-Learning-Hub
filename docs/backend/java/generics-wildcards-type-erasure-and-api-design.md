@@ -21,6 +21,28 @@ Box<String> 使用：这一次把 T 确定为 String
 
 第一次学习优先掌握 `T` 的含义、泛型类、泛型方法，以及为什么 `List<Dog>` 不能直接当作 `List<Animal>`。通配符、PECS、类型擦除和堆污染是 API 设计进阶，不应阻挡你正常使用集合。
 
+## 为什么 List&lt;Dog&gt; 不能当 List&lt;Animal&gt;
+
+不要先背“不变性”，先做一次反证。假如赋值被允许：
+
+```java
+List<Dog> dogs = new ArrayList<>();
+List<Animal> animals = dogs; // 假设允许
+animals.add(new Cat());      // 对 List<Animal> 完全合法
+Dog dog = dogs.get(0);       // 现在却取出一只 Cat，类型合同被破坏
+```
+
+编译器禁止第二行，正是为了保证从 `List<Dog>` 取出的永远可以当 `Dog`。通配符是在明确限制能力后安全放宽接收范围：`List<? extends Animal>` 可以读取为 `Animal`，却不能随意写入；`List<? super Dog>` 可以安全写入 `Dog`，读取时只能先当 `Object`。
+
+```text
+? extends Animal：来源可能是 Dog 列表或 Cat 列表 → 适合读
+? super Dog：目标可能是 Dog、Animal 或 Object 列表 → 适合写 Dog
+```
+
+PECS 是这个读写方向的助记法，不是看到参数就机械加通配符。若一个方法既要写入又要精确读出同一种类型，通常需要有名字的类型参数 `T`。
+
+泛型主要在编译期守合同；类型擦除后，JVM 通常看不到 `List<String>` 与 `List<Integer>` 的完整参数差异。这解释了为什么不能直接 `new T()`、不能可靠地 `instanceof List<String>`，也解释了原始类型为何会把问题推迟成运行时 `ClassCastException`。
+
 ## 1. 学习目标
 
 完成本节后，你应该能够：
