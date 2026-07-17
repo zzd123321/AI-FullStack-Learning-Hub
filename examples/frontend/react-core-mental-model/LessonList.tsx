@@ -1,5 +1,4 @@
 import type { Lesson } from './types'
-import { Button } from './Button'
 
 interface LessonListProps {
   lessons: readonly Lesson[]
@@ -13,14 +12,15 @@ export function LessonList({ lessons, selectedId, onSelect }: LessonListProps) {
   return (
     <ul aria-label="课程列表">
       {lessons.map((lesson) => (
+        // key 表达课程的稳定身份，不要使用数组下标或随机数。
         <li key={lesson.id}>
-          <Button
+          <button
+            type="button"
             aria-pressed={lesson.id === selectedId}
             onClick={() => onSelect(lesson.id)}
-            tone={lesson.id === selectedId ? 'primary' : 'neutral'}
           >
             {lesson.title} · {lesson.level}
-          </Button>
+          </button>
         </li>
       ))}
     </ul>

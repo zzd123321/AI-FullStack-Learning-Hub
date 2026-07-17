@@ -8,6 +8,7 @@ interface SearchControlsProps {
 
 export function SearchControls({ filters, onChange }: SearchControlsProps) {
   function updateKeyword(event: ChangeEvent<HTMLInputElement>): void {
+    // 尽早从 DOM Event 取出领域值，并创建新的筛选对象。
     onChange({ ...filters, keyword: event.currentTarget.value })
   }
 

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Button } from './Button'
 
 export function StateSnapshotDemo() {
   const [count, setCount] = useState(0)
@@ -23,8 +22,12 @@ export function StateSnapshotDemo() {
       <h2>State 快照与更新队列</h2>
       <output aria-live="polite">当前计数：{count}</output>
       <div>
-        <Button onClick={addThreeFromSnapshot}>用快照连续加三次</Button>
-        <Button onClick={addThreeFromQueue}>用函数更新连续加三次</Button>
+        <button type="button" onClick={addThreeFromSnapshot}>
+          用快照连续加三次
+        </button>
+        <button type="button" onClick={addThreeFromQueue}>
+          用函数更新连续加三次
+        </button>
       </div>
     </section>
   )

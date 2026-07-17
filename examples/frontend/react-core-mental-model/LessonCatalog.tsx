@@ -15,7 +15,10 @@ const initialFilters: LessonFilters = {
 }
 
 export function LessonCatalog({ initialLessons }: LessonCatalogProps) {
+  // catalog 会被编辑，所以它是 State；复制数组避免把 Props 当作可变容器。
   const [catalog, setCatalog] = useState<readonly Lesson[]>(() => [...initialLessons])
+
+  // 筛选条件需要同时交给 SearchControls 和课程列表，由共同父组件拥有。
   const [filters, setFilters] = useState<LessonFilters>(initialFilters)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
@@ -24,6 +27,8 @@ export function LessonCatalog({ initialLessons }: LessonCatalogProps) {
   const selectedLesson = catalog.find((lesson) => lesson.id === selectedId) ?? null
 
   function saveTitle(lessonId: string, title: string): void {
+    // 使用函数式更新，确保基于更新队列里的最新课程数组计算。
+    // map 和对象展开会创建新值，不修改旧 State 快照。
     setCatalog((current) =>
       current.map((lesson) =>
         lesson.id === lessonId ? { ...lesson, title } : lesson

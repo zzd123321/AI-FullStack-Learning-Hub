@@ -11,6 +11,7 @@ export function filterLessons(
   source: readonly Lesson[],
   filters: LessonFilters
 ): readonly Lesson[] {
+  // 先统一搜索格式，使下面的过滤条件只关心业务判断。
   const keyword = filters.keyword.trim().toLocaleLowerCase()
 
   return source.filter((lesson) => {
