@@ -27,9 +27,11 @@ def _validated_copy(value: object) -> dict[str, str]:
 def load_config(path: Path) -> dict[str, str]:
     """Load a string-to-string JSON object and translate infrastructure errors."""
     try:
+        # with 无论 json.load 成功还是抛异常都会关闭文件对象。
         with path.open("r", encoding="utf-8") as stream:
             value = json.load(stream)
     except FileNotFoundError as error:
+        # 领域异常对调用方稳定，同时 from 保留底层异常与 traceback。
         raise ConfigNotFoundError(f"configuration does not exist: {path}") from error
     except json.JSONDecodeError as error:
         raise ConfigFormatError(
@@ -49,6 +51,7 @@ def atomic_text_writer(target: Path) -> Iterator[TextIO]:
     performed on the same filesystem. If the with body fails, the old target is
     left untouched and the temporary file is removed.
     """
+    # 临时文件必须与目标同目录，os.replace 才能在同一文件系统内原子替换。
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{target.name}.", suffix=".tmp", dir=target.parent, text=True
     )
@@ -63,9 +66,11 @@ def atomic_text_writer(target: Path) -> Iterator[TextIO]:
 
         with stream:
             yield stream
+            # flush 把 Python 缓冲交给 OS，fsync 再请求 OS 把文件内容同步到底层设备。
             stream.flush()
             os.fsync(stream.fileno())
 
+        # 只有 with 主体和同步全部成功，旧目标才被完整新文件替换。
         os.replace(temporary_path, target)
     except BaseException:
         temporary_path.unlink(missing_ok=True)

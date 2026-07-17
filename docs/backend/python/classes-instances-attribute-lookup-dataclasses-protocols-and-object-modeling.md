@@ -22,6 +22,8 @@ task = {"id": "task-1", "title": "Learn Python", "status": "pending"}
 
 类也不是默认答案。无状态转换、只有少量字段的临时数据，函数、tuple、`TypedDict` 或普通 mapping 可能更直接。本课目标是理解机制后做建模选择，而不是把所有名词变成类。
 
+第一次学习先掌握 `class`、实例、`self`、`__init__`、实例属性与组合。descriptor、MRO 和 `__new__` 用来解释 Python 对象机制的边界，不需要在开始 FastAPI 前熟练运用。
+
 ## 2. 本课目标
 
 完成本课后，应能解释：

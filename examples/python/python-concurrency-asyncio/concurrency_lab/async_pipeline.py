@@ -29,12 +29,14 @@ class ActivityProbe:
 async def _fetch_async(job: Job, probe: ActivityProbe) -> JobResult:
     probe.enter(job.id)
     try:
+        # asyncio.sleep 是可等待点；当前 Task 暂停时 event loop 可以推进其他 Task。
         await asyncio.sleep(job.delay)
         if job.fail:
             raise JobError(f"job failed: {job.id}")
         return JobResult(job.id, "event-loop")
     except asyncio.CancelledError:
         probe.cancelled.append(job.id)
+        # 记录后必须重新抛出，让 TaskGroup/timeout 正确观察取消状态。
         raise
     finally:
         probe.exit(job.id)
@@ -43,6 +45,7 @@ async def _fetch_async(job: Job, probe: ActivityProbe) -> JobResult:
 async def _bounded_fetch(
     job: Job, semaphore: asyncio.Semaphore, probe: ActivityProbe
 ) -> JobResult:
+    # Semaphore 限制真正进入外部操作的任务数，Task 数量不等于下游并发量。
     async with semaphore:
         return await _fetch_async(job, probe)
 
@@ -63,6 +66,7 @@ async def run_async(
     semaphore = asyncio.Semaphore(concurrency)
     tasks: list[asyncio.Task[JobResult]] = []
 
+    # timeout 覆盖整个任务组；超时或子任务失败时 TaskGroup 会取消其余子任务并等待清理。
     async with asyncio.timeout(timeout):
         async with asyncio.TaskGroup() as group:
             tasks = [
@@ -73,4 +77,5 @@ async def run_async(
                 for job in jobs
             ]
 
+    # 离开 TaskGroup 时所有任务都已完成，result() 在这里不会阻塞 event loop。
     return tuple(task.result() for task in tasks)

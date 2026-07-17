@@ -13,6 +13,7 @@ class ValidationError(ValueError):
 
 
 def is_string_list(value: object) -> TypeGuard[list[str]]:
+    # TypeGuard 同时执行运行时检查，并告诉静态检查器成功分支中的具体类型。
     return isinstance(value, list) and all(isinstance(item, str) for item in value)
 
 
@@ -38,10 +39,12 @@ def _task_status(value: object) -> TaskStatus:
 
 
 def parse_task(value: object) -> Task:
+    # 外部 JSON 应从 object 开始，经过逐项验证后才构造可信 Task。
     payload = _as_string_mapping(value)
     raw_priority = payload.get("priority")
     raw_tags = payload.get("tags", [])
 
+    # bool 是 int 的子类，因此必须单独排除 True/False。
     if not isinstance(raw_priority, int) or isinstance(raw_priority, bool):
         raise ValidationError("priority must be an integer")
     if not 1 <= raw_priority <= 5:

@@ -10,7 +10,9 @@ from .quote import build_quote
 
 def build_report() -> dict[str, Any]:
     original = ["Python"]
+    # 赋值只增加一个指向同一 list 的名称，不会复制 list。
     alias = original
+    # copy 创建新的外层 list；其中元素引用仍会被共享。
     shallow_copy = original.copy()
     alias.append("FastAPI")
 
@@ -20,6 +22,7 @@ def build_report() -> dict[str, Any]:
 
     number = 10
     previous_number = number
+    # int 不可变，+= 产生新整数并让 number 重新绑定，previous_number 仍指向 10。
     number += 1
 
     return {

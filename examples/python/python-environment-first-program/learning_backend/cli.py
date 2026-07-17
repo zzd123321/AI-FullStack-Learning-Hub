@@ -19,13 +19,16 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    # argv 可由测试显式传入；生产运行时传 None，argparse 会读取 sys.argv。
     parser = create_parser()
     arguments = parser.parse_args(argv)
 
     try:
+        # CLI 只做输入/输出适配，真正的业务校验留在可独立测试的函数中。
         message = build_greeting(arguments.name, arguments.topic)
     except ValueError as error:
         parser.error(str(error))
 
     print(message)
+    # 返回值由 __main__ 转成进程退出状态；0 表示程序正常完成。
     return 0
