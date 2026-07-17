@@ -143,6 +143,7 @@ export default defineConfig({
             { text: '渲染性能、并发特性与 Suspense', link: '/frontend/react/rendering-performance-concurrency-and-suspense' },
             { text: '测试策略与可测试架构', link: '/frontend/react/testing-strategy-and-testable-architecture' },
             { text: 'Server Components、Server Functions 与全栈边界', link: '/frontend/react/server-components-functions-and-fullstack-boundaries' },
+            { text: 'Server Components、Server Functions 与全栈边界（补充）', link: '/frontend/react/server-components-server-functions-and-fullstack-boundaries' },
             { text: '大型应用架构、渐进迁移与生产治理', link: '/frontend/react/large-scale-architecture-migration-and-production-governance' }
           ]
         },
@@ -255,6 +256,8 @@ export default defineConfig({
             ,{ text: '异步、调度、上下文与优雅停机', link: '/backend/spring-boot/async-execution-scheduling-context-and-graceful-shutdown' }
             ,{ text: 'RabbitMQ、Kafka、可靠投递与 Outbox', link: '/backend/spring-boot/messaging-rabbitmq-kafka-reliability-and-outbox' }
             ,{ text: 'Spring Security：认证、授权、Session、JWT 与 CSRF', link: '/backend/spring-boot/security-authentication-authorization-session-jwt-and-csrf' }
+            ,{ text: '测试策略：JUnit、Mockito、切片测试与集成测试', link: '/backend/spring-boot/testing-strategy-junit-mockito-slices-and-integration-tests' }
+            ,{ text: '生产运行时：打包、配置、健康检查、代理与优雅停机', link: '/backend/spring-boot/production-packaging-configuration-health-proxy-and-graceful-shutdown' }
           ]
         }
         ,{
@@ -288,7 +291,15 @@ export default defineConfig({
         {
           text: '后端架构', collapsed: false, items: [
             { text: '专题首页', link: '/backend/architecture/' },
-            { text: 'HTTP API：资源建模、语义、错误、分页、并发与版本', link: '/backend/architecture/http-api-resource-modeling-semantics-errors-pagination-concurrency-and-versioning' }
+            { text: 'HTTP API：资源建模、语义、错误、分页、并发与版本', link: '/backend/architecture/http-api-resource-modeling-semantics-errors-pagination-concurrency-and-versioning' },
+            { text: 'HTTP 缓存、CDN、再验证、缓存键与失效', link: '/backend/architecture/http-cache-cdn-revalidation-keys-and-invalidation' },
+            { text: '应用缓存、Redis、Cache-Aside、TTL 与一致性', link: '/backend/architecture/application-cache-redis-cache-aside-ttl-stampede-and-consistency' },
+            { text: '事件驱动、Broker、确认、重试、幂等与 Outbox', link: '/backend/architecture/messaging-event-driven-broker-ack-retry-idempotency-and-outbox' },
+            { text: '分布式事务、Saga、补偿与一致性', link: '/backend/architecture/distributed-transactions-saga-compensation-and-consistency' },
+            { text: '超时、重试、熔断、隔舱、限流与过载保护', link: '/backend/architecture/resilience-deadline-retry-circuit-breaker-bulkhead-rate-limit-and-overload' },
+            { text: 'API Gateway、服务发现、健康检查与配置', link: '/backend/architecture/api-gateway-service-discovery-health-and-configuration' },
+            { text: '微服务边界、模块化单体与渐进演进', link: '/backend/architecture/microservice-boundaries-modular-monolith-and-evolution' },
+            { text: '容量、SLO、可用性与灾难恢复', link: '/backend/architecture/capacity-slo-availability-and-disaster-recovery' }
           ]
         }
       ],
@@ -297,58 +308,13 @@ export default defineConfig({
           text: '数据库',
           items: [
             { text: '专题首页', link: '/database/' },
-            {
-              text: '关系模型与第一条查询',
-              link: '/database/relational-model-and-first-query'
-            },
-            { text: 'MySQL 与 PostgreSQL 基础', link: '/database/mysql-postgresql-basics' },
-            { text: '数据类型、默认值与约束', link: '/database/data-types-defaults-and-constraints' },
-            { text: 'SELECT、过滤、排序与分页', link: '/database/select-filter-sort-pagination' },
-            { text: '表关系与 JOIN', link: '/database/relationships-and-joins' },
-            { text: '聚合、GROUP BY 与 HAVING', link: '/database/aggregates-group-by-having' },
-            { text: '子查询与 CTE', link: '/database/subqueries-and-cte' },
-            { text: '安全的 INSERT、UPDATE 与 DELETE', link: '/database/safe-insert-update-delete' },
-            { text: '索引与查询形状', link: '/database/indexes-and-query-shapes' },
-            { text: '读懂查询执行计划', link: '/database/reading-query-plans' },
-            { text: '事务与 ACID', link: '/database/transactions-and-acid' },
-            { text: '事务隔离级别', link: '/database/transaction-isolation-levels' },
-            { text: '锁与 MVCC', link: '/database/locks-and-mvcc' },
-            { text: '数据库设计与范式', link: '/database/database-design-and-normalization' },
-            { text: 'Redis 基础与数据类型', link: '/database/redis/fundamentals-and-data-types' }
-            ,{ text: 'Redis 专题首页', link: '/database/redis/' }
-            ,{ text: 'Cache-Aside 与缓存一致性', link: '/database/redis/cache-aside-and-consistency' }
-            ,{ text: '缓存穿透、击穿与雪崩', link: '/database/redis/cache-penetration-breakdown-avalanche' }
-            ,{ text: '分布式锁、幂等、计数器与限流', link: '/database/redis/distributed-locks-idempotency-counters-rate-limiting' }
-            ,{ text: 'List、Pub/Sub 与 Streams 消息模型', link: '/database/redis/lists-pubsub-streams-messaging' }
-            ,{ text: 'TTL、内存淘汰、大 key 与热 key', link: '/database/redis/ttl-memory-eviction-big-hot-keys' }
-            ,{ text: 'RDB、AOF、复制、Sentinel 与故障转移', link: '/database/redis/persistence-replication-sentinel-failover' }
-            ,{ text: 'Redis Cluster、分片与 hash slot', link: '/database/redis/cluster-sharding-hash-slots-multi-key' }
-            ,{ text: 'Redis 安全、可观测性与容量规划', link: '/database/redis/security-observability-capacity-planning' }
-            ,{ text: 'Redis 客户端、超时、重试与优雅停机', link: '/database/redis/client-connections-timeouts-retries-shutdown' }
-            ,{ text: '数据库性能诊断', link: '/database/database-performance-diagnosis' }
-            ,{ text: 'SQL 与索引优化', link: '/database/sql-and-index-optimization' }
-            ,{ text: '连接池、超时与过载保护', link: '/database/connection-pools-timeouts-overload' }
-            ,{ text: '读写分离、复制延迟与一致性', link: '/database/read-write-splitting-replication-consistency' }
-            ,{ text: '分区表、数据生命周期与归档', link: '/database/partitioning-data-lifecycle-archiving' }
-            ,{ text: '分库分表、路由与全局一致性', link: '/database/sharding-routing-global-consistency' }
-            ,{ text: '备份、PITR 与灾难恢复', link: '/database/backup-pitr-disaster-recovery' }
-            ,{ text: 'Schema 迁移与在线 DDL', link: '/database/schema-migrations-online-ddl' }
-            ,{ text: '访问控制、租户隔离与审计', link: '/database/access-control-tenant-isolation-auditing' }
-            ,{ text: '容量规划、SLO 与压测', link: '/database/capacity-planning-slo-load-testing' }
-            ,{ text: '故障响应、切换与复盘', link: '/database/incident-response-failover-postmortem' }
-            ,{ text: '版本升级、兼容性与回滚', link: '/database/version-upgrades-compatibility-rollback' }
-            ,{ text: '数据质量、对账与安全修复', link: '/database/data-quality-reconciliation-safe-repair' }
-            ,{ text: '技术选型、架构评审与演进', link: '/database/technology-selection-architecture-review-evolution' }
-            ,{ text: 'CDC、Transactional Outbox 与可靠事件传播', link: '/database/cdc-transactional-outbox-reliable-events' }
-            ,{ text: '大规模数据回填、分批与检查点', link: '/database/large-scale-backfills-batching-checkpoints' }
-            ,{ text: '数据库测试、测试数据、CI 与发布门禁', link: '/database/testing-test-data-ci-release-gates' }
-            ,{ text: '视图、物化视图、汇总表与派生读模型', link: '/database/views-materialized-views-summary-read-models' }
-            ,{ text: '时间语义、历史数据与时态建模', link: '/database/time-semantics-history-temporal-modeling' }
-            ,{ text: '函数、存储过程、触发器与定时任务的边界', link: '/database/functions-procedures-triggers-scheduled-jobs' }
-            ,{ text: 'ORM、驱动与 Repository 边界', link: '/database/orm-drivers-repository-boundaries' }
-            ,{ text: 'JSON 与半结构化数据建模', link: '/database/json-semi-structured-data-modeling' }
-            ,{ text: '全文检索、排序与搜索架构', link: '/database/full-text-search-ranking-architecture' }
-            ,{ text: '数据库全栈综合项目', link: '/database/full-stack-capstone' }
+            { text: '全栈必修主线', link: '/database/core/' },
+            { text: '后端工程进阶', link: '/database/advanced/' },
+            { text: '架构与运维参考', link: '/database/reference/' },
+            { text: 'Redis 专题首页', link: '/database/redis/' },
+            { text: 'Redis 全栈必修', link: '/database/redis/core/' },
+            { text: 'Redis 进阶', link: '/database/redis/advanced/' },
+            { text: 'Redis 架构与运维参考', link: '/database/redis/reference/' }
           ]
         }
       ],
