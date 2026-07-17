@@ -37,6 +37,8 @@ export function useLessonSearch(keyword: Ref<string>, gateway: LessonGateway) {
 
   const stop = watch(keyword, search, { immediate: true })
   onScopeDispose(() => {
+    // 即使 Gateway 无法真正取消，作用域销毁后旧请求也失去写回资格。
+    requestId += 1
     stop()
     controller?.abort()
   })

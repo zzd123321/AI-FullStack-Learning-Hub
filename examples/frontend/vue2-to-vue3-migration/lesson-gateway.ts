@@ -12,6 +12,35 @@ function toSearchParams(query: LessonSearchQuery): URLSearchParams {
   })
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function parseSearchResult(value: unknown): LessonSearchResult {
+  if (!isRecord(value) || !Array.isArray(value.items) || typeof value.total !== 'number') {
+    throw new Error('课程接口返回了无效数据')
+  }
+
+  const items = value.items.map((item) => {
+    if (
+      !isRecord(item) ||
+      typeof item.id !== 'string' ||
+      typeof item.title !== 'string' ||
+      !['beginner', 'intermediate', 'advanced'].includes(String(item.level))
+    ) {
+      throw new Error('课程接口返回了无效数据')
+    }
+
+    return {
+      id: item.id,
+      title: item.title,
+      level: item.level as 'beginner' | 'intermediate' | 'advanced'
+    }
+  })
+
+  return { items, total: value.total }
+}
+
 export function createHttpLessonGateway(
   fetcher: typeof fetch = fetch
 ): LessonGateway {
@@ -26,7 +55,7 @@ export function createHttpLessonGateway(
         throw new Error(`课程搜索失败：${response.status}`)
       }
 
-      return (await response.json()) as LessonSearchResult
+      return parseSearchResult(await response.json())
     }
   }
 }

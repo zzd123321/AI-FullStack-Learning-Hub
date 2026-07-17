@@ -35,7 +35,8 @@ export function summarizeMigration(items: readonly MigrationItem[]): MigrationSu
     blocked,
     remainingCompat,
     verified,
-    readyToRemoveCompat: items.length > 0 && blocked === 0 && remainingCompat === 0
+    // “已经改成原生 Vue 3”仍不等于“行为已经验证”。
+    readyToRemoveCompat: items.length > 0 && verified === items.length
   }
 }
 

@@ -1,75 +1,78 @@
 ---
 title: Vue 2 到 Vue 3 的渐进式迁移与大型应用架构
-description: 用兼容构建、边界适配、自动化验证和可回滚发布，把大型 Vue 2 应用安全迁移到原生 Vue 3
+description: 用兼容构建、契约适配、业务切片和可回滚发布，把大型 Vue 2 应用迁移到原生 Vue 3
 ---
 
 # Vue 2 到 Vue 3 的渐进式迁移与大型应用架构
 
-> 适用对象：维护过 Vue 2 Options API、Vue Router 3、Vuex 与传统 Vue CLI/Webpack 项目的开发者。Vue 2 已于 2023 年 12 月 31 日结束官方支持；依赖版本和兼容性必须按项目锁文件及官方迁移说明逐项核对。
+> 适合维护过 Vue 2 Options API、Vue Router 3、Vuex 与 Vue CLI/Webpack 项目的开发者。Vue 2 已在 2023 年底结束官方支持；迁移时必须以项目锁文件、依赖矩阵和官方迁移说明为准。
 
-## 1. 学习目标
+你已经学完 Vue 3 的组件、响应式、Pinia、Router、表单、性能、测试和 SSR。回到一个运行多年的 Vue 2 项目，真正的问题不是“怎样把 data 改成 ref”，而是：
 
-完成本节后，你应该能够：
+> 怎样在业务继续迭代的同时替换运行平台，并且随时知道改坏了什么、怎样回退？
 
-- 把迁移视为受约束的系统演进，而不是一次大规模语法重写。
-- 盘点运行时、模板、插件、组件库、构建链与浏览器支持风险。
-- 判断原地升级、`@vue/compat`、Vue 2.7 过渡和并行应用的适用条件。
-- 建立可观测、可分批、可回滚的迁移路线。
-- 正确迁移 `createApp`、`v-model`、Events、Attrs、Slots 和生命周期。
-- 升级 Vue Router 3 到 4，并识别路由行为而非只改 API 名称。
-- 在 Vuex 与 Pinia 并存期间按业务域逐步迁移 Store。
-- 从 Mixins 和大型 Options 组件中提取稳定的 Composable 与服务边界。
-- 使用适配器保持新旧组件契约，降低调用方同时修改的范围。
-- 通过契约、组件、路由和 E2E 测试证明行为等价。
-- 定义移除兼容构建的客观退出条件。
+迁移成功的标志不是代码看起来像 `<script setup>`，而是系统已经运行在受支持的 Vue 3 生态上，关键行为有证据，兼容层可以删除。
 
-## 2. 迁移的真正目标
+## 先把三个目标拆开
 
-迁移不是让代码“看起来像 Vue 3”，而是在业务持续交付的情况下改变运行平台，同时保持用户可观察行为、数据正确性和可运维性。
+大型迁移常把不同目标混成“前端重写”：
 
-应区分三个目标：
+1. **运行时迁移**：从 Vue 2 真正切到标准 Vue 3；
+2. **生态迁移**：Router、Store、UI 库、测试和构建链进入受支持版本；
+3. **架构改进**：清理 Mixins、事件总线、隐式全局和巨型组件。
 
-1. **运行时迁移**：应用真正运行在标准 Vue 3 上。
-2. **生态迁移**：Router、Store、UI 库、测试和构建工具进入受支持版本。
-3. **架构改进**：逐步清理全局状态、隐式 Mixins、事件总线和难测试组件。
+前两个通常是必要工作，第三个要按收益安排。
 
-前两个是必要条件，第三个应按收益实施。把三者一次性绑定成“重写整个前端”，会放大回归范围，也无法判断故障来自框架变化还是架构重构。
+若同时替换框架、Router、Vuex、HTTP Client、UI 库、目录、TypeScript 和全部组件写法，一次回归会有八种可能原因。长迁移分支还会持续与业务代码冲突。
 
-完成迁移的定义不应是“本地能打开首页”，而应包括：
-
-- 使用标准 Vue 3 构建，不再 Alias 到 `@vue/compat`。
-- 生产依赖不存在 Vue 2 副本或仅支持 Vue 2 的插件。
-- 兼容警告为零，控制台无 Vue 运行时警告。
-- 关键业务、深层路由、权限、表单和异常路径已验证。
-- 性能、错误率和核心转化不劣于迁移前基线。
-- 回滚方案经过演练，而不只是文档中的一句话。
-
-## 3. 为什么“大爆炸重写”通常失败
-
-一次性改框架、语言、状态库、路由、构建工具、UI 系统和目录结构，会让每个失败同时拥有多个可能原因。长分支还会持续与业务主线冲突，最后只能在压力下合并一个难以审查的巨型变更。
-
-更稳妥的原则是：
+更稳的路线是：
 
 ```text
-先建立基线 → 解耦环境边界 → 让旧代码跑在新运行时
-            → 按业务切片替换旧语义 → 移除兼容层
+建立可比较基线
+  ↓
+清理最危险的旧边界
+  ↓
+让旧业务先跑在 Vue 3 / compat
+  ↓
+按业务切片迁移契约
+  ↓
+每片独立验证、灰度、回滚
+  ↓
+清零 compat 与旧依赖
+  ↓
+再做有收益的架构优化
 ```
 
-每个阶段都应保持可部署。迁移可以慢，但不能处于长期“只有迁移分支能运行”的状态。
+## 完成定义要在动代码前写清楚
 
-## 4. 第一步不是升级，而是盘点
+“首页能打开”远远不够。迁移完成至少应满足：
 
-### 运行与产品约束
+- 标准 Vue 3 构建，不再把 `vue` alias 到 `@vue/compat`；
+- 生产依赖没有 Vue 2 副本和只支持 Vue 2 的插件；
+- compat 警告和 Vue runtime 警告为零；
+- 深层路由、权限、表单、异常和回退路径已验证；
+- 关键性能、错误率和业务指标不劣于基线；
+- 监控能区分旧实现和新实现；
+- 回滚流程真正演练过。
 
-- 是否仍需 IE11？Vue 3 不支持 IE11。
-- 是否有 SSR、微前端、多入口、内嵌 WebView 或浏览器扩展？
-- 哪些流程产生收入、权限变更或不可逆写操作？
-- 可以灰度到用户、租户、路由还是构建版本？
-- 可接受的维护窗口与回滚时间是多少？
+这份定义会影响每个阶段的证据和退出条件。如果最后才讨论“怎样算完成”，compat 很容易永久留在生产。
 
-### 代码扫描
+## 第一步不是升级依赖，而是建立事实
 
-优先搜索这些高信号模式：
+### 运行环境和产品约束
+
+先回答：
+
+- 是否仍要求 IE11？Vue 3 不支持 IE11；
+- 是否有 SSR、微前端、多入口、WebView 或浏览器扩展；
+- 哪些流程涉及收入、权限和不可逆写操作；
+- 能否按用户、租户、路由或发布版本灰度；
+- 可接受的回滚时间是多少；
+- 当前 Node、包管理器、构建环境和浏览器范围是什么。
+
+这些答案可能直接决定能否原地升级。
+
+### 用搜索找到高风险语法
 
 ```text
 new Vue(
@@ -78,558 +81,635 @@ $on / $off / $once / $children / $listeners / $scopedSlots
 .native / .sync / filters / functional
 beforeDestroy / destroyed
 Vue.set / this.$set / Vue.delete / this.$delete
-<transition-group> / render( / h(
-watch: 中被原地修改的数组
+watch 数组原地修改
+render( / h(
 ```
 
-搜索只能发现语法，不能发现依赖对 Vue 2 私有 VNode、全局构造器或 DOM 时序的假设。还要运行真实页面并收集兼容警告、组件堆栈和第三方调用来源。
+搜索只能找到显式语法。第三方库还可能依赖 Vue 2 VNode 私有字段、旧 Slot 形状或特定 DOM 时序。必须运行真实页面，记录 compat 警告、组件堆栈和来源。
 
-### 依赖矩阵
+### 建立依赖矩阵
 
-为每个运行时依赖记录：
+每个运行时依赖至少记录：
 
 | 字段 | 要回答的问题 |
 | --- | --- |
-| Vue 3 支持版本 | 是否有官方兼容版本，迁移说明是什么？ |
-| 维护状态 | 是否仍维护，安全与浏览器策略如何？ |
-| 替代方案 | 原包停更时是否能替换或内部封装？ |
-| 使用范围 | 全局初始化还是只有两个页面？ |
-| 私有 API | 是否读取 VNode、`_` 前缀字段或依赖旧 Slot 结构？ |
-| CSS/DOM 契约 | 升级后结构、类名和 Teleport 是否变化？ |
-| 阻塞等级 | 阻止启动、局部异常，还是仅有警告？ |
+| Vue 3 支持 | 官方支持哪个版本，迁移说明是什么 |
+| 维护状态 | 是否仍维护，安全公告和浏览器策略如何 |
+| 使用范围 | 全局初始化还是只在两个页面 |
+| 私有依赖 | 是否读取 VNode、`_` 字段或旧 Slot |
+| DOM/CSS 契约 | 升级后结构、class、Teleport 是否变化 |
+| 替代方案 | 停更时能否替换或包一层适配器 |
+| 阻塞等级 | 无法启动、局部异常还是仅警告 |
 
-不要只看 `peerDependencies`。UI 组件库可能声明支持 Vue 3，但主题、表单验证、日期时区或自动导入插件仍有行为差异。
+不要只看 peerDependencies。组件库即使“支持 Vue 3”，主题、表单校验、日期时区和自动导入插件也可能有行为差异。
 
-## 5. 先保存可比较的基线
+### 保存迁移前基线
 
-迁移前记录：
+至少记录：
 
-- 锁文件、Node 版本、构建命令和环境变量清单。
-- 单元、组件、E2E 当前通过率与已知 flaky case。
-- 关键页面截图和可访问性树。
-- 路由表、重定向、权限和滚动行为。
-- Bundle 大小、构建时长、LCP/INP、JS 错误率。
-- 登录、搜索、创建、编辑、支付等关键业务指标。
+- 锁文件、Node 版本、构建命令和环境变量；
+- 当前测试通过率与已知 flaky；
+- 路由、重定向、权限、滚动；
+- 关键页面截图和可访问性树；
+- Bundle、构建时长、LCP、INP、JS 错误率；
+- 登录、搜索、创建、支付等业务指标。
 
-没有迁移前数据，就无法区分“已有问题”和“迁移回归”，也无法证明新版本可以放量。
+没有基线，就无法区分旧问题和迁移回归，也无法证明新版本可以扩大流量。
 
-## 6. 四种迁移路径
+## 选择路径：不是所有项目都适合同一种迁移法
 
-### 直接升级到标准 Vue 3
+### 直接切标准 Vue 3
 
-适合规模较小、依赖简单、自动化覆盖良好的项目。优点是没有长期兼容债务；缺点是一次修改范围较大。
+适合依赖少、规模小、测试充分的项目。优点是没有 compat 债务；代价是一次修改范围更大。
 
 ### 使用 `@vue/compat`
 
-迁移构建本质是 Vue 3，但可配置地模拟部分 Vue 2 公共行为，并对已变更 API 发出警告。适合大多数能在同一运行时内升级的大型 SPA。
-
-它不保证兼容：依赖 Vue 2 内部 API、旧 VNode 细节、IE11 或复杂自定义 SSR 的项目可能无法直接使用。即使能运行，也要把 compat 当作临时迁移工具，不是最终运行平台。
+Migration Build 本质上是 Vue 3，但能模拟一部分 Vue 2 公共行为，并为已变化特性发出警告。
 
 典型节奏：
 
-1. 工具链和编译器升级到兼容组合。
-2. `vue` Alias 到 `@vue/compat`，版本与 Vue 保持一致。
-3. 先用 MODE 2 让旧行为运行，修编译错误和高频警告。
-4. 对已迁移组件切换 MODE 3，或逐项禁用兼容特性。
-5. 所有警告和依赖清零后移除 Alias，使用标准 Vue 3。
+1. 升级到兼容的 Vue、compiler-sfc、loader/plugin 组合；
+2. 将 `vue` alias 到同版本 `@vue/compat`；
+3. MODE 2 让大部分旧行为先运行；
+4. 修启动错误和高频警告；
+5. 对已迁移组件启用 MODE 3，或逐项关闭 compat；
+6. 警告和旧依赖清零后删除 alias。
 
-兼容标志不是“消音按钮”。每次临时开启都要有负责人、退出条件和验证证据。
+Compat 不是完整 Vue 2 模拟器。依赖内部 VNode、IE11、旧 SSR 或特殊私有 API 的项目可能不适用。
 
-### 先进入 Vue 2.7
+每个临时 compat flag 都应有：
 
-Vue 2.7 内置 Composition API 和部分现代 SFC 能力，可先在仍运行 Vue 2 的情况下提取 Composable、更新 Slot 语法和加强 TypeScript 边界。但它不提供 Vue 3 的 Proxy 运行时，也不能替代最终升级；Vue 2 本身已经 EOL。
+- 对应代码范围；
+- 负责人；
+- 为什么暂时保留；
+- 行为验证；
+- 删除条件和日期。
+
+关闭 warning 只会移除观察能力，不会完成迁移。
+
+### Vue 2.7 作为短期桥梁
+
+Vue 2.7 内置 Composition API 和部分现代 SFC 能力，可以先提取 Composable、改善 TypeScript 和更新可双栈语法。
+
+但它仍是 Vue 2 响应式运行时，且 Vue 2 已 EOL。它只能降低后续改动量，不能成为新的长期目标。
 
 ### 新旧应用并行
 
-当关键依赖无法共存、页面天然分区或后端能按路由分流时，可以让 Vue 2 和 Vue 3 作为两个独立入口：
+关键依赖不能共存、页面天然分区或团队需要独立发布时，可以让 Vue 2 与 Vue 3 成为两个入口，由网关按路由分发。
 
-- 服务端或网关按路径分发。
-- Vue 3 新应用逐路由接管。
-- 身份、导航、设计 Token 和遥测通过明确协议共享。
+必须明确共享协议：
 
-不要让两个 Vue 运行时同时管理同一 DOM 子树。微前端带来包体、路由、全局 CSS、通信和运维成本，只应在组织与发布独立性确有价值时采用。
+- 登录与会话；
+- 顶层导航；
+- 设计 Token；
+- 埋点与 request ID；
+- 跨应用跳转；
+- 错误和版本标识。
 
-## 7. 推荐的阶段化路线
+两个 Vue runtime 不能同时管理同一 DOM 子树。微前端还会增加包体、全局 CSS、路由和运维成本，只有组织与发布独立性真正有价值时才采用。
 
-| 阶段 | 主要产出 | 退出条件 |
+## 推荐按可部署阶段推进
+
+| 阶段 | 主要产出 | 退出证据 |
 | --- | --- | --- |
-| 0. 基线 | 测试、监控、依赖矩阵 | 能复现和度量当前版本 |
-| 1. 前置清理 | 去除私有 API、更新可双栈语法 | Vue 2 下行为不变 |
-| 2. 工具链 | Node、SFC 编译器、测试工具 | CI 可重复构建和测试 |
-| 3. Compat 启动 | Vue 3 runtime + 兼容警告 | 关键页面可以运行 |
-| 4. 核心生态 | Router 4、Store 策略、UI 库 | 导航与状态行为稳定 |
-| 5. 业务切片 | 逐域进入 Vue 3 原生语义 | 切片可独立灰度回滚 |
-| 6. 去 Compat | 标准 Vue 3 | 零兼容标志、零旧依赖 |
-| 7. 优化 | Composition、Pinia、Vite 等 | 由收益驱动而非迁移阻塞 |
+| 基线 | 测试、监控、依赖矩阵 | 能复现和度量旧版本 |
+| 前置清理 | 去私有 API、统一服务边界 | Vue 2 下行为不变 |
+| 工具链 | 受支持 Node、编译和测试 | CI 可重复构建 |
+| Compat 启动 | Vue 3 runtime + 警告台账 | 核心页面可运行 |
+| 生态升级 | Router、UI、Store 策略 | 导航和状态有集成证据 |
+| 业务切片 | 每个领域进入原生语义 | 可独立灰度回滚 |
+| 去 Compat | 标准 Vue 3 | 所有台账项已验证 |
+| 后续优化 | Pinia、Vite、Composition | 由收益而非迁移阻塞驱动 |
 
-把“工具链换 Vite”与“Vue 运行时迁移”拆开评估。Vite 是 Vue 3 官方推荐工具，但如果旧 Webpack 构建本身复杂，先在原工具链升级运行时可减少变量；也可以先让 Vue 2 在 Vite 上运行。选择取决于哪条路径更易验证和回滚。
+工具链换 Vite 与运行时升级也可以拆开。旧 Webpack 极复杂时，先在原工具链切运行时可能变量更少；也可以先让 Vue 2 运行在 Vite。选择“更容易验证和回滚”的顺序，不要把工具偏好当作唯一答案。
 
-## 8. 应用入口：从全局构造器到 App 实例
+## 应用全局从构造器变成实例边界
 
-Vue 2 的 `Vue.use()`、`Vue.mixin()`、`Vue.component()` 和 `Vue.prototype` 修改共享构造器，容易污染测试和同页其他根实例。Vue 3 把可变全局配置收敛到 `createApp()` 返回的应用实例。
+Vue 2 的：
 
 ```ts
-// Vue 2
-Vue.use(router)
+Vue.use(plugin)
+Vue.mixin(mixin)
+Vue.component('BaseButton', BaseButton)
 Vue.prototype.$api = api
-new Vue({ store, render: (h) => h(App) }).$mount('#app')
 ```
 
-标准 Vue 3 入口：
+修改共享 Vue 构造器，容易污染测试和同页面其他根实例。
+
+Vue 3 把这些配置放在 `createApp()` 返回的实例上：
 
 <<< ../../../examples/frontend/vue2-to-vue3-migration/main.mts
 
-迁移插件时检查：
+这不是单纯 API 改名，而是隔离模型改变：
 
-- 插件是否实现 `install(app, options)`。
-- 全局组件和指令是否注册到当前 app。
-- 是否能用 `provide/inject` 代替 `globalProperties`。
-- 测试是否每例创建新 app，而非复用污染后的全局 Vue。
-- `mount()` 不再用新根节点替换容器，依赖容器 DOM 的 CSS/测试要复核。
+- 每个 app 安装自己的插件、组件和指令；
+- 测试可以创建独立 app；
+- 微前端根实例不必共享所有配置；
+- SSR 可以每请求创建 app。
 
-不要机械地把所有 `Vue.prototype.$api` 改成 `app.config.globalProperties.$api`。后者仍是隐式全局依赖；对业务服务优先使用显式导入或带类型的 Provide/Inject。
+不要机械地把所有 `Vue.prototype.$api` 改成 `app.config.globalProperties.$api`。它仍是隐式全局。业务服务优先显式 import，或通过带类型的 provide/inject 从应用边界提供。
 
-## 9. Options API 不需要被“消灭”
-
-Options API 在 Vue 3 中仍被支持，也没有官方弃用计划。一个迁移后的 Options 组件可以先只修改破坏性 API，保持业务结构不变：
-
-<<< ../../../examples/frontend/vue2-to-vue3-migration/LegacyLessonSearch.vue
-
-该组件已经使用 Vue 3 的 `beforeUnmount` 与 `emits`，但仍是 Options API。这样做的好处是把“运行时兼容”与“代码组织优化”分成两个可审查步骤。
-
-适合重构为 Composition API 的信号：
-
-- 单个业务关注点散落在 data、computed、watch、methods 和生命周期。
-- 多个组件靠 Mixin 复制逻辑，来源和冲突不清晰。
-- 依赖 `this` 让 TypeScript 推断困难。
-- 同一状态机需要在组件、Store 和测试中复用。
-
-小而稳定的 Options 组件没有迁移压力。为了风格统一改写几百个简单组件，通常收益低于风险。
-
-## 10. 从 Mixin 提取 Composable，而不是逐行翻译
-
-先识别一个完整业务能力的输入、输出、副作用和清理，再提取。课程搜索 Composable：
-
-<<< ../../../examples/frontend/vue2-to-vue3-migration/useLessonSearch.mts
-
-它显式接收响应式关键词和 `LessonGateway`，并处理：
-
-- 旧请求取消。
-- 异步竞态隔离。
-- Error 边界。
-- Scope 销毁时停止 Watch 和 Abort。
-- 对外暴露只读状态。
-
-迁移后的页面组件只负责模板契约：
-
-<<< ../../../examples/frontend/vue2-to-vue3-migration/LessonSearch.vue
-
-不要把 Mixin 中所有字段原样塞进一个巨型 `useLegacyPage()`。那只是把隐式耦合从 Options 搬到函数。按搜索、权限、草稿、遥测等业务能力拆分，并显式传入服务。
-
-## 11. 建立与 Vue 无关的服务边界
-
-迁移最容易验证的是纯 TypeScript 契约：
-
-<<< ../../../examples/frontend/vue2-to-vue3-migration/contracts.ts
-
-HTTP 实现在框架外：
-
-<<< ../../../examples/frontend/vue2-to-vue3-migration/lesson-gateway.ts
-
-这样旧 Options 组件和新 Composition 组件可以调用同一个 Gateway，避免迁移时同时重写数据协议。测试也能注入内存实现，不依赖 `this.$http` 或模块 Mock。
-
-边界应处理 URL、Header、状态码和数据验证；组件负责交互状态。不要让组件到处拼 URL，也不要让 API Client 持有 Vue ref。
-
-## 12. `v-model` 与 `.sync` 的契约迁移
-
-Vue 2 自定义组件默认使用：
-
-```text
-prop: value       event: input
-```
-
-Vue 3 默认使用：
-
-```text
-prop: modelValue  event: update:modelValue
-```
-
-`.sync` 和组件 `model` Option 被带参数的 `v-model` 取代；Vue 3 还允许一个组件有多个 `v-model`。
-
-原生 Vue 3 Toggle：
-
-<<< ../../../examples/frontend/vue2-to-vue3-migration/BaseToggle.vue
-
-如果几十个旧调用方仍传 `value` / 监听 `input`，先加薄适配器：
-
-<<< ../../../examples/frontend/vue2-to-vue3-migration/LegacyToggleAdapter.vue
-
-适配器让新组件内部只维护一种标准契约，旧调用方可逐步切换。等调用数归零再删除适配器。不要让核心组件永久同时支持两套 Props/Events，否则每个状态都可能出现双写和优先级问题。
-
-## 13. Events、`$attrs` 与组件边界
-
-Vue 3 移除了组件实例的 `$on`、`$off`、`$once`，因此 `new Vue()` 事件总线模式不再成立。先判断通信类型：
-
-- 父子通信：Props / Emits。
-- 跨层依赖：Provide / Inject。
-- 共享业务状态：Pinia。
-- 与 Vue 无关的短生命周期通知：小型外部 emitter。
-
-本课的类型安全 Emitter：
-
-<<< ../../../examples/frontend/vue2-to-vue3-migration/typed-emitter.ts
-
-运行时只创建一个显式实例：
-
-<<< ../../../examples/frontend/vue2-to-vue3-migration/migration-runtime.mts
-
-它仍然需要退订和所有权规则，不能成为新的全局垃圾场。若事件会影响页面可恢复业务状态，应放入 Store，而不是依赖“刚好收到过”某个瞬时事件。
-
-Vue 3 新增 `emits` 声明。未声明的事件监听器会进入 `$attrs`，默认落到根元素；再手动 `$emit` 同名原生事件可能造成触发两次。迁移组件必须盘点公开事件并声明它们。
-
-同时注意：
-
-- `.native` 被移除。
-- `$listeners` 合并进 `$attrs`。
-- `$attrs` 现在包含 `class` 和 `style`。
-- Fragment 多根组件无法自动判断 Attr 应落在哪个根，需要显式 `v-bind="$attrs"`。
-- Slot 在 Vue 3 中统一为函数，读取和转发方式需要复核。
-
-## 14. 模板语义变化不能靠类型检查发现
-
-高风险变化包括：
-
-| Vue 2 习惯 | Vue 3 行为/迁移策略 |
-| --- | --- |
-| 同元素同时写 `v-for` 与 `v-if` | 优先级变化；用外层 `<template>` 或计算属性拆开 |
-| 多个 `v-bind` 合并 | 顺序决定覆盖结果；显式安排对象和单项绑定顺序 |
-| `<template v-for>` 的 Key 在子节点 | Key 放到 `<template>` 上 |
-| Filter `{{ value \| format }}` | 改用方法、Computed 或普通格式化函数 |
-| KeyCode 修饰符 | 使用按键名修饰符 |
-| `TransitionGroup` 默认有根元素 | 明确 `tag` 或调整 CSS/布局 |
-| `*-enter` / `*-leave` 类 | 检查新的 `*-enter-from` / `*-leave-from` 类名 |
-| 函数式 SFC 模板 | 改为普通函数或标准组件 |
-| 异步组件工厂 | 使用 `defineAsyncComponent()` |
-
-模板编译警告很有价值，但视觉回归、DOM 查询、Transition 和 CSS 选择器仍需浏览器测试。
-
-## 15. 响应式差异与 Watch 陷阱
-
-Vue 3 使用 Proxy，因此通常不再需要 `Vue.set` / `this.$set` / `Vue.delete`。直接新增和删除响应式对象属性即可。
-
-但“删除 `$set`”不代表响应式语义完全相同：
-
-- 对同一原始对象调用 `reactive()` 得到 Proxy，身份比较要谨慎。
-- 解构 reactive 属性会失去响应式连接，应使用 `toRefs()` 或直接访问对象。
-- 第三方类实例、不可变对象可考虑 `markRaw` / `shallowRef`。
-- 不应依赖 Vue 2 Observer 的 `__ob__` 等内部字段。
-
-Watch 数组是常见静默回归。Vue 3 默认只在数组被替换时触发；若要观察 `push/splice`：
-
-```ts
-watch(items, handleItemsChange, { deep: 1 }) // Vue 3.5+
-```
-
-Vue 3.0—3.4 只能用 `deep: true`，但这还会深度遍历元素。不要为了模拟旧行为给所有 Watch 加 `deep: true`；先确认真正依赖的是数组成员变化、元素内部变化，还是可由 Action 显式触发的业务事件。
-
-## 16. 生命周期与指令迁移
-
-主要命名变化：
-
-```text
-beforeDestroy → beforeUnmount
-destroyed     → unmounted
-```
-
-自定义指令 Hook 也与组件生命周期对齐，例如 `bind` → `beforeMount`、`inserted` → `mounted`、`componentUpdated` → `updated`、`unbind` → `unmounted`。指令的 Binding、VNode 参数也要按官方说明检查，不能只重命名函数。
-
-迁移时重点验证资源清理：Timer、Observer、EventListener、Socket、AbortController 是否确实在卸载时释放。`KeepAlive` 页面还要区分 deactivated 与 unmounted。
-
-## 17. Vue Router 3 到 4
-
-完整 Vue Router 4 示例：
+示例 Router 也改成工厂：
 
 <<< ../../../examples/frontend/vue2-to-vue3-migration/router.mts
 
-关键变化：
+普通 SPA 可以只创建一次；测试、SSR 或多入口则能获得独立实例。
 
-- `new VueRouter()` → `createRouter()`。
-- `mode: 'history'` → `history: createWebHistory(base)`。
-- Hash/abstract 分别对应 `createWebHashHistory()` / `createMemoryHistory()`。
-- `onReady()` → 返回 Promise 的 `isReady()`。
-- `router.currentRoute` 现在是 Ref，组件外读取 `.value`。
-- Catch-all 从 `*` 改为 `/:pathMatch(.*)*`。
-- `scrollBehavior` 的 `x/y` 改为 `left/top`。
-- 导航守卫可返回值，不再要求到处调用 `next()`。
-- `<RouterView>` 与 Transition/KeepAlive 组合使用 scoped slot。
+## Options API 不需要在迁移中消失
 
-迁移 Router 不能只让 TypeScript 通过。必须验证：
+Vue 3 继续支持 Options API。下面的组件已经满足 Vue 3 语义，却仍保留熟悉结构：
 
-- 直接打开深层 URL 时服务器回退配置正确。
-- Base path、编码参数、Query 和尾斜线行为。
-- 登录重定向和 return URL 不形成循环或开放重定向。
-- 重复导航、取消导航、异步权限和 404。
-- Back/Forward、滚动恢复、KeepAlive 缓存 Key。
-- 手写 `history.pushState()` 不破坏 Router 自己的 state。
+<<< ../../../examples/frontend/vue2-to-vue3-migration/LegacyLessonSearch.vue
 
-## 18. Vuex 到 Pinia 应与 Vue 3 迁移解耦
+它只修改迁移必需项：
 
-Vuex 4 可以运行在 Vue 3，因此最稳方案常是先升级运行时和 Router，保留 Store 行为；之后再按业务域迁到 Pinia。不要在最脆弱的运行时切换阶段同时重写全部状态。
+- 声明 emits；
+- `beforeDestroy` 改为 `beforeUnmount`；
+- 请求取消和竞态有明确所有权；
+- 依赖通过 typed Prop 输入。
 
-Pinia 官方迁移策略是：一个 namespaced Vuex module 通常对应一个独立 Store；嵌套模块也可拆成 Store，并通过函数调用组合。
+把“能在标准 Vue 3 正确运行”和“重构成 Composition API”分成两个提交，审查者才能判断行为变化来自哪里。
 
-示例 Pinia Store：
+适合进一步重构的信号：
+
+- 一个业务关注点散落在 data、computed、watch、methods 和生命周期；
+- 多个组件依赖相同 Mixin，字段来源和冲突不清；
+- `this` 让类型推断困难；
+- 同一状态机需要独立测试和复用。
+
+小而稳定的 Options 组件没有强制改写价值。
+
+## 从 Mixin 提取业务能力，而不是翻译语法
+
+先画出 Mixin 的：
+
+```text
+输入 → 状态 → 派生值 → 异步副作用 → 清理 → 对外操作
+```
+
+再按一个完整能力提取：
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/useLessonSearch.mts
+
+它显式接收 keyword 和 Gateway，并管理：
+
+- 立即搜索；
+- 新请求取消旧请求；
+- 旧结果所有权；
+- error/loading；
+- Scope 销毁时停止 watch、取消请求并失效旧结果。
+
+页面只负责展示契约：
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/LessonSearch.vue
+
+不要创建一个包含原 Mixin 所有字段的 `useLegacyPage()`。那只是把隐式耦合换了语法。按搜索、权限、草稿、遥测等能力拆分。
+
+## 先建立与 Vue 无关的服务契约
+
+新旧组件共享：
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/contracts.ts
+
+HTTP Gateway：
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/lesson-gateway.ts
+
+组件不再依赖 `this.$http`，也不到处拼 URL。Gateway 负责：
+
+- query 和 Header；
+- AbortSignal；
+- HTTP 状态；
+- 把响应 unknown 校验成领域类型。
+
+旧 Options 组件和新 Composition 组件可调用同一接口。这样迁移组件时不同时改后端协议，契约测试也能对两种实现复用。
+
+TypeScript `as LessonSearchResult` 不能证明旧 API 真返回该结构。迁移期间后端版本、代理和 Mock 更容易不一致，运行时校验尤其重要。
+
+## 组件契约变化要在边界适配
+
+### `v-model` 和 `.sync`
+
+Vue 2 默认：
+
+```text
+value + input
+```
+
+Vue 3 默认：
+
+```text
+modelValue + update:modelValue
+```
+
+Vue 3 原生组件：
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/BaseToggle.vue
+
+若几十个旧调用方仍使用 value/input，先加薄适配器：
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/LegacyToggleAdapter.vue
+
+适配器的价值是把同时修改的范围变小：
+
+```text
+旧调用方 → 旧契约适配器 → 唯一 Vue 3 核心契约
+```
+
+调用方逐批切换，数量归零后删除适配器。不要让核心组件永久同时支持两套 Prop/Event，否则会出现双写和优先级问题。
+
+`.sync` 改为带参数 `v-model:visible`；Vue 3 也允许多个 v-model。迁移要核对事件名和修饰符行为，不只是模板能编译。
+
+### Emits、Attrs 和原生监听器
+
+Vue 3 移除了实例 `$on/$off/$once`；父子通信使用 Props/Emits，跨层依赖用 provide/inject，共享业务状态用 Store。
+
+确实与 Vue 无关的短生命周期事件可以用类型化 emitter：
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/typed-emitter.ts
+
+订阅必须返回取消函数，并在作用域销毁时调用。不要重新创建一个无边界的全局事件总线。
+
+`$listeners` 合并进 `$attrs`，class/style 也进入 attrs；组件声明了 emits 后，相应监听器不会作为普通 attrs 透传。若忘记声明 emits，父级监听可能既被组件 emit 触发，又作为原生监听落到根元素，造成双触发。
+
+多根组件没有自动 Attr fallthrough 目标，必须显式 `v-bind="$attrs"` 到正确元素。
+
+## 模板差异要靠行为测试发现
+
+高风险变化包括：
+
+- filter 移除；
+- `.native` 移除；
+- `.sync` 变化；
+- key 和 template v-for 语义；
+- Transition/TransitionGroup 根结构；
+- Slot API 统一为函数；
+- 自定义指令钩子更名；
+- 多根 Fragment 改变 attrs 与 CSS 选择器假设。
+
+类型检查无法证明点击只触发一次、Slot 放在正确位置或 Transition 时序没变。每修一类语义，都应有最小组件测试和关键页面 E2E。
+
+模板 filter 应改成方法或 computed，而不是注册另一个全局管道。格式化逻辑进入普通 TypeScript 后更容易测试、tree-shake 和服务端复用。
+
+## 响应式升级改变了限制，也改变了观察语义
+
+Vue 2 基于 Object.defineProperty：
+
+- 新增对象属性需要 `Vue.set/this.$set`；
+- 删除需要 `Vue.delete`；
+- 数组索引和 length 有特殊限制。
+
+Vue 3 Proxy 能观察新增、删除和索引更新，因此这些辅助 API 被移除。
+
+但迁移不只是删掉 `$set`：
+
+- 持有原始对象与代理对象的身份比较要复核；
+- 第三方对象可能更适合 shallowRef/markRaw；
+- 解构 reactive 属性会失去响应连接；
+- 依赖 Vue 2 Watch 时序的代码需要测试。
+
+### 数组 watch 是常见回归
+
+Vue 3 默认 watch 数组只在数组被替换时触发，不因 push/splice 自动回调；需要观察变更时要按当前版本使用合适 deep 选项。
+
+不要机械给所有数组 watch 加 deep。先问它真正想观察：
+
+- 数组引用变化；
+- 项目增删；
+- 项目内部任意深层属性；
+- 某个可声明的派生值。
+
+最后一种通常更适合 computed 或精确 getter。深度 watch 巨大结构会增加成本，也让副作用来源难懂。
+
+## 生命周期迁移要检查资源所有权
+
+常见改名：
+
+- `beforeDestroy → beforeUnmount`；
+- `destroyed → unmounted`。
+
+名称替换以后还要检查：
+
+- timer 和事件监听是否真的清理；
+- KeepAlive 使用 activated/deactivated 还是 unmounted；
+- 异步结果在销毁后是否失效；
+- 浏览器专用副作用是否在 mounted；
+- 指令的 bind/inserted/update/componentUpdated/unbind 如何映射。
+
+迁移是修正旧泄漏的机会，但应单独提交并保留行为证据。
+
+## Router 3 → Vue 3 Router 要验证导航行为
+
+核心变化：
+
+- `new VueRouter` → `createRouter`；
+- `mode` → 显式 History 工厂；
+- base 传给 History；
+- `currentRoute` 变成 ref；
+- catch-all 语法变化；
+- 初始导航与所有导航异步；
+- push/replace 使用 Promise；
+- RouterView Slot 和 Transition 组合变化。
+
+示例：
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/router.mts
+
+迁移后至少验证：
+
+- 深链接直接刷新；
+- params/query 编码；
+- 重定向和 404；
+- 登录与权限守卫；
+- back/forward 和滚动恢复；
+- 重复导航和失败；
+- 动态 import；
+- initial navigation 是否需要 `router.isReady()`。
+
+当前 Vue Router 文档也包含 v5 过渡版本；不使用文件路由的 v4 项目升级 v5通常无代码破坏。迁移项目仍应按锁定目标版本阅读相应指南，不要把“Vue 3”理解成一个永远固定的 Router 版本号。
+
+## Vuex → Pinia 可以与运行时迁移解耦
+
+Vuex 4 可运行在 Vue 3，所以不必在切 runtime 同时重写所有 Store。可选顺序：
+
+1. 先保留 Vuex，稳定 Vue 3 runtime；
+2. Vuex 与 Pinia 并存；
+3. 按业务 Module 迁成独立 Pinia Store；
+4. 调用方迁完后删除旧 Module。
+
+Pinia 官方迁移指南明确支持并存。
+
+新 Store：
 
 <<< ../../../examples/frontend/vue2-to-vue3-migration/lesson-store.mts
 
-渐进迁移原则：
+不要让 Vuex 和 Pinia 双向同步同一状态。它会制造两个事实来源和循环更新。迁移一个领域时，应明确所有权切换点，并通过适配读取旧 Store 或新 Store，而不是双方互相复制。
 
-- 新 Store 可以读取尚未迁移的 Vuex，但依赖方向应单向并可追踪。
-- 不要对同一业务实体在 Vuex 与 Pinia 双写；定义唯一 Source of Truth。
-- 先迁叶子模块，再迁被大量模块依赖的核心状态。
-- 保持 Action 的异步错误与返回值契约。
-- 对持久化、SSR 序列化和跨 Tab 同步单独验证。
-- Store ID 是命名空间和 DevTools 身份，必须稳定且唯一。
+Module 到 Store 也不是逐行改名：
 
-完成某域后删除 Vuex 旧模块和桥接代码，避免“临时双栈”永久化。
+- 每个 namespaced Module 通常成为独立 Store；
+- mutations 变成 Action 或直接赋值；
+- rootState 依赖改成显式 Store 组合；
+- 插件持久化和订阅语义要复核；
+- Option Store 与 Setup Store 的 reset 行为不同；
+- Store 外使用要绑定正确 Pinia 实例。
 
-## 19. 用业务切片组织大型迁移
+## 用业务切片，而不是按文件类型迁移
 
-按文件类型迁移容易形成“所有 Store 已改，但没有一条业务链能上线”。按业务切片迁移更容易端到端验证：
+不推荐：
 
 ```text
-课程搜索切片
-├── 路由入口
-├── 搜索页面与子组件
-├── LessonGateway
-├── 选择状态
-├── 权限与遥测
-└── 组件/路由/E2E 测试
+本周改完所有 Button
+下周改完所有 Store
+再下周统一改所有页面
 ```
 
-完整迁移页同时保留旧、新搜索实现，并由发布标志选择：
+更好的切片是一个可交付用户能力：
+
+```text
+课程搜索
+├── 路由入口
+├── 搜索组件
+├── Gateway
+├── 选择状态
+├── 测试与指标
+└── Feature Flag / 回滚
+```
+
+示例页面让新旧搜索实现保持同一 Props/Events 契约：
 
 <<< ../../../examples/frontend/vue2-to-vue3-migration/MigrationPage.vue
 
-这里的静态 Flag 只是代码示例。生产 Flag 系统应明确：
+同一调用方可以在 flag 下切换实现。这个 Flag 必须由可靠配置与发布系统管理，示例常量只用于展示边界。
 
-- Flag 在启动、请求还是会话级求值。
-- 同一用户是否稳定分桶。
-- Flag 服务失败时采用哪个安全默认值。
-- 回滚是否只切流量，还是还涉及数据 Schema。
-- Flag 何时删除以及由谁负责。
+切片完成时要能独立回答：
 
-同一接口契约使新旧实现能被同一套测试驱动，也让回滚不需要转换数据。
+- 功能是否等价；
+- 数据是否同一份；
+- 指标是否能区分实现；
+- 出错能否只回退这一片；
+- 旧代码何时删除。
 
-## 20. 兼容警告必须成为可管理的工作项
-
-浏览器控制台滚过几千条 Warning 不等于迁移计划。把每类问题建立台账：
+## 兼容警告必须进入迁移台账
 
 <<< ../../../examples/frontend/vue2-to-vue3-migration/migration-ledger.ts
 
-建议记录：
+每项记录：
 
-- Compat Feature ID 与组件堆栈。
-- 自有代码或第三方依赖来源。
-- 影响页面和风险等级。
-- 负责人、目标版本和回滚 Flag。
-- 修复 PR、测试、灰度和生产证据。
+- area 和具体 ID；
+- owner；
+- blocked / compat / native-vue3 / verified；
+- rollback flag；
+- 验证证据。
 
-台账摘要只有在没有 blocked 和 compat 项时才允许移除兼容层。`assertAssignedOwners()` 保证每项都有负责人；真实系统还应验证 ID 唯一、Flag 存在和证据链接有效。
+`native-vue3` 只表示代码已经改成原生语义，不代表行为已证明。只有所有项都是 `verified`，台账才允许移除 compat。
 
-## 21. 组件库与 Design System 是迁移放大器
+这一区分非常重要：
 
-底层 Button、Input、Dialog 被上千个页面调用，契约变化会被放大。优先为公共组件建立：
+```text
+代码已改 ≠ 页面能运行 ≠ 行为等价 ≠ 可以扩大流量
+```
 
-- Props、Events、Slots、Expose 的类型和文档。
-- Vue 2/3 契约适配层。
-- 视觉回归、键盘和屏幕阅读器测试。
-- Teleport Target、Z-index、焦点锁定和滚动锁定验证。
-- CSS Token，而不是依赖内部 DOM 层级的全局选择器。
+## 组件库是迁移放大器
 
-先迁叶子业务组件还是基础组件没有统一答案。若 Design System 已有成熟 Vue 3 版本，应先建立兼容适配；若公共组件本身高度不稳定，可以先迁一个垂直切片来验证新实现，再逐步扩大。
+升级组件库要验证：
 
-## 22. TypeScript 迁移不要用 `any` 掩盖框架变化
+- v-model 和 change/input payload；
+- 表单校验触发时机；
+- Dialog/Dropdown 的 Teleport 位置；
+- DOM 与 class 变化；
+- 日期、Locale 和时区；
+- Tree shaking 和按需导入；
+- SSR/Hydration；
+- 无障碍角色和键盘行为。
 
-常见临时做法是给 `this`、Router、Store 和组件实例全部加 `any`，结果运行时错误只是从编译期被推迟。更有效的顺序：
+若旧组件库停更，可先在业务与组件库之间建立应用级 Adapter。业务只依赖稳定内部契约，底层实现逐步替换。
 
-1. 先为 API DTO、路由 Meta、Store State 建立领域类型。
-2. Options 组件使用 `defineComponent()` 改善 `this` 推断。
-3. 明确 Props 默认值、Emits Payload 和 Template Ref。
-4. 用 `unknown` 接错误和外部输入，再收窄。
-5. 局部兼容声明必须带删除条件，不能覆盖整个 `vue` 模块。
+不要在同一迁移提交中顺便重做视觉系统。除非旧库完全阻塞 Vue 3，否则把视觉改版独立发布，回归原因更清楚。
 
-第三方包缺类型时，可在边界写最小 Module Declaration；不要声明成一个无所不包的 `any`，否则升级真正改变 API 时编译器无法帮助发现。
+## TypeScript 迁移不能用 any 吞掉差异
 
-## 23. 测试：验证行为等价，不验证代码形状
+高价值类型边界：
+
+- Props 与 Emits；
+- Route params/query 转换；
+- Store state/actions；
+- provide/inject key；
+- API unknown 响应验证；
+- Feature Flags；
+- 错误类型。
+
+短期适配器确实可能需要断言，但每个断言应局部、有原因、有删除条件。把 `this`、Route、Store 全部转成 any，会让编译器失去发现破坏性变化的能力。
+
+类型正确仍不等于运行正确。Attrs 透传、DOM 结构、Watch 时序和 Hydration 需要运行时测试。
+
+## 测试迁移的是“行为等价”
 
 ### 契约测试
 
-旧搜索组件和新搜索组件应共享同一行为套件：
+旧 Gateway 和新 Gateway 跑同一套：
 
-- 首次加载调用 Gateway。
-- 输入关键词产生正确查询。
-- 旧请求被取消，慢响应不覆盖新响应。
-- 错误可访问地展示。
-- 点击结果发出相同的领域 Payload。
+- query 规范化；
+- 分页；
+- 404/500；
+- 畸形响应；
+- AbortSignal；
+- 错误转换。
 
 ### 组件测试
 
-验证 Props、Events、Slots、Attrs 和 DOM 行为，尤其关注：
+旧搜索和新搜索跑同一行为：
 
-- `v-model` 是否单次更新，避免 input/update 双发。
-- 未声明事件是否意外落到根 DOM。
-- Fragment 的 class/style/listener 是否正确透传。
-- 卸载后异步回调不会继续写状态。
+- 初始搜索；
+- 输入后请求；
+- loading/error/empty；
+- 快速输入旧结果不覆盖；
+- select payload 一致；
+- unmount 后清理。
 
-### Router 集成测试
+### Router 集成
 
-每个测试创建新的 Router，`push()` 后等待 `isReady()`。覆盖权限、重定向、404、动态参数和 navigation failure。
+用真实 Router 验证路径、Props、守卫、重定向、404 和滚动。
 
-### 真实浏览器 E2E
+### E2E 与视觉/性能
 
-关键流程同时在旧版和迁移版执行，比较用户可见结果、API 写操作和遥测。把 Vue Warning、Unhandled Rejection 和 Console Error 视为失败，而不是人工忽略。
+关键用户旅程在真实浏览器验证。组件库升级补充视觉回归和无障碍；迁移前后比较 Bundle、LCP/INP、错误率和 API 重复请求。
 
-### 视觉与性能回归
+不要主要测试“这个组件使用 Composition API”或“调用了某个新方法”。用户不关心代码形状。
 
-Transition、UI 库 DOM 和 Attr 变化可能不触发功能断言。对核心页面做截图与可访问性检查，并比较 Bundle、LCP、INP 和错误率。
+## 灰度、监控和回滚是实现的一部分
 
-## 24. 灰度、监控与回滚
+每个切片应能被区分：
 
-发布顺序建议：
+- build version；
+- migration cohort；
+- feature flag；
+- route/domain；
+- Vue 2/compat/native Vue 3 实现。
 
-1. 内部环境和自动化全量。
-2. 员工或测试租户。
-3. 少量稳定用户，保持分桶粘性。
-4. 按指标逐步扩大。
-5. 全量后保留短期回滚窗口。
-6. 稳定后删除 Flag 和旧实现。
+关注：
 
-监控至少按构建版本、Vue 模式和 Flag 维度切分：
+- JS 错误和未处理 Promise；
+- Router 失败；
+- API 错误、超时、重复提交；
+- 核心转化；
+- LCP/INP 和内存；
+- compat warning 数量。
 
-- JS Error、白屏、Chunk load failure。
-- API 错误和重复写请求。
-- 路由导航失败与登录循环。
-- Web Vitals 和长任务。
-- 核心流程成功率和业务转化。
+推荐逐步：
 
-回滚不一定只是部署旧 Bundle。如果迁移同时改变 API 或本地持久化 Schema，旧前端可能读不懂新数据。使用向后兼容 Schema、版本化存储和 Expand/Contract 发布，确保回滚链路真实成立。
+```text
+内部用户 → 小比例真实流量 → 扩大租户/路由 → 全量
+```
 
-## 25. 移除 `@vue/compat` 的 Gate
+回滚不能依赖“再发一个修复版本”。Feature Flag、旧静态资源和 API 兼容窗口要事先准备。若新旧前端共用后端，数据库和接口变化要向前、向后兼容。
 
-只有同时满足以下条件才切换标准构建：
+Flag 也有生命周期：迁移稳定后删除旧分支和 Flag，否则代码会永久承担双实现成本。
 
-- 自有代码和依赖产生的 Compat Warning 为零。
-- 没有启用的 Compat Feature Flag 或 MODE 2 组件。
-- 所有生产 Vue 插件明确支持当前 Vue 3 版本。
-- Lockfile 只有预期 Vue Runtime，编译器版本匹配。
-- 关键测试、视觉测试和性能门禁通过。
-- 灰度期错误率与业务指标稳定。
-- 标准构建已在 CI 和预生产独立验证。
+## 删除 compat 的 Gate
 
-切换标准构建后，再运行一次全量回归。兼容构建“零警告”和标准构建仍不是绝对等价，第三方包可能存在没有警告覆盖的隐式依赖。
+只有以下证据齐全才删除：
 
-## 26. 常见失败模式
+- compat 警告为零；
+- 台账全部 verified；
+- 没有组件级 MODE 2 和临时 flag；
+- 依赖树无 Vue 2 与仅 Vue 2 插件；
+- 标准 Vue 3 构建、类型检查和测试通过；
+- 关键 E2E 与深链接通过；
+- 错误、性能和业务指标达到基线；
+- 生产灰度稳定；
+- 回滚演练完成。
 
-### 把 Warning 全部关闭
+删除 alias 后重新安装依赖并检查产物，避免 lockfile 或预构建缓存仍带旧 runtime。
 
-控制台安静了，但旧语义仍在。只允许针对已知第三方阻塞短期配置兼容，并建立退出项。
+## 阅读完整示例的顺序
 
-### 先改所有组件为 `<script setup>`
+稳定领域契约：
 
-代码 Diff 巨大，运行时仍未升级。先获得标准 Vue 3 运行能力，再按维护收益重构。
+<<< ../../../examples/frontend/vue2-to-vue3-migration/contracts.ts
 
-### Vuex 和 Pinia 双向同步
+<<< ../../../examples/frontend/vue2-to-vue3-migration/lesson-gateway.ts
 
-一处更新触发两个订阅系统，循环、竞态和调试成本迅速增加。按域确定唯一所有者，通过只读适配过渡。
+旧、新实现共享行为：
 
-### 新旧组件契约同时扩散
+<<< ../../../examples/frontend/vue2-to-vue3-migration/LegacyLessonSearch.vue
 
-所有调用方都写版本判断。应把版本差异封装在边界 Adapter，内部只维护一种新契约。
+<<< ../../../examples/frontend/vue2-to-vue3-migration/useLessonSearch.mts
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/LessonSearch.vue
+
+组件契约适配：
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/BaseToggle.vue
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/LegacyToggleAdapter.vue
+
+运行边界：
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/main.mts
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/router.mts
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/lesson-store.mts
+
+切片与台账：
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/MigrationPage.vue
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/migration-runtime.mts
+
+<<< ../../../examples/frontend/vue2-to-vue3-migration/migration-ledger.ts
+
+## 常见失败方式
+
+### 先把所有文件改成 script setup
+
+变化范围巨大，却没有先证明 runtime 和生态兼容。先修必要语义。
+
+### 关闭所有 compat warning
+
+失去迁移雷达，旧行为仍在。警告进入有 owner 的台账。
+
+### Vuex 与 Pinia 双向同步
+
+形成两个事实来源。按领域一次转移所有权。
+
+### 新旧契约同时扩散
+
+核心组件永久支持两套输入，复杂度倍增。旧契约限制在薄 Adapter。
 
 ### 只测 Happy Path
 
-迁移回归集中在权限、取消、卸载、深链接、表单错误和第三方组件。风险矩阵必须覆盖异常路径。
+最容易漏的是取消、错误、权限、深链接、返回导航和重复提交。
 
-### Compat 永久留在生产
+### Compat 永久生产化
 
-临时层没有日期和负责人就会变成平台本身。用退出 Gate 和台账控制兼容债务。
+依赖和 warning 越积越多，最终没人敢删除。开始时就定义退出 Gate。
 
-## 27. 完整示例结构
+### 迁移分支长期脱离主线
 
-```text
-examples/frontend/vue2-to-vue3-migration/
-├── BaseToggle.vue
-├── LegacyLessonSearch.vue
-├── LegacyToggleAdapter.vue
-├── LessonDetailPage.vue
-├── LessonSearch.vue
-├── MigrationPage.vue
-├── NotFoundPage.vue
-├── contracts.ts
-├── lesson-gateway.ts
-├── lesson-store.mts
-├── main.mts
-├── migration-ledger.ts
-├── migration-runtime.mts
-├── router.mts
-├── typed-emitter.ts
-└── useLessonSearch.mts
-```
+业务改动持续冲突，最后只能巨型合并。每个阶段保持可部署并小批合入。
 
-前文已经展示核心文件。以下补齐剩余完整源码，保证页面可以直接阅读整套示例。
+## 本课小结
 
-### 课程详情占位页
+- 运行时、生态和架构优化是三个目标，不要一次绑成重写；
+- 迁移前先建立依赖矩阵、行为基线和完成定义；
+- 直接升级、compat、Vue 2.7 桥梁和并行应用适合不同约束；
+- Vue 3 App 实例边界替代 Vue 2 共享构造器，全局依赖应逐步显式化；
+- Options API 可以继续使用，Composition API 重构应由业务聚合和复用收益驱动；
+- 新旧组件通过服务契约和薄 Adapter 共存，不让双契约进入核心；
+- Router 与响应式升级要验证行为，不能只改 API 名；
+- Vuex 和 Pinia可以按业务域并存，但同一状态只能有一个所有者；
+- Feature Flag、监控、台账和回滚属于迁移实现；
+- native-vue3 不等于 verified，只有证据齐全才删除 compat。
 
-<<< ../../../examples/frontend/vue2-to-vue3-migration/LessonDetailPage.vue
+至此 Vue 3 模块完成。下一阶段进入[React 核心心智模型与 TypeScript 组件设计](/frontend/react/core-mental-model-and-typescript-components)，会对照 Vue 已经建立的响应式、组件所有权、路由、表单、性能和测试模型，学习 React 的不同取舍。
 
-### 404 页
+## 官方资料
 
-<<< ../../../examples/frontend/vue2-to-vue3-migration/NotFoundPage.vue
-
-示例没有包含 `@vue/compat` 的 Vite 配置，因为本专题不得修改根 `package.json` 和构建配置，而且兼容版本必须与真实项目锁定的 Vue/SFC 编译器版本匹配。迁移时应从 Vue 官方 Migration Build 配置开始，而不是复制一个脱离版本上下文的配置片段。
-
-## 28. 生产检查清单
-
-### 规划
-
-- 有依赖矩阵、业务风险、负责人和阶段退出条件。
-- 迁移前功能、性能与错误率基线可重复。
-- 目标浏览器和 SSR/微前端约束已确认。
-
-### 代码边界
-
-- 不依赖 Vue 2 私有 API、VNode 结构和全局事件总线。
-- API、领域规则和迁移台账可在 Vue 外测试。
-- 新旧契约差异集中在 Adapter。
-- 每个业务状态只有一个 Source of Truth。
-
-### Vue 语义
-
-- `v-model`、Emits、Attrs、Slots 和数组 Watch 已审计。
-- 生命周期和自定义指令完成清理验证。
-- Template、Transition、异步与函数式组件已扫描。
-- Router 深链、权限、History 和 404 已验证。
-
-### 发布
-
-- Flag 有稳定分桶、安全默认值和删除日期。
-- 指标能区分旧版、新版和迁移切片。
-- 回滚兼容数据、缓存与持久化 Schema。
-- 标准 Vue 3 构建已经过独立灰度。
-
-## 29. 进一步阅读
-
-- [Vue 3 Migration Guide](https://v3-migration.vuejs.org/)
-- [Vue：Migration Build](https://v3-migration.vuejs.org/migration-build.html)
-- [Vue：Breaking Changes](https://v3-migration.vuejs.org/breaking-changes/)
-- [Vue：Composition API FAQ](https://vuejs.org/guide/extras/composition-api-faq.html)
-- [Vue Router：Migrating from Vue 2](https://router.vuejs.org/guide/migration/)
-- [Pinia：Migrating from Vuex ≤4](https://pinia.vuejs.org/cookbook/migration-vuex.html)
+- [Vue 3 Migration Guide：Migration Build](https://v3-migration.vuejs.org/migration-build.html)
+- [Vue 3 Migration Guide：Breaking Changes](https://v3-migration.vuejs.org/breaking-changes/)
+- [Vue：Options API FAQ](https://vuejs.org/guide/extras/composition-api-faq.html)
+- [Vue Router：从 Vue Router 3 迁移](https://router.vuejs.org/guide/migration/)
+- [Pinia：从 Vuex ≤4 迁移](https://pinia.vuejs.org/cookbook/migration-vuex.html)
 - [Vue 2 EOL](https://v2.vuejs.org/eol/)
-
-## 30. 本节小结
-
-大型 Vue 迁移的核心能力不是记住破坏性 API 清单，而是控制变化：先建立基线和边界，让旧行为在新运行时中可观测；再按业务切片替换语义，用 Adapter、Flag、测试和监控降低每次发布风险；最后以零兼容项和标准 Vue 3 构建作为明确终点。
-
-Options API、Vuex 和旧构建工具不必在同一时间被重写。真正需要尽快消除的是不受支持的运行时、私有 API、跨域隐式状态和无法回滚的发布路径。迁移完成后，Composition API、Pinia 与 Vite 才能作为持续架构优化，而不是一次高风险升级的附加负担。
