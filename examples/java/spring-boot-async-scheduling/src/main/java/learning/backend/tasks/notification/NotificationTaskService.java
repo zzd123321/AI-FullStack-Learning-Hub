@@ -20,6 +20,7 @@ public class NotificationTaskService {
     public CompletableFuture<NotificationResult> execute(
             UUID taskId,
             NotificationRequest request) {
+        // 经 Spring 代理调用时，下面代码在线程池线程而不是 HTTP 请求线程执行。
         String workerThread = Thread.currentThread().getName();
         String correlationId = RequestContext.correlationIdOr("system");
         registry.markRunning(taskId, workerThread);
@@ -36,6 +37,7 @@ public class NotificationTaskService {
                     workerThread,
                     "SENT"));
         } catch (InterruptedException exception) {
+            // 中断通常表示关闭或取消请求：先恢复标记，再把失败写入可查询状态。
             Thread.currentThread().interrupt();
             registry.markFailed(taskId, "任务被中断");
             return CompletableFuture.failedFuture(exception);

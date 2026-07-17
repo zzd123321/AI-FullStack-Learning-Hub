@@ -74,10 +74,13 @@ public class SecurityConfiguration {
             JwtAuthenticationConverter jwtAuthenticationConverter,
             JsonAuthenticationEntryPoint entryPoint,
             JsonAccessDeniedHandler deniedHandler) throws Exception {
+        // 这条链只匹配 /api/**，采用 Bearer JWT，不创建服务器 Session。
         http
                 .securityMatcher("/api/**")
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(csrf -> csrf.disable())
+                // 这里关闭 CSRF 的前提是 API 只从 Authorization header 取 Bearer token，
+                // 浏览器不会像 Cookie 那样自动附加它；若改用 Cookie，必须重新评估。
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/public", "/api/auth/token").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
@@ -99,6 +102,8 @@ public class SecurityConfiguration {
             SecurityContextRepository repository,
             JsonAuthenticationEntryPoint entryPoint,
             JsonAccessDeniedHandler deniedHandler) throws Exception {
+        // JavaScript 需要读取 CSRF token 并放入请求头，因此示例 Cookie 不是 HttpOnly。
+        // 认证 Session Cookie 仍应保持 HttpOnly，两类 Cookie 不能混为一谈。
         var csrfRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         http
                 .securityMatcher("/session/**")
@@ -120,6 +125,7 @@ public class SecurityConfiguration {
     @Bean
     @Order(3)
     SecurityFilterChain fallbackChain(HttpSecurity http) throws Exception {
+        // 未被前两条链覆盖的请求默认拒绝，避免新增路径意外公开。
         http.authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/error").permitAll()
                 .anyRequest().denyAll());

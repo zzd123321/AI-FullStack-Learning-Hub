@@ -8,6 +8,10 @@ outline: deep
 
 > 基准环境：Spring Boot 4.1.0、Spring Framework 7.0.8、Maven 3.9.16；JDK 25 运行，Java 17 编译目标。
 
+## 从第一课的“Spring 创建对象”继续向下看
+
+第一课把 ApplicationContext 当成对象容器，本课只回答三个后续问题：对象何时创建、活多久、关闭时由谁清理。第一次先掌握 singleton Bean、构造注入和初始化/销毁回调；request scope、作用域代理、AOP 代理和循环依赖用于解释特殊边界，不能取代清晰的对象设计。
+
 ## 1. 学习目标
 
 完成本节后，你应该能够：

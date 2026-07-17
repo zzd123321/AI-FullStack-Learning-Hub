@@ -31,6 +31,7 @@ public class LessonController {
 
     @GetMapping
     public LessonPage findAll(
+            // 原始 query string 先转成 int，再由方法参数约束检查范围。
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page 不能小于 0") int page,
             @RequestParam(defaultValue = "10")
             @Min(value = 1, message = "size 不能小于 1")
@@ -49,6 +50,7 @@ public class LessonController {
 
     @PostMapping
     public ResponseEntity<LessonView> create(@Valid @RequestBody CreateLessonRequest request) {
+        // JSON 读取、类型转换和 Bean Validation 全部成功后，方法才会执行到这里。
         LessonView created = lessonService.create(request);
         return ResponseEntity.created(URI.create("/api/lessons/" + created.id())).body(created);
     }

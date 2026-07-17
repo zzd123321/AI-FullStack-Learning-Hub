@@ -8,6 +8,12 @@ outline: deep
 
 > 基准环境：Spring Boot 4.1.0、Spring Framework 7.0.8、Maven 3.9.16；Java 17 编译目标。
 
+## Controller 参数不是凭空变成 Java 对象
+
+第一课展示了一个能返回响应的方法，本课把进入方法之前的过程放大：网络上只有路径、Header 和 JSON 字节，Spring MVC 必须先匹配路由、读取数据、转换类型并校验，全部成功后才调用 Controller。
+
+第一次先掌握 `@PathVariable`、`@RequestParam`、`@RequestBody`、`@Valid` 与统一错误结构。方法校验异常分类和复杂参数解析属于出现对应失败后再查的第二层。
+
 ## 1. 学习目标
 
 完成本节后，你应该能够：

@@ -50,11 +50,13 @@ public class BeanObservationController {
 
     @GetMapping("/prototype")
     public Map<String, String> prototype() {
+        // ObjectProvider 每次 getObject 都向容器请求一个新 prototype 实例。
         return Map.of("firstLookup", prototypeTokens.getObject().id(), "secondLookup", prototypeTokens.getObject().id());
     }
 
     @GetMapping("/request")
     public Map<String, Object> request() {
+        // 字段实际持有 scoped proxy；代理在每次请求中定位当前 request-scope 对象。
         return Map.of(
                 "requestId", requestTrace.id(),
                 "firstUse", requestTrace.nextUseCount(),

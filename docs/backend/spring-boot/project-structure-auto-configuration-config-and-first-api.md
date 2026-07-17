@@ -8,6 +8,21 @@ outline: deep
 
 > 基准环境：Spring Boot 4.1.0、Spring Framework 7.0.8、Maven 3.9.16；JDK 25 运行构建和示例，Java 17 编译目标。
 
+## 第一次阅读只追踪一个请求
+
+这一课内容很多，但主线只有一条：
+
+```text
+main 启动 Spring
+  → Spring 创建 Controller 和 Service
+  → Tomcat 监听端口
+  → HTTP 请求匹配 Controller 方法
+  → Service 执行业务
+  → 返回值或异常被转换为 HTTP 响应
+```
+
+第一次先跑通示例并能说清这条链。starter、条件化自动配置、配置优先级和可执行 JAR内部结构用于解释“为什么不用手工装配”，不要求一次记住。遇到注解时先问它参与启动阶段还是请求阶段。
+
 ## 1. 学习目标
 
 完成本节后，你应该能够：

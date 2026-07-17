@@ -36,6 +36,7 @@ public class OrderApplicationService {
                 request.customerId(),
                 request.totalCents(),
                 now);
+        // 订单和 Outbox 行在同一数据库事务中提交，避免“订单成功但消息尚未记录”。
         orders.save(order);
 
         String payload = objectMapper.writeValueAsString(new OrderCreatedPayload(
@@ -43,6 +44,7 @@ public class OrderApplicationService {
                 request.customerId(),
                 request.totalCents(),
                 now));
+        // 此处只写 Outbox，不直接假设 Broker 发送与数据库提交可以原子完成。
         outboxWriter.save(new OutboxEvent(
                 eventId,
                 "PurchaseOrder",
@@ -55,6 +57,7 @@ public class OrderApplicationService {
 
     @Transactional
     public void createThenFail(CreateOrderRequest request) {
+        // 该调用仍经过当前事务；随后异常会让订单与 Outbox 一起回滚。
         create(request);
         throw new IllegalStateException("模拟业务事务回滚");
     }
