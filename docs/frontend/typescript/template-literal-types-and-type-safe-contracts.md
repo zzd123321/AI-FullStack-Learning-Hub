@@ -1,207 +1,29 @@
 ---
 title: TypeScript 模板字面量类型与类型安全契约
-description: 从字符串字面量派生事件、路由和配置契约，并使用 satisfies 保留精确推断
+description: 从有限字符串规则派生事件名和路由参数，并用 satisfies 校验配置契约
+outline: deep
 ---
 
 # TypeScript 模板字面量类型与类型安全契约
 
-> 适用环境：TypeScript 7.x、Node.js 22+、`strict` 模式。本节只在规模有限、规则稳定的字符串集合中使用类型级组合；外部字符串仍需运行时解析和校验。
-
-## 1. 学习目标
-
-完成本节后，你应该能够：
-
-- 区分 JavaScript 模板字符串与 TypeScript 模板字面量类型。
-- 使用字符串字面量和联合类型生成有规则的字符串集合。
-- 理解多个联合插值位置产生的笛卡尔积。
-- 使用 `Uppercase`、`Lowercase`、`Capitalize` 和 `Uncapitalize`。
-- 从对象键派生事件名、Getter、Setter 和配置键。
-- 使用模板匹配与 `infer` 从字符串结构中提取信息。
-- 为路由参数、国际化键和领域事件建立类型安全契约。
-- 理解 `satisfies`、类型注解、类型断言和 `as const` 的差异。
-- 使用 `as const satisfies` 同时获得只读字面量推断与结构校验。
-- 识别大型联合、宽泛 `string`、动态输入和运行时验证的边界。
-
-## 2. 前置知识
-
-建议先掌握：
-
-- 字符串字面量类型和联合类型。
-- 泛型与泛型约束。
-- `keyof`、索引访问类型与条件类型。
-- `infer`、映射类型和键重映射 `as`。
-- `Record`、`Pick` 等常用工具类型。
-
-上一节：[TypeScript 映射类型与常用工具类型](/frontend/typescript/mapped-types-and-utility-types)
-
-## 3. 为什么字符串也需要类型关系
-
-前端工程中有大量带规则的字符串：
-
-- `titleChanged` 表示 `title` 字段变化。
-- `/api/v1/lessons` 表示资源端点。
-- `lesson.created` 表示领域事件。
-- `zh-CN.lesson.title` 表示国际化消息键。
-- `VITE_API_BASE_URL` 表示环境变量名。
-
-如果全部写成普通 `string`：
+[上一课](/frontend/typescript/mapped-types-and-utility-types)使用映射类型逐键生成对象结构，并在键重映射中见过：
 
 ```ts
-function on(eventName: string, callback: (value: unknown) => void) {
-  // ...
+type Getters<Model> = {
+  [Key in keyof Model as `get${Capitalize<string & Key>}`]:
+    () => Model[Key]
 }
 ```
 
-编译器无法发现拼写错误，也无法建立事件名与回调参数之间的关系。
+其中 `` `get${...}` `` 不是 JavaScript 模板字符串，而是**模板字面量类型**。它在编译阶段描述一组符合规则的字符串。
 
-模板字面量类型可以把字符串命名规则提升为静态契约，同时仍保留普通字符串在运行时的实现方式。
+这项能力适合解决前端中一类常见问题：事件名、路由、配置键看起来只是字符串，实际上各部分之间存在稳定关系。如果所有参数都写成 `string`，拼写和关联错误只能等到运行时才暴露。
 
-## 4. 基本语法
+本课从一个表单事件开始，再把同一思路扩展到路由与配置表。
 
-JavaScript 模板字符串出现在值位置：
+## 从普通字符串到有限字符串契约
 
-```ts
-const world = 'world'
-const greeting = `hello ${world}`
-```
-
-模板字面量类型出现在类型位置：
-
-```ts
-type World = 'world'
-type Greeting = `hello ${World}`
-// 'hello world'
-```
-
-两者语法相似，但职责不同：
-
-| 能力 | 模板字符串 | 模板字面量类型 |
-| --- | --- | --- |
-| 存在阶段 | 运行时 | 编译期 |
-| 生成真实字符串 | 能 | 不能 |
-| 组合字符串类型 | 不能 | 能 |
-| 校验真实外部输入 | 通过代码实现 | 不能 |
-
-## 5. 拼接字符串字面量
-
-```ts
-type Resource = 'lesson'
-type Action = 'created'
-type EventName = `${Resource}.${Action}`
-// 'lesson.created'
-```
-
-每个插值位置都必须能表示为模板字符串支持的原始值类型。工程中最常见的是字符串字面量联合。
-
-```ts
-type ApiVersion = 'v1'
-type LessonEndpoint = `/api/${ApiVersion}/lessons`
-// '/api/v1/lessons'
-```
-
-模板字面量类型适合描述格式，不会自动把任意字符串转换成该格式。
-
-## 6. 联合类型会展开
-
-插值位置是联合类型时，结果包含每个成员对应的字符串：
-
-```ts
-type Resource = 'lesson' | 'course'
-type Action = 'created' | 'updated'
-
-type DomainEvent = `${Resource}.${Action}`
-// 'lesson.created'
-// | 'lesson.updated'
-// | 'course.created'
-// | 'course.updated'
-```
-
-这不是字符串模糊匹配，而是有限集合的静态展开。
-
-## 7. 多个联合产生笛卡尔积
-
-每个插值位置的联合都会相互组合：
-
-```ts
-type Locale = 'zh-CN' | 'en-US'
-type Namespace = 'lesson' | 'course'
-type Message = 'title' | 'description'
-
-type MessageKey = `${Locale}.${Namespace}.${Message}`
-```
-
-结果共有 `2 × 2 × 2 = 8` 个成员。
-
-```mermaid
-flowchart LR
-  A["2 个 Locale"] --> D["8 个 MessageKey"]
-  B["2 个 Namespace"] --> D
-  C["2 个 Message"] --> D
-```
-
-当多个集合很大时，组合数量会迅速膨胀，增加类型检查和编辑器提示成本。
-
-## 8. 大型字符串集合应预生成
-
-模板字面量类型适合：
-
-- 少量稳定状态。
-- 本地组件事件。
-- 有限资源与操作的组合。
-- 小型配置键和国际化键。
-
-以下场景通常更适合代码生成或运行时 Schema：
-
-- 数千条国际化消息。
-- 从 OpenAPI 派生的全部路由。
-- 数据库或 CMS 动态字段。
-- 插件生态提供的任意事件名。
-
-官方文档也建议大型字符串联合使用提前生成。类型系统应帮助维护，而不是成为另一个昂贵的编译器。
-
-## 9. 宽泛 `string` 会降低精度
-
-```ts
-type DynamicResource = string
-type DynamicEvent = `${DynamicResource}.created`
-```
-
-`DynamicEvent` 表示“任意以 `.created` 结尾的字符串”，不再是可穷举的有限联合。
-
-它仍比普通 `string` 多一个格式约束，但无法提供完整自动补全或穷尽检查。若资源集合本来有限，应保留字面量联合，不要过早扩大为 `string`。
-
-## 10. 内置字符串操作类型
-
-TypeScript 提供四个编译器内置工具：
-
-```ts
-type Upper = Uppercase<'typescript'>
-// 'TYPESCRIPT'
-
-type Lower = Lowercase<'VUE'>
-// 'vue'
-
-type Capitalized = Capitalize<'lesson'>
-// 'Lesson'
-
-type Uncapitalized = Uncapitalize<'Course'>
-// 'course'
-```
-
-它们不需要导入，也不是普通运行时函数。
-
-## 11. 字符串操作不是本地化方案
-
-内置字符串操作采用类似 JavaScript `toUpperCase()`、`toLowerCase()` 的非 locale-aware 映射，不能代替本地化大小写规则。
-
-```ts
-type GetterName<Key extends string> =
-  `get${Capitalize<Key>}`
-```
-
-它适合代码标识符和协议键，不应被用于生成面向用户的本地化文案。真实 UI 文案仍应由国际化资源管理。
-
-## 12. 从对象键派生事件名
+假设表单库约定字段变化事件由“字段名 + `Changed`”组成：
 
 ```ts
 interface LessonForm {
@@ -210,35 +32,127 @@ interface LessonForm {
   published: boolean
 }
 
-type ChangeEventName<Type> =
-  `${string & keyof Type}Changed`
-
-type LessonChangeEvent = ChangeEventName<LessonForm>
-// 'titleChanged'
-// | 'durationMinutesChanged'
-// | 'publishedChanged'
+function on(eventName: string, callback: (value: unknown) => void) {
+  // 注册事件
+}
 ```
 
-`keyof Type` 可能包含 `string | number | symbol`；`string & keyof Type` 只保留字符串键，满足模板字面量的命名需求。
+这个签名过于宽松：`titleChange`、`titelChanged` 都能通过，回调值也失去了字段类型。
 
-## 13. 让事件名与回调值关联
-
-只限制事件名还不够，回调值也应与原字段类型一致：
+先写一个最小模板字面量类型：
 
 ```ts
-type PropEventSource<Type> = {
-  on<Key extends string & keyof Type>(
+type Field = 'title'
+type ChangeEvent = `${Field}Changed`
+// 'titleChanged'
+```
+
+它与值位置的模板字符串语法相似，存在阶段却不同：
+
+```ts
+const field = 'title'
+const eventName = `${field}Changed` // 运行时产生字符串值
+
+type Field = 'title'
+type EventName = `${Field}Changed`  // 编译期产生字符串类型
+```
+
+类型不会创建真实字符串，也不会为外部输入做运行时校验。
+
+## 联合插入模板后会逐项展开
+
+插值位置是联合类型时，每个成员都会参与组合：
+
+```ts
+type Field = 'title' | 'durationMinutes' | 'published'
+type ChangeEvent = `${Field}Changed`
+// 'titleChanged' | 'durationMinutesChanged' | 'publishedChanged'
+```
+
+有多个联合位置时，结果是所有可能组合，也就是笛卡尔积：
+
+```ts
+type Resource = 'lesson' | 'course'
+type Action = 'created' | 'updated'
+
+type EventName = `${Resource}.${Action}`
+// 'lesson.created' | 'lesson.updated'
+// | 'course.created' | 'course.updated'
+```
+
+若第一个位置有 3 个成员、第二个有 4 个，结果就有 `3 × 4 = 12` 个成员。
+
+### 能组合不等于应该组合
+
+假设课程允许发布，但学习路径不允许：
+
+```ts
+type Resource = 'lesson' | 'learningPath'
+type Action = 'created' | 'published'
+type EventName = `${Resource}.${Action}`
+```
+
+这会错误地产生 `learningPath.published`。类型的目标是表达真实规则，不是追求最短写法。组合并非完全规则时，显式联合更准确：
+
+```ts
+type EventName =
+  | 'lesson.created'
+  | 'lesson.published'
+  | 'learningPath.created'
+```
+
+### 组合规模必须受控
+
+模板字面量适合少量、稳定、可穷举的集合。语言 × 命名空间 × 页面 × 消息可能生成数千个成员，拖慢类型检查和编辑器提示。TypeScript 官方文档也建议大型字符串联合提前生成。
+
+大型国际化资源、OpenAPI 路由或 CMS 动态字段通常应使用代码生成或运行时 Schema，而不是手写越来越复杂的类型运算。
+
+## 从模型键派生事件名
+
+字段名不应重复维护，可以从对象模型获得：
+
+```ts
+type ChangeEventName<Model> =
+  `${string & keyof Model}Changed`
+
+type LessonChangeEvent = ChangeEventName<LessonForm>
+// 'titleChanged' | 'durationMinutesChanged' | 'publishedChanged'
+```
+
+为什么不是直接写 `keyof Model`？对象键可能是 `string | number | symbol`，而这里的命名协议只处理字符串键。`string & keyof Model` 取出其中可作为字符串的部分。
+
+也可以写成更直观的工具类型：
+
+```ts
+type StringKeyOf<Model> = Extract<keyof Model, string>
+type ChangeEventName<Model> = `${StringKeyOf<Model>}Changed`
+```
+
+## 事件名与回调参数必须保持关联
+
+只校验事件名还不够：监听 `titleChanged` 时回调应接收 `string`，监听 `publishedChanged` 时应接收 `boolean`。
+
+```ts
+type EventSource<Model> = {
+  on<Key extends string & keyof Model>(
     eventName: `${Key}Changed`,
-    callback: (newValue: Type[Key]) => void
+    callback: (newValue: Model[Key]) => void
   ): void
 }
 ```
 
+调用时发生的推断过程是：
+
+1. 从 `'titleChanged'` 中匹配出 `Key` 为 `'title'`；
+2. 验证 `'title'` 确实属于 `keyof Model`；
+3. 用 `Model['title']` 查到值类型 `string`；
+4. 把 `string` 传递给回调参数。
+
 ```ts
-declare const lessonEvents: PropEventSource<LessonForm>
+declare const lessonEvents: EventSource<LessonForm>
 
 lessonEvents.on('titleChanged', title => {
-  title.toUpperCase() // title 是 string
+  title.toUpperCase() // title: string
 })
 
 lessonEvents.on('publishedChanged', published => {
@@ -246,107 +160,84 @@ lessonEvents.on('publishedChanged', published => {
 })
 ```
 
-编译器从事件字符串的 `Changed` 前缀部分反向推断 `Key`，再通过 `Type[Key]` 得到回调值类型。
+这里真正重要的不是字符串拼接，而是事件名中的字段与回调值之间仍保留对应关系。
 
-## 14. 从键生成 Getter
+## 与映射类型组合生成处理器对象
 
-模板字面量类型与映射类型的键重映射可以生成对象 API：
+如果 API 使用一个处理器对象而不是 `on()` 方法，可以把上一课的键重映射接进来：
 
 ```ts
-type Getters<Type> = {
-  [Key in keyof Type as
-    `get${Capitalize<string & Key>}`
-  ]: () => Type[Key]
+type ChangeHandlers<Model> = {
+  [Key in keyof Model as `${string & Key}Changed`]:
+    (newValue: Model[Key]) => void
 }
 ```
 
-```ts
-type LessonGetters = Getters<LessonForm>
-// getTitle(): string
-// getDurationMinutes(): number
-// getPublished(): boolean
-```
-
-这适合框架适配层或库 API。普通业务对象如果直接访问属性更清晰，就没有必要人为生成 Getter 类型。
-
-## 15. 同时生成 Getter 与 Setter
+对 `LessonForm` 而言，结果近似：
 
 ```ts
-type Accessors<Type> = {
-  [Key in keyof Type as
-    `get${Capitalize<string & Key>}`
-  ]: () => Type[Key]
-} & {
-  [Key in keyof Type as
-    `set${Capitalize<string & Key>}`
-  ]: (value: Type[Key]) => void
+type LessonChangeHandlers = {
+  titleChanged: (newValue: string) => void
+  durationMinutesChanged: (newValue: number) => void
+  publishedChanged: (newValue: boolean) => void
 }
 ```
 
-交叉类型把两组映射结果组合起来。接口会随原模型字段同步，但也会让公共 API 快速增长，应评估是否真正改善调用体验。
+模型新增字段后，处理器对象会要求补上对应事件；字段值类型变化后，处理器参数也会同步变化。
 
-## 16. 使用条件类型匹配字符串
+## 内置字符串操作类型只处理命名
 
-模板字面量类型可以出现在条件类型的匹配结构中：
+TypeScript 内置四个字符串操作类型：
 
 ```ts
-type EventKey<Event extends string> =
-  Event extends `${infer Key}Changed`
-    ? Key
+type A = Uppercase<'lesson'>       // 'LESSON'
+type B = Lowercase<'VUE'>          // 'vue'
+type C = Capitalize<'lesson'>      // 'Lesson'
+type D = Uncapitalize<'Course'>    // 'course'
+```
+
+它们常与键重映射组合：
+
+```ts
+type Getters<Model> = {
+  [Key in keyof Model as `get${Capitalize<string & Key>}`]:
+    () => Model[Key]
+}
+```
+
+这些类型由编译器实现，不是需要导入的运行时函数。其大小写转换不感知 locale，因此适合代码标识符和协议键，不适合生成面向用户的本地化文案。
+
+## 模板匹配可以从字符串中提取信息
+
+模板字面量也能放进条件类型，通过 `infer` 捕获其中一段：
+
+```ts
+type ChangedField<Event extends string> =
+  Event extends `${infer Field}Changed`
+    ? Field
     : never
+
+type A = ChangedField<'titleChanged'> // 'title'
+type B = ChangedField<'lesson.created'> // never
 ```
 
-```ts
-type A = EventKey<'titleChanged'>
-// 'title'
-
-type B = EventKey<'lesson.created'>
-// never
-```
-
-这里的 `infer Key` 捕获 `Changed` 之前的字符串片段。
-
-## 17. 模板匹配遵循结构而非正则表达式
+可以把它理解成编译期的结构拆分，但它不是正则表达式引擎。
 
 ```ts
 type SplitOnce<Value extends string> =
   Value extends `${infer Head}.${infer Tail}`
     ? [Head, Tail]
     : [Value]
-```
 
-```ts
 type Parts = SplitOnce<'lesson.created.v1'>
 // ['lesson', 'created.v1']
 ```
 
-它按模板结构推断，不提供完整正则表达式语法，也不会在运行时解析字符串。
+第一个 `infer` 会得到匹配结构所需的前一段，剩余内容进入后一段。复杂语法、转义和错误位置仍应交给真正的解析器。
 
-需要复杂语法、转义、错误位置或安全校验时，应使用真实解析器。
+## 路由参数展示了“类型算法 + 运行时实现”
 
-## 18. 递归拆分字符串
-
-可以递归处理分隔符：
-
-```ts
-type Split<
-  Value extends string,
-  Separator extends string
-> = Value extends `${infer Head}${Separator}${infer Tail}`
-  ? [Head, ...Split<Tail, Separator>]
-  : [Value]
-```
-
-```ts
-type EventParts = Split<'lesson.created.v1', '.'>
-// ['lesson', 'created', 'v1']
-```
-
-递归必须有明确终止分支。空分隔符、很长字符串和复杂联合都会增加实例化成本，业务代码中应限制输入范围。
-
-## 19. 提取路由参数名
-
-路由模板中的 `:param` 可以转为参数键联合：
+路由模板是很好的边界案例：类型可以提取参数名，真正替换与 URL 编码仍必须由 JavaScript 完成。
 
 ```ts
 type RouteParamNames<Path extends string> =
@@ -357,516 +248,199 @@ type RouteParamNames<Path extends string> =
       : never
 ```
 
+逐步看 `/courses/:courseId/lessons/:lessonId`：
+
+1. 第一分支捕获 `courseId`，并把剩余路径递归交给自身；
+2. 剩余路径捕获末尾的 `lessonId`；
+3. 返回 `'courseId' | 'lessonId'`。
+
+再把联合变为参数对象：
+
 ```ts
-type LessonRouteParams = RouteParamNames<
-  '/courses/:courseId/lessons/:lessonId'
->
-// 'courseId' | 'lessonId'
+type ParamsFor<Path extends string> =
+  Record<RouteParamNames<Path>, string>
 ```
 
-再与 `Record` 组合：
-
 ```ts
-type ParamsFor<Path extends string> = Record<
-  RouteParamNames<Path>,
-  string
->
-```
-
-调用者必须提供完整参数，但类型仍不会检查参数值是否合法、URL 是否需要编码或路由模板是否来自可信来源。
-
-## 20. 构建路由时仍需运行时代码
-
-```ts
-function buildRoute<Path extends string>(
+declare function buildRoute<Path extends string>(
   template: Path,
   params: ParamsFor<Path>
-): string {
-  return template.replace(
-    /:([A-Za-z0-9_]+)/g,
-    (_match, key: string) =>
-      encodeURIComponent(
-        params[key as RouteParamNames<Path>]
-      )
-  )
-}
+): string
+
+buildRoute('/courses/:courseId/lessons/:lessonId', {
+  courseId: 'typescript',
+  lessonId: 'template-literal-types'
+})
 ```
 
-```ts
-const route = buildRoute(
-  '/courses/:courseId/lessons/:lessonId',
-  {
-    courseId: 'ts',
-    lessonId: 'template-literals'
-  }
-)
-```
+少写或拼错参数键会在编译时暴露。不过类型仍不能完成这些工作：
 
-类型契约检查参数键，正则替换与 `encodeURIComponent` 才真正构造 URL。实现中的受控断言集中在路由边界，并依赖正则捕获与类型算法保持一致。
+- 运行时替换 `:param`；
+- 对参数调用 `encodeURIComponent`；
+- 验证外部模板可信且语法正确；
+- 支持可选参数、通配符和复杂路由规则。
 
-## 21. 可选路由参数会增加复杂度
+成熟路由库已经有自己的语法和类型时，应使用库提供的能力，避免维护一套不完全兼容的解析器。
 
-真实路由可能包含：
+## `satisfies` 用来检查契约表而不覆盖推断结果
 
-- 可选参数。
-- 通配符。
-- 重复参数。
-- 查询字符串。
-- 参数约束和转义。
-
-为成熟路由库重新实现完整类型解析通常不值得。优先使用框架或库提供的官方类型；自定义解析只适合规则小而稳定的内部 DSL。
-
-## 22. 国际化消息键
-
-有限的语言、命名空间和消息名可以组合成完整键：
+模板字面量经常用于配置对象。现在需要保证所有接口路径都符合格式：
 
 ```ts
-type Locale = 'zh-CN' | 'en-US'
-type Namespace = 'lesson' | 'course'
-type MessageName = 'title' | 'description'
-
-type I18nKey =
-  `${Locale}.${Namespace}.${MessageName}`
-```
-
-```ts
-const messages: Record<I18nKey, string> = {
-  'zh-CN.lesson.title': '课程标题',
-  'zh-CN.lesson.description': '课程说明',
-  'zh-CN.course.title': '课程体系标题',
-  'zh-CN.course.description': '课程体系说明',
-  'en-US.lesson.title': 'Lesson title',
-  'en-US.lesson.description': 'Lesson description',
-  'en-US.course.title': 'Course title',
-  'en-US.course.description': 'Course description'
-}
-```
-
-大型国际化项目应从资源文件生成键，避免维护一套与真实文案分离的手写联合。
-
-## 23. 领域事件命名
-
-```ts
-type Aggregate = 'lesson' | 'course'
-type PastTenseAction = 'created' | 'updated' | 'published'
-type DomainEventName = `${Aggregate}.${PastTenseAction}`
-```
-
-有限联合能统一命名格式并提供自动补全，但并不代表所有组合都有业务意义。
-
-例如 `course.published` 如果不允许，就不应该通过笛卡尔积生成。应改成显式联合：
-
-```ts
-type DomainEventName =
-  | 'lesson.created'
-  | 'lesson.updated'
-  | 'lesson.published'
-  | 'course.created'
-  | 'course.updated'
-```
-
-类型应表达真实领域集合，而不是为了短小制造无效组合。
-
-## 24. 环境变量键
-
-```ts
-type PublicEnvName =
-  | 'API_BASE_URL'
-  | 'APP_TITLE'
-
-type VitePublicEnvKey = `VITE_${PublicEnvName}`
-```
-
-这能限制本地封装函数接受的键：
-
-```ts
-function readPublicEnv(key: VitePublicEnvKey): string {
-  // 这里只演示契约，真实实现由构建工具环境决定
-  return key
-}
-```
-
-环境变量在运行时仍可能缺失或格式错误。类型不能证明部署环境实际提供了它们，必须在应用启动时校验。
-
-## 25. 什么是 `satisfies`
-
-`satisfies` 检查一个表达式是否可赋值给目标类型，同时尽量保留表达式自身更具体的推断结果：
-
-```ts
-type Status = 'draft' | 'published'
-
-const statusConfig = {
-  draft: {
-    label: '草稿',
-    color: 'gray'
-  },
-  published: {
-    label: '已发布',
-    color: 'green'
-  }
-} satisfies Record<
-  Status,
-  { label: string; color: string }
->
-```
-
-它特别适合需要检查键完整性、但又希望保留每个属性具体结构的配置对象。
-
-## 26. 类型注解与 `satisfies`
-
-使用类型注解时，变量直接以目标类型为准：
-
-```ts
-type Value = string | readonly [number, number, number]
-
-const annotated: Record<'green' | 'red', Value> = {
-  green: '#00ff00',
-  red: [255, 0, 0]
-}
-```
-
-读取 `annotated.green` 时，静态类型是联合 `Value`，需要进一步收窄。
-
-使用 `satisfies`：
-
-```ts
-const checked = {
-  green: '#00ff00',
-  red: [255, 0, 0]
-} satisfies Record<'green' | 'red', Value>
-
-checked.green.toUpperCase()
-```
-
-目标结构得到检查，同时 `green` 仍保留适合字符串方法的精确类型。
-
-## 27. 类型断言与 `satisfies`
-
-类型断言告诉编译器“按这个类型看待表达式”：
-
-```ts
-const config = value as AppConfig
-```
-
-它可能绕过本应发现的不兼容，尤其是双重断言。`satisfies` 则要求表达式真正兼容目标类型：
-
-```ts
-const config = {
-  mode: 'production'
-} satisfies AppConfig
-```
-
-| 写法 | 检查兼容性 | 变量采用目标类型 | 保留表达式具体信息 |
-| --- | --- | --- | --- |
-| `const x: T = value` | 是 | 是 | 可能减少 |
-| `value satisfies T` | 是 | 否 | 通常更多 |
-| `value as T` | 较弱 | 作为 `T` 使用 | 由断言决定 |
-
-`satisfies` 不是类型转换，也不会生成运行时代码。
-
-## 28. `as const` 与 `satisfies`
-
-`as const` 让字面量属性保持更窄，并将对象属性和数组视为只读：
-
-```ts
-const endpoints = {
-  lessons: '/api/v1/lessons',
-  courses: '/api/v1/courses'
-} as const
-```
-
-`satisfies` 负责结构校验：
-
-```ts
+type ApiVersion = 'v1' | 'v2'
 type Resource = 'lessons' | 'courses'
-type Endpoint = `/api/v1/${Resource}`
+type ApiEndpoint = `/api/${ApiVersion}/${Resource}`
+```
 
+直接使用类型注解：
+
+```ts
+const endpoints: Record<string, ApiEndpoint> = {
+  lessons: '/api/v1/lessons'
+}
+```
+
+变量会以目标类型为准，具体属性值的信息可能变宽。`satisfies` 的职责不同：检查表达式可赋给目标类型，同时保留表达式自身的推断结果。
+
+```ts
 const endpoints = {
   lessons: '/api/v1/lessons',
-  courses: '/api/v1/courses'
-} as const satisfies Record<Resource, Endpoint>
+  courses: '/api/v2/courses'
+} satisfies Record<string, ApiEndpoint>
 ```
 
-组合顺序表达了：“保留只读字面量信息，并验证它满足完整端点映射。”
+如果写成 `/api/v3/lessons` 会报错，而 `endpoints.lessons` 仍保留更具体的信息。
 
-## 29. `satisfies` 不会主动冻结对象
+### 类型注解、断言与 `satisfies` 不是同一件事
 
 ```ts
-const settings = {
-  theme: 'dark'
-} satisfies { theme: string }
-
-settings.theme = 'light'
+const annotated: Contract = value
+const asserted = value as Contract
+const checked = value satisfies Contract
 ```
 
-这通常是合法的，因为 `satisfies` 不是只读操作。需要只读字面量时使用 `as const`、显式 `readonly` 或 `Readonly<T>`，并区分静态只读与运行时冻结。
+它们分别表达：
 
-## 30. `satisfies` 与额外属性检查
+- 类型注解：检查 `value`，变量采用 `Contract`；
+- 类型断言：要求编译器按 `Contract` 看待值，可能绕过不兼容问题；
+- `satisfies`：检查 `value` 满足 `Contract`，表达式仍保留自身类型。
 
-对象字面量配合有限键 `Record` 可以发现拼写错误和多余键：
+`satisfies` 不是类型转换，不校验运行时数据，也不会生成 JavaScript。
+
+### `as const satisfies` 各自承担一半职责
 
 ```ts
-type Status = 'draft' | 'review' | 'published'
+type EndpointName = 'lessonList' | 'courseList'
 
-const labels = {
-  draft: '草稿',
-  review: '审核中',
-  published: '已发布'
-} satisfies Record<Status, string>
+const endpoints = {
+  lessonList: '/api/v1/lessons',
+  courseList: '/api/v1/courses'
+} as const satisfies Record<EndpointName, ApiEndpoint>
 ```
 
-少写键或写成 `publised` 会报错。若目标是 `Record<string, string>`，任意字符串键本来就合法，自然无法检查有限键拼写。
+- `as const` 保留只读字面量信息；
+- `satisfies` 检查键完整且值符合端点格式。
 
-## 31. `satisfies` 不能验证动态数据
+它不会执行 `Object.freeze()`。所谓只读仍是静态约束，不是运行时冻结。
+
+## 外部字符串必须经过运行时校验
+
+下面的函数只接受正确事件名：
 
 ```ts
-const config = JSON.parse(text)
+function subscribe(eventName: 'lesson.created' | 'lesson.published') {
+  // ...
+}
 ```
 
-如果 `JSON.parse` 的结果是 `any`，后接 `satisfies AppConfig` 不能把未知 JSON 变成可信数据，也不会在运行时执行验证。
-
-正确边界应是：
-
-```mermaid
-flowchart LR
-  A["外部 JSON"] --> B["unknown"]
-  B --> C["运行时 Schema / 校验函数"]
-  C --> D["AppConfig"]
-  D --> E["内部类型安全代码"]
-```
-
-`satisfies` 最适合检查源代码中可见的静态配置对象。
-
-## 32. 用 `satisfies` 定义路由表
+但来自地址栏、接口、localStorage 或消息队列的数据通常只是 `string` 或 `unknown`：
 
 ```ts
-type PageName = 'lessonList' | 'lessonDetail'
-type AppRoute =
-  | '/lessons'
-  | '/lessons/:lessonId'
-
-const routes = {
-  lessonList: '/lessons',
-  lessonDetail: '/lessons/:lessonId'
-} as const satisfies Record<PageName, AppRoute>
+const eventName = JSON.parse(input) as unknown
 ```
 
-这样可以同时获得：
-
-- 页面名完整性检查。
-- 路由格式检查。
-- `routes.lessonDetail` 的精确字面量类型。
-- 后续从具体路由提取参数名的能力。
+模板字面量无法证明它在运行时有效。需要解析或类型守卫：
 
 ```ts
-type DetailParams = ParamsFor<typeof routes.lessonDetail>
-// { lessonId: string }
-```
+type LessonEventName = 'lesson.created' | 'lesson.published'
 
-## 33. 用 `satisfies` 定义事件配置
-
-```ts
-type LessonEvent =
-  | 'lesson.created'
-  | 'lesson.published'
-
-type EventMetadata = {
-  durable: boolean
-  description: string
+function isLessonEventName(value: unknown): value is LessonEventName {
+  return value === 'lesson.created' || value === 'lesson.published'
 }
 
-const eventMetadata = {
-  'lesson.created': {
-    durable: true,
-    description: '课程创建完成'
-  },
-  'lesson.published': {
-    durable: true,
-    description: '课程正式发布'
-  }
-} satisfies Record<LessonEvent, EventMetadata>
+if (isLessonEventName(eventName)) {
+  subscribe(eventName)
+}
 ```
 
-新增事件时，配置遗漏会在编译阶段暴露。事件真实载荷仍应由可辨识联合或 Schema 独立描述。
-
-## 34. 类型安全契约的分层
-
-可靠的前端契约通常包含三层：
-
-1. **名称集合**：字面量联合、模板字面量类型。
-2. **静态对应关系**：泛型、索引访问、映射类型、`satisfies`。
-3. **运行时边界**：路由实现、数据校验、URL 编码、权限检查。
-
-```mermaid
-flowchart TD
-  A["有限字符串规则"] --> B["模板字面量类型"]
-  B --> C["映射类型 / satisfies"]
-  C --> D["调用方自动补全与静态错误"]
-  E["外部动态数据"] --> F["运行时解析与验证"]
-  F --> D
-```
-
-任何一层都不能替代另外两层。
-
-## 35. 完整项目示例：课程路由与事件配置
-
-本站提供可运行源码：
+因此边界很清楚：
 
 ```text
-examples/typescript/template-literal-types-and-type-safe-contracts.ts
+程序内部的有限规则 → 模板字面量提供拼写、推断和重构保障
+程序外部的动态输入 → 运行时解析、校验和错误处理
+```
+
+## 完整示例：事件、端点与路由
+
+完整示例把三条关系放在一起：
+
+```text
+表单模型的键 ──→ `${Key}Changed` ──→ 对应值类型的处理器
+版本与资源联合 ──→ `/api/${Version}/${Resource}` ──→ 端点配置
+路由模板 ──→ 参数名联合 ──→ 必填参数对象 ──→ 运行时 URL
 ```
 
 <<< ../../../examples/typescript/template-literal-types-and-type-safe-contracts.ts
 
-示例包含：
+运行：
 
-1. 由资源名派生 API 端点。
-2. 使用 `as const satisfies` 定义完整端点表。
-3. 从路由模板递归提取参数键。
-4. `buildRoute` 在运行时替换并编码参数。
-5. 从课程表单字段派生变化事件名。
-6. 事件名与回调参数类型的对应关系。
-7. 使用 `satisfies` 检查领域事件元数据。
-
-## 36. 常见错误
-
-### 把模板字面量类型当作运行时格式校验
-
-来自地址栏、接口或存储的字符串仍是动态数据，必须在运行时验证。
-
-### 组合出大量无效字符串
-
-笛卡尔积会生成所有组合。如果领域只允许部分组合，应写显式联合或从单一数据源生成类型。
-
-### 让联合规模爆炸
-
-多个大型联合相乘会降低类型检查和编辑器性能。大型集合应提前生成。
-
-### 过早扩大成 `string`
-
-宽泛 `string` 会失去有限集合的穷尽检查和精确自动补全。
-
-### 误以为 `satisfies` 改变变量类型
-
-它检查兼容性，但表达式不会简单变成目标类型。需要公共 API 明确采用某类型时仍可使用类型注解。
-
-### 用 `satisfies` 代替数据校验
-
-类型系统会擦除，不能验证 JSON、环境变量或用户输入。
-
-### 用类型断言掩盖实现不一致
-
-字符串拼装函数中的断言必须集中、可解释，并由测试验证运行时算法与类型算法一致。
-
-### 为成熟 DSL 重写类型解析器
-
-路由、SQL、GraphQL 等复杂语法应优先使用生态库或代码生成提供的类型。
-
-## 37. 工程最佳实践
-
-- 只为有限、稳定且能改善调用体验的字符串规则建立模板类型。
-- 先写真实领域集合，再决定能否安全地用笛卡尔积生成。
-- 从对象键和单一配置源派生名称，减少重复声明。
-- 泛型回调使用 `Type[Key]` 保持名称和值类型关联。
-- 模板匹配与递归类型必须有清晰终止条件。
-- 大型国际化键、API 路由和 Schema 优先使用代码生成。
-- 配置字面量使用 `satisfies` 检查结构并保留精确推断。
-- 需要只读字面量时使用 `as const satisfies`，不要混淆二者职责。
-- 对外函数参数和返回值仍应根据 API 需要提供显式类型注解。
-- 动态数据从 `unknown` 开始，经过运行时验证后再进入静态类型世界。
-- 受控断言集中在实现边界，并通过测试保证与类型规则一致。
-- 类型错误开始难以理解或编辑器变慢时，应降低类型级抽象复杂度。
-
-## 38. 与 Vue 3 的联系
-
-### 组件事件
-
-Vue 组件事件通常是有限集合。可以用字面量联合或对象式事件声明确保事件名和载荷类型匹配，不必为了模板字面量类型而绕开 Vue 官方 API。
-
-若多个字段都遵循统一的 `update:field` 规则，可派生名称：
-
-```ts
-type FormField = 'title' | 'summary'
-type UpdateEvent = `update:${FormField}`
+```bash
+node --experimental-strip-types examples/typescript/template-literal-types-and-type-safe-contracts.ts
 ```
 
-### `v-model`
+示例中的路由实现包含一个受控断言。它依赖“类型递归所接受的参数名语法”和“运行时正则捕获的参数名语法”始终一致；若其中一边改变，另一边也必须同步。这正是类型世界和运行时世界衔接时应明确记录的假设。
 
-Vue 的命名 `v-model` 使用 `update:modelName` 约定。模板字面量类型能描述这一格式，但组件运行时仍必须真正声明并触发对应事件。
+## 什么时候值得使用
 
-### 路由
+优先考虑模板字面量类型：
 
-从静态路由表保留字面量后，可以派生页面名或参数键。成熟项目应优先采用 Vue Router 提供的类型化路由能力或生成方案，避免维护不完整的自定义解析器。
+- 字符串集合有限且命名规则稳定；
+- 规则能消除重复声明或常见拼写错误；
+- 字符串的一部分需要决定另一个参数的类型；
+- 生成后的联合仍容易阅读和调试。
 
-## 39. 与后端和协议生成的联系
+考虑显式联合、代码生成或运行时 Schema：
 
-模板字面量类型适合描述小型 REST 路径前缀、事件主题和缓存键。但后端协议往往包含参数约束、版本兼容和权限规则，不能只靠字符串格式表达。
+- 并非所有组合都有业务意义；
+- 联合规模很大或来源由外部系统维护；
+- 协议包含转义、可选段或复杂语法；
+- 类型实现已经比业务规则更难解释。
 
-如果契约由 OpenAPI、GraphQL Schema、Protobuf 或 AsyncAPI 定义，应让协议成为单一事实来源，通过生成器得到前端类型。模板类型可在生成结果之上提供少量本地组合，而不应复制整套协议。
+一个实用判断是：如果团队成员看见类型错误后，不能快速用业务语言说明哪里错了，这个类型可能已经过度设计。
 
-## 40. 概念辨析与因果回顾
+## 本课小结
 
-### 什么是模板字面量类型？
+模板字面量类型的核心不是“在类型里拼字符串”，而是建立关系：
 
-它是在类型位置使用模板字符串语法，根据字面量和联合类型生成新的字符串字面量类型。
+1. 联合成员放入模板后形成有限字符串集合；
+2. 多个联合会交叉组合，规模与业务合法性都要控制；
+3. `infer` 可以从字符串结构中反向提取信息；
+4. 它与 `keyof`、索引访问、条件类型和映射类型组合后，能保持名称与值类型的对应；
+5. `satisfies` 适合校验配置契约，同时保留表达式的具体推断；
+6. 所有动态输入和真实字符串处理仍需要运行时代码。
 
-### 联合类型放在多个插值位置会怎样？
+## 下一课
 
-每个位置的成员会交叉组合，形成笛卡尔积。组合数量是各联合成员数量的乘积。
+下一节是[项目配置与模块边界](/frontend/typescript/project-configuration-and-module-boundaries)。前面的课程主要解决“一个文件里的类型如何准确”，下一课转向工程层面：
 
-### 如何从 `titleChanged` 提取 `title`？
+- `tsconfig.json` 怎样决定哪些代码被检查、以什么规则检查；
+- `module` 与 `moduleResolution` 为什么必须匹配真实运行环境；
+- 类型导入、包导出和项目引用怎样形成模块边界；
+- 为什么能通过编辑器检查的代码，仍可能在 Node.js 或打包器中运行失败。
 
-使用条件类型匹配 `` `${infer Key}Changed` ``，真分支得到推断出的 `Key`。
-
-### `Capitalize<T>` 是运行时函数吗？
-
-不是。它是编译器内置的类型级字符串操作，不生成 JavaScript，也不负责本地化规则。
-
-### `satisfies` 与类型注解有何区别？
-
-二者都会检查兼容性；类型注解让变量采用目标类型，`satisfies` 通常保留表达式自身更具体的推断结果。
-
-### `satisfies` 与 `as` 有何区别？
-
-`satisfies` 要求表达式兼容目标类型；`as` 是类型断言，可能绕开部分不兼容检查。两者都不执行运行时验证。
-
-### 为什么常见 `as const satisfies`？
-
-`as const` 保留只读字面量信息，`satisfies` 校验该精确对象符合目标契约，二者职责互补。
-
-## 41. 本节总结
-
-- 模板字面量类型在类型位置组合字符串字面量。
-- 联合插值会展开，多个位置形成笛卡尔积。
-- 大型字符串联合应考虑提前生成，避免类型规模爆炸。
-- `Uppercase`、`Lowercase`、`Capitalize`、`Uncapitalize` 是编译器内置工具。
-- `string & keyof Type` 常用于从对象的字符串键派生命名。
-- 泛型事件名可以与 `Type[Key]` 建立回调参数对应关系。
-- 条件类型配合 `infer` 可以按模板结构拆解字符串。
-- 路由参数类型只检查键，真实替换、编码和验证仍发生在运行时。
-- `satisfies` 校验兼容性并通常保留更具体的表达式推断。
-- 类型注解、类型断言、`as const` 与 `satisfies` 各有不同职责。
-- `satisfies` 不能验证 JSON、环境变量或其他动态输入。
-- 字符串类型契约应服务于真实领域规则，不能制造无效组合。
-
-## 42. 下一步学习
-
-下一节建议学习：[**TypeScript 工程配置与模块边界**](/frontend/typescript/project-configuration-and-module-boundaries)。
-
-届时将继续讲解：
-
-- `tsconfig.json` 的继承、包含范围与严格模式选项。
-- `module`、`moduleResolution` 与 ESM/CJS 的关系。
-- `verbatimModuleSyntax`、类型导入和运行时导入。
-- 浏览器、Node.js 与测试环境的类型边界。
-- 项目引用、声明文件和前端工程中的类型检查流程。
-
-## 43. 参考资料
+## 参考资料
 
 - [TypeScript Handbook：Template Literal Types](https://www.typescriptlang.org/docs/handbook/2/template-literal-types.html)
+- [TypeScript 4.9：The `satisfies` Operator](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-9.html#the-satisfies-operator)
 - [TypeScript Handbook：Mapped Types](https://www.typescriptlang.org/docs/handbook/2/mapped-types.html)
-- [TypeScript Handbook：Conditional Types](https://www.typescriptlang.org/docs/handbook/2/conditional-types.html)
-- [TypeScript Handbook：Utility Types](https://www.typescriptlang.org/docs/handbook/utility-types.html#intrinsic-string-manipulation-types)
-- [TypeScript 4.1 Release Notes：Template Literal Types](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-1.html#template-literal-types)
-- [TypeScript 4.1 Release Notes：Key Remapping in Mapped Types](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-1.html#key-remapping-in-mapped-types)
-- [TypeScript 4.9 Release Notes：The `satisfies` Operator](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-9.html#the-satisfies-operator)
+- [TypeScript Handbook：Creating Types from Types](https://www.typescriptlang.org/docs/handbook/2/types-from-types.html)
