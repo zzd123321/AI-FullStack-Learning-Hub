@@ -38,6 +38,45 @@ flowchart LR
     H --> B
 ```
 
+## 先让同一份 JAR 在两个环境运行
+
+代码里若写死 `http://localhost:9000`，部署到生产只能改源码、重新编译。更合理的边界是构建产物不变，运行环境提供值：
+
+```text
+同一个 app.jar
+  + 开发环境 APP_CLIENT_BASE_URL=http://localhost:9000
+  → 连接本地服务
+
+同一个 app.jar
+  + 生产环境 APP_CLIENT_BASE_URL=https://internal.example
+  → 连接生产服务
+```
+
+Configuration Properties 把松散字符串一次绑定成有类型对象，并在启动期校验。缺少必需 URL 时应拒绝启动，而不是等第一个用户请求才出现空指针。
+
+## 属性覆盖不是“随机选一个”
+
+```text
+application.yaml: app.feature.enabled=false
+环境变量:          APP_FEATURE_ENABLED=true
+命令行:            --app.feature.enabled=false
+```
+
+Spring Environment 按规定的 PropertySource 优先级解析，较高来源覆盖较低来源。排查最终值时要同时确认“值是什么”和“来自哪个允许来源”，但绝不能把 secret 原文打印进日志或 Actuator。
+
+Profile 只是条件化的一组 Bean/配置，不等同于一台物理环境。稳定值优先外部化，只有对象实现确实不同才使用条件 Bean；不要把每个配置组合都做成新的 Profile。
+
+## 日志、指标和健康端点分别回答什么
+
+| 信号 | 典型问题 | 不应承载 |
+| --- | --- | --- |
+| 日志 | 某次错误发生在哪个阶段、异常是什么 | 每秒请求量的高效聚合 |
+| 指标 | 错误率、延迟、饱和度是否异常 | 单个用户请求的全部细节 |
+| trace | 一次跨组件请求的时间与父子关系 | 长期保存所有业务字段 |
+| health | 当前实例能否存活/接流量 | 把完整内部诊断公开给互联网 |
+
+进程存活不等于 ready：配置尚未加载、连接池正在建立或应用正在停机时，liveness 可以成功，readiness 应阻止新流量。第一次学习先做到同一 JAR 外部配置、启动期类型校验、请求可从日志定位、Actuator 只暴露必要端点。
+
 第一次学习只需形成三个习惯：环境差异放进外部配置，重要事件留下带上下文的日志，服务健康与业务指标通过受控端点暴露。Profile 优先级、完整指标体系和 tracing 在项目需要多环境与跨服务排障时再深入。
 
 ## 2. 学习目标

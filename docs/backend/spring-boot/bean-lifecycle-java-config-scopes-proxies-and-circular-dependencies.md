@@ -12,6 +12,63 @@ outline: deep
 
 第一课把 ApplicationContext 当成对象容器，本课只回答三个后续问题：对象何时创建、活多久、关闭时由谁清理。第一次先掌握 singleton Bean、构造注入和初始化/销毁回调；request scope、作用域代理、AOP 代理和循环依赖用于解释特殊边界，不能取代清晰的对象设计。
 
+## 从三个普通 Java 对象开始
+
+```java
+CourseRepository repository = new InMemoryCourseRepository();
+CourseService service = new CourseService(repository);
+CourseController controller = new CourseController(service);
+```
+
+这里已经存在一张对象图：Controller 需要 Service，Service 需要 Repository。Spring 的构造注入只是把“由 main 手工 new 并连接”改成“由容器根据 Bean 定义创建并连接”。业务对象仍是普通 Java 对象。
+
+```text
+扫描/配置得到 BeanDefinition
+  → 发现 CourseController 构造器需要 CourseService
+  → 先找到或创建 CourseService
+  → CourseService 又需要 CourseRepository
+  → 创建 Repository
+  → 依次完成 Service、Controller
+  → 初始化回调完成后才成为可用 singleton
+```
+
+BeanDefinition 类似对象的“创建说明书”，Bean instance 才是运行中的对象。把两者混淆，就难以理解为什么 BeanFactoryPostProcessor 能修改定义，却不是在操作最终业务对象。
+
+## 生命周期由资源所有权决定
+
+若容器创建并长期保存外部 client，它也应知道何时关闭：
+
+```text
+context refresh
+  → 创建 client
+  → 初始化连接池
+  → 多个请求共享使用
+  → context close
+  → 执行 destroy/close
+```
+
+不要在每个请求里随手 `new ExternalClient()`，否则连接池反复创建且关闭责任不清；也不要把请求独有对象放进 singleton 字段，否则不同线程会共享用户状态。
+
+## 用生命周期冲突理解 scope proxy
+
+singleton Controller 在启动时创建，request-scoped 对象要等请求到来才存在：
+
+```text
+启动时：Controller 需要 RequestContext
+但此刻：没有任何 HTTP request
+```
+
+scoped proxy 注入的是一个稳定代理。请求期调用代理时，它再查找“当前请求真正的 RequestContext”。它解决的是生命周期错位，不是为了让业务代码“更高级”。若 singleton 构造阶段就必须读取请求值，设计本身仍然错误。
+
+## 构造器循环为什么无法开始
+
+```text
+A 构造器需要 B
+B 构造器需要 A
+```
+
+容器要创建 A，必须先有 B；创建 B，又必须先有 A，没有任何完整对象可以作为起点。`@Lazy` 可能用代理暂时打断，但通常说明职责切分错误。优先提取第三个协作对象、改变调用方向或用事件解除双向依赖。
+
 ## 1. 学习目标
 
 完成本节后，你应该能够：

@@ -23,6 +23,67 @@ main 启动 Spring
 
 第一次先跑通示例并能说清这条链。starter、条件化自动配置、配置优先级和可执行 JAR内部结构用于解释“为什么不用手工装配”，不要求一次记住。遇到注解时先问它参与启动阶段还是请求阶段。
 
+## 先把启动阶段和请求阶段分开
+
+Spring Boot 初学者最容易把所有注解想成“请求来了才执行”。实际先发生一次启动，再发生很多次请求：
+
+```mermaid
+sequenceDiagram
+    participant J as JVM main thread
+    participant S as SpringApplication
+    participant C as ApplicationContext
+    participant T as Embedded Tomcat
+    participant H as HTTP client
+    J->>S: run(Application.class, args)
+    S->>C: 创建 Environment 与 Bean definitions
+    C->>C: 实例化 Controller、Service 等 singleton
+    C->>T: 创建并启动 Web Server
+    T-->>J: 端口 ready，启动完成
+    H->>T: GET /api/courses/C-101
+    T->>C: DispatcherServlet 查找 Controller
+    C-->>H: JSON response
+```
+
+`@Component`、`@Service`、`@RestController` 主要帮助启动期发现和创建对象；`@GetMapping` 注册的是请求期匹配规则。一个 Controller 默认只创建一次，之后可被多个请求线程并发调用，因此不要把某个用户的可变请求状态放进它的字段。
+
+## 如果不用 Boot，需要手工完成什么
+
+Spring Boot 没有替你写业务逻辑，它主要根据 classpath、配置和已有 Bean 提供合理基础设施候选项。一个 MVC 应用若全部手工装配，至少要决定：
+
+```text
+选择并配置 Servlet 容器
+  → 注册 DispatcherServlet
+  → 配置 JSON message converter
+  → 建立参数解析、异常处理和校验基础设施
+  → 创建 Controller/Service 对象图
+  → 管理端口、日志和关闭生命周期
+```
+
+加入 web starter 后，自动配置看到 MVC/Tomcat 相关类存在，且用户没有提供冲突 Bean，才创建默认组件：
+
+```text
+依赖出现在 classpath
+  + 当前是 Servlet Web 应用
+  + 某个 Bean 尚不存在
+  + 配置条件满足
+  → 对应 auto-configuration 生效
+```
+
+因此自动配置不是“Spring 猜到我想要什么”，也不是无法覆盖的黑盒。`--debug` 的 condition report 正是用来回答某项配置为什么生效或没生效。
+
+## 用一个 404 定位请求在哪一层失败
+
+请求 `/api/courses/C-101` 返回 404 时，不要立刻怀疑 Service：
+
+```text
+端口是否真的由当前应用监听？
+  → 请求 method/path 是否匹配 mapping？
+  → Controller 是否位于组件扫描根包之下？
+  → 若 Controller 已进入，业务才可能返回“课程不存在”
+```
+
+路由级 404 与业务资源不存在都可能显示 404，但日志、错误 body 和测试应能区分。学会沿启动链和请求链定位，比背 `@SpringBootApplication` 的三个组成注解更重要。
+
 ## 1. 学习目标
 
 完成本节后，你应该能够：

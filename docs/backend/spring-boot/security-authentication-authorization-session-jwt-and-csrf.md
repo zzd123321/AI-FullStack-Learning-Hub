@@ -17,6 +17,59 @@
 
 第一次阅读先沿着一条受保护请求理解：过滤器从凭据恢复身份，把认证结果放进 SecurityContext，再按 URL、方法和业务对象检查权限。密码、Session/JWT、CSRF 与 CORS 是这条链上不同边界，不要把“使用 JWT”当成整套安全设计。
 
+## 一次受保护请求在 Controller 前发生什么
+
+```http
+GET /api/orders/o-100 HTTP/1.1
+Cookie: JSESSIONID=...
+```
+
+Servlet container 先把请求交给 Spring Security filter chain：
+
+```text
+SecurityContext persistence filter 恢复已有认证状态
+  → authentication filter 从 session/token 取得凭据
+  → AuthenticationManager 选择 provider
+  → provider 验证凭据并产生已认证 Authentication
+  → SecurityContext 保存当前 principal/authorities
+  → authorization filter 检查 URL/method 规则
+  → 通过后才进入 DispatcherServlet 和 Controller
+```
+
+所以安全失败时 Controller 断点可能永远不会命中。认证失败由 authentication entry point 转为 401；身份有效但权限不足由 access denied handler 转为 403。
+
+## URL 允许仍不代表能读这张订单
+
+```java
+.requestMatchers(HttpMethod.GET, "/api/orders/**").authenticated()
+```
+
+这只要求“是已登录用户”。Controller/Service 仍要验证订单 `o-100` 是否属于当前用户或其租户：
+
+```text
+URL 层：任何已登录用户可以进入订单查询功能
+方法/业务层：当前 principal 是否能访问具体 orderId
+```
+
+攻击者把 `/orders/o-100` 改成 `/orders/o-101` 的 IDOR 越权，不能靠“已经 JWT 登录”阻止。
+
+## Session 与 JWT 改变的是状态位置
+
+```text
+Session：浏览器持有随机 session id，服务端保存认证状态
+JWT：浏览器持有签名 claims，服务端每次验证并恢复身份
+```
+
+JWT 不是加密保险箱，也不自动支持即时撤销；Session 也不天然不适合扩容，可以使用共享或粘性策略。选择要根据撤销、密钥轮换、跨服务传播和泄漏窗口，而不是“无状态更先进”。
+
+## CSRF、CORS 与 XSS 不在同一层
+
+- CSRF 利用浏览器自动携带 Cookie，让受害者在不知情时提交请求；
+- CORS 决定其他 origin 的脚本能否读取/发送受限跨源请求，不是身份验证；
+- XSS 是恶意脚本已经在你的 origin 执行，往往能以用户身份做更多事。
+
+关闭 CSRF 的理由应该是当前 API 不使用浏览器自动附带的认证凭据，并且威胁模型明确，而不是“用了 JWT”这三个字。
+
 ## 2. 本课的学习目标
 
 完成本课后，应能解释：

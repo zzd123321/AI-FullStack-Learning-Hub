@@ -12,6 +12,67 @@ outline: deep
 
 第一次学习先分清“请求已经被接受”和“任务已经完成”。能丢失的短小辅助工作才适合进程内异步；必须恢复的工作应进入持久化任务或消息系统。线程池细节、上下文传播与多实例调度都从这个可靠性选择继续展开。
 
+## 一次 `@Async` 调用到底切换了什么
+
+```java
+@Async("notificationExecutor")
+public CompletableFuture<Void> sendNotice(String userId) {
+    ...
+}
+```
+
+调用链不是“当前线程跑得更快”，而是：
+
+```text
+HTTP request thread 调用 Spring proxy
+  → proxy 把方法调用包装成 task
+  → 尝试提交到 notificationExecutor
+  → request thread 立即得到 Future
+  → 某个 pool worker 稍后取出 task
+  → worker thread 执行真实方法
+  → 成功/异常写入 Future
+```
+
+若直接 `this.sendNotice()`，调用没有经过 proxy，方法仍在当前线程同步执行。若线程池队列已满，失败可能发生在“提交 task”这一步，真实方法甚至没有开始。
+
+## 线程切换后哪些上下文会断开
+
+request thread 上的这些状态不会天然成为 worker thread 状态：
+
+```text
+数据库 transaction
+ThreadLocal
+MDC request_id
+SecurityContext
+Servlet request 生命周期
+```
+
+可以显式复制安全、不可变的 correlation/identity snapshot；不能把仍绑定原线程的数据库 Connection、EntityManager 或 HttpServletRequest 塞给后台线程继续用。异步方法需要自己的 transaction 和资源边界。
+
+## 202 只表示接受，不表示完成
+
+若 API 提交任务后立即返回：
+
+```http
+HTTP/1.1 202 Accepted
+Location: /api/tasks/task-42
+```
+
+客户端需要通过 task resource 看到 `PENDING/RUNNING/SUCCEEDED/FAILED`。如果应用只是返回 `200 {"sent":true}`，实际 worker 稍后失败，合同就在撒谎。
+
+进程内线程池无法跨重启恢复。重要工作要进入持久化任务或 broker；`@Async` 更适合允许丢失或有其他重建来源的短任务。
+
+## 优雅停机也有时间边界
+
+```text
+停止接收新任务
+  → 等待队列中/正在执行的任务
+  → 在 grace period 内完成
+  → 超时后取消或强制退出
+```
+
+graceful 不等于永远等待。任务必须响应中断、外部调用必须有 timeout，重要状态必须可恢复，否则滚动发布仍会丢工作。
+
 ## 1. 版本、环境与学习目标
 
 本课示例基于：

@@ -12,6 +12,63 @@ outline: deep
 
 > 这是进阶课。没有测量出重复读取压力时，先不要加缓存。第一次只理解 cache-aside 的 hit、miss、回填和失效；Spring 注解、Caffeine/Redis 切换、防击穿和事务后失效都是这条数据副本主线的实现细节。
 
+## 用两次方法调用观察代理做了什么
+
+```java
+@Cacheable(cacheNames = "courses", key = "#courseId")
+public CourseView findCourse(long courseId) {
+    return repository.findRequired(courseId);
+}
+```
+
+第一次调用：
+
+```text
+调用者持有的其实是 Spring proxy
+  → proxy 计算 cache=course、key=42
+  → CacheManager 返回对应 Cache
+  → key miss
+  → proxy 调用真实 findCourse
+  → repository 查询权威数据
+  → 正常返回后 proxy 写缓存
+  → 返回调用者
+```
+
+第二次调用：
+
+```text
+proxy 计算同一 key
+  → cache hit
+  → 直接返回缓存值
+  → 真实方法和 repository 都不执行
+```
+
+所以 `@Cacheable` 不是在方法第一行执行的普通语句。`this.findCourse()` 没有经过外部 proxy，就可能绕过缓存；debug 时看到方法没进，不是 JVM 跳过代码，而是 interceptor 已经返回结果。
+
+## 更新成功不等于可以提前清缓存
+
+```text
+开始数据库 transaction
+  → UPDATE course
+  → 先删除 cache
+  → transaction 最后 rollback
+```
+
+数据库仍是旧值，但缓存已被删除；下一次读取会重建旧值，虽然不一定错误，却制造无谓波动。更危险的是事务未提交时就把新值写入缓存，其他请求可能读到最终回滚的数据。
+
+因此常见策略是数据库成功 commit 后再失效副本：
+
+```text
+transaction commit
+  → after-commit event/listener
+  → evict key
+  → 下一次读取从权威源重建
+```
+
+它仍不是原子分布式事务：commit 后进程在 evict 前崩溃，旧缓存会留到 TTL。TTL、版本字段和观测共同限制这个窗口；Spring annotation 不能让数据库与 Redis 自动成为一个原子提交。
+
+第一次学习先用测试证明“第一次查库、第二次不查、更新提交后再次查库”，再考虑 provider、击穿和多节点一致性。
+
 ## 1. 版本、环境与学习目标
 
 本课示例基于：

@@ -14,6 +14,52 @@ outline: deep
 
 第一次先掌握 `@PathVariable`、`@RequestParam`、`@RequestBody`、`@Valid` 与统一错误结构。方法校验异常分类和复杂参数解析属于出现对应失败后再查的第二层。
 
+## 用同一个请求观察四个失败阶段
+
+假设接口声明：
+
+```java
+@PostMapping("/courses/{courseId}/lessons")
+LessonView create(
+        @PathVariable long courseId,
+        @Valid @RequestBody CreateLessonRequest request) {
+    return service.create(courseId, request);
+}
+```
+
+1. `PUT /course/1/lessons` 的 method/path 不匹配，Controller 不执行。
+2. `POST /courses/abc/lessons` 匹配路径，但 `"abc"` 无法转成 `long`，Service 不执行。
+3. JSON 能解析，但空标题违反 `@NotBlank`，方法体仍不执行。
+4. 输入完全合法，但课程已归档，由 Service 抛出业务冲突。
+
+```text
+HTTP bytes
+  → route matching
+  → argument resolution/type conversion
+  → JSON deserialization
+  → Jakarta Validation
+  → Controller
+  → Service business rule
+```
+
+统一异常处理不是把所有失败都变成同一个 400，而是让不同阶段映射为稳定、可区分的 problem type。
+
+## `@Valid` 不会替你定义规则
+
+```java
+record CreateLessonRequest(
+        @NotBlank String title,
+        @Positive int durationMinutes) {}
+```
+
+约束在字段/类型上定义；`@Valid` 只告诉参数解析器对对象执行级联验证。没有约束的对象加 `@Valid` 不会凭空知道什么是合法业务数据。
+
+还要区分输入约束和业务不变量：标题为空适合请求模型约束；“归档课程不能新增课时”需要查询当前课程状态，应留在业务层，不能伪装成一个脱离状态的 annotation。
+
+## 测试要证明方法有没有被调用
+
+只断言 status 不够。校验失败测试还应验证 Service 没有被调用，从而证明不可信输入停在 HTTP 边界；业务异常测试则让 mock Service 抛出明确异常，验证 advice 的映射。这样失败阶段才不会在重构中悄悄移动。
+
 ## 1. 学习目标
 
 完成本节后，你应该能够：
