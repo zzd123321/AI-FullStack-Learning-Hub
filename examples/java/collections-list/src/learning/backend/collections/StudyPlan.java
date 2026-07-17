@@ -11,6 +11,7 @@ public final class StudyPlan {
                     .thenComparingInt(LearningTask::estimatedMinutes)
                     .thenComparing(LearningTask::title);
 
+    // 内部使用可变 ArrayList，但不把这份引用直接交给调用方。
     private final List<LearningTask> tasks = new ArrayList<>();
 
     public void add(LearningTask task) {
@@ -46,10 +47,12 @@ public final class StudyPlan {
     }
 
     public List<LearningTask> snapshot() {
+        // copyOf 创建不可修改快照，调用方无法通过返回值增删内部任务。
         return List.copyOf(tasks);
     }
 
     public List<LearningTask> prioritizedSnapshot() {
+        // 在副本上排序，避免查询操作悄悄改变 StudyPlan 内部顺序。
         List<LearningTask> result = new ArrayList<>(tasks);
         result.sort(PRIORITY_ORDER);
         return List.copyOf(result);

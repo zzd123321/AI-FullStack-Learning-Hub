@@ -8,6 +8,7 @@ import java.nio.file.Path;
 
 public final class ProgressFileReader {
     public ProgressSummary read(Path path) throws ProgressFileException {
+        // 调用方传入 null 属于违反方法契约，不是文件系统失败。
         if (path == null) {
             throw new IllegalArgumentException("文件路径不能为空。");
         }
@@ -15,6 +16,7 @@ public final class ProgressFileReader {
         int entryCount = 0;
         int totalMinutes = 0;
 
+        // try-with-resources 保证 reader 在正常返回或异常传播时都会关闭。
         try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
             String line;
             int lineNumber = 0;
@@ -26,6 +28,7 @@ public final class ProgressFileReader {
                     continue;
                 }
 
+                // 把单行解析拆开后，read 方法只负责“逐行读取和累计”这条主线。
                 int minutes = parseMinutes(line, lineNumber);
 
                 try {
@@ -36,6 +39,7 @@ public final class ProgressFileReader {
                 entryCount++;
             }
         } catch (IOException error) {
+            // 添加正在读取的路径，同时把原 IOException 保存为 cause。
             throw new ProgressFileException("无法读取进度文件：" + path, error);
         }
 

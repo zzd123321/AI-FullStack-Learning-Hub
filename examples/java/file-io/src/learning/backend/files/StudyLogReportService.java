@@ -14,6 +14,7 @@ import java.util.Locale;
 public final class StudyLogReportService {
     public StudyLogSummary generate(Path input, Path output)
             throws IOException, StudyLogFormatException {
+        // 顶层方法像流程图一样编排：规范路径 → 读取 → 格式化 → 安全发布。
         Path normalizedInput = requireFilePath(input, "输入文件");
         Path normalizedOutput = requireFilePath(output, "输出文件");
         StudyLogSummary summary = readSummary(normalizedInput);
@@ -101,6 +102,7 @@ public final class StudyLogReportService {
         Path parent = output.getParent();
         Files.createDirectories(parent);
 
+        // 先写同目录临时文件，避免程序中途失败时把半份报告留在正式路径。
         Path temporary = Files.createTempFile(
                 parent,
                 "." + output.getFileName() + "-",
@@ -118,6 +120,7 @@ public final class StudyLogReportService {
             );
 
             try {
+                // 同一文件系统支持时，原子移动让其他进程只看到旧文件或完整新文件。
                 Files.move(
                         temporary,
                         output,
@@ -125,10 +128,12 @@ public final class StudyLogReportService {
                         StandardCopyOption.REPLACE_EXISTING
                 );
             } catch (AtomicMoveNotSupportedException | FileAlreadyExistsException error) {
+                // 原子移动不是所有文件系统都支持；回退仍会替换文件，但保证较弱。
                 Files.move(temporary, output, StandardCopyOption.REPLACE_EXISTING);
             }
             published = true;
         } finally {
+            // 发布失败时清理临时文件；成功移动后 temporary 已经不存在。
             if (!published) {
                 Files.deleteIfExists(temporary);
             }

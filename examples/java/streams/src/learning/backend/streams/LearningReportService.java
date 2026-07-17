@@ -21,11 +21,13 @@ public final class LearningReportService {
             throw new IllegalArgumentException("最低分钟数必须大于 0。");
         }
 
+        // 把三个筛选条件组合成一个有名字的判断行为。
         Predicate<LearningActivity> selected = LearningActivity::completed;
         selected = selected
                 .and(activity -> activity.learner().equals(normalizedLearner))
                 .and(activity -> activity.minutes() >= minimumMinutes);
 
+        // toList 是终止操作：执行到这里才真正遍历 source。
         List<LearningActivity> matched = source.stream()
                 .filter(Objects::nonNull)
                 .filter(selected)
@@ -39,6 +41,7 @@ public final class LearningReportService {
                 ))
                 .toList();
 
+        // map 只取分钟数，reduce 从 0 开始把它们合并为一个总数。
         int totalMinutes = matched.stream()
                 .map(LearningActivity::minutes)
                 .reduce(0, Math::addExact);
@@ -47,6 +50,7 @@ public final class LearningReportService {
                 .collect(Collectors.toMap(
                         LearningActivity::topic,
                         LearningActivity::minutes,
+                        // 同一主题出现多次时累加；没有合并函数会抛重复键异常。
                         Math::addExact,
                         LinkedHashMap::new
                 ));
@@ -73,6 +77,7 @@ public final class LearningReportService {
         Objects.requireNonNull(source, "活动来源不能为空。");
         String normalizedLearner = requireLearner(learner);
 
+        // max 可能找不到任何匹配元素，所以返回 Optional 而不是 null。
         return source.stream()
                 .filter(Objects::nonNull)
                 .filter(LearningActivity::completed)
