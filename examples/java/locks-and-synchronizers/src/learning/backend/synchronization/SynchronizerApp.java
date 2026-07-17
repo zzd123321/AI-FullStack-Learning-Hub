@@ -35,11 +35,14 @@ public final class SynchronizerApp {
             if (!ready.await(1, TimeUnit.SECONDS)) {
                 throw new IllegalStateException("工作线程未按时就绪");
             }
+            // 所有 worker 就绪后一次性打开起跑门，避免启动快慢干扰并发演示。
             start.countDown();
 
+            // 有界队列满时 put 会等待消费者腾出空间，这就是生产者背压。
             for (String task : List.of("lock", "api", "spring", "jvm")) {
                 queue.put(task);
             }
+            // 每个 worker 需要一个停止标记，否则部分线程会永远阻塞在 take。
             for (int index = 0; index < WORKER_COUNT; index++) {
                 queue.put(STOP);
             }
@@ -76,6 +79,7 @@ public final class SynchronizerApp {
     ) {
         ready.countDown();
         try {
+            // worker 先报告就绪，再等待主线程统一放行。
             start.await();
             while (true) {
                 String task = queue.take();
@@ -89,6 +93,7 @@ public final class SynchronizerApp {
         } catch (RuntimeException error) {
             failures.add(error);
         } finally {
+            // 无论正常停止、中断还是业务失败，主线程都必须知道这个 worker 已结束。
             done.countDown();
         }
     }

@@ -18,10 +18,12 @@ from .routers import system, tasks
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
+    # 测试可显式传 settings；真实启动才从环境读取，避免 import 时偷偷依赖本机配置。
     resolved_settings = settings or load_settings()
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        # repository 属于整个应用生命周期，但会通过 dependency 显式提供给每次请求。
         repository = InMemoryTaskRepository()
         application.state.repository = repository
         application.state.request_events = []
@@ -45,6 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request: Request, error: TaskNotFoundError
     ) -> JSONResponse:
         del request
+        # 领域错误在最外层 HTTP 边界统一转换，service 不需要知道 404。
         body = ErrorResponse(
             error=ErrorBody(
                 code="task_not_found",
@@ -74,6 +77,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request: Request, error: RequestValidationError
     ) -> JSONResponse:
         del request
+        # Pydantic 的 ctx 可能含 Exception 对象；先转成字符串才能安全 JSON 序列化。
         details = error.errors()
         for detail in details:
             context = detail.get("ctx")

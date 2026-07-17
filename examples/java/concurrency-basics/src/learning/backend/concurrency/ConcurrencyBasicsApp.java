@@ -12,10 +12,12 @@ public final class ConcurrencyBasicsApp {
                 new Thread(recordingTask(ledger, "小林", 1_000), "record-xiaolin-2")
         };
 
+        // start 才会创建并发执行；直接调用 worker.run() 仍只会在 main 线程顺序执行。
         for (Thread worker : workers) {
             worker.start();
         }
 
+        // join 建立“工作线程完成 → 主线程读取结果”的先后关系，不能靠 sleep 猜完成时间。
         if (!joinAll(workers)) {
             System.err.println("主线程被中断，演示提前结束。");
             return;
@@ -31,6 +33,7 @@ public final class ConcurrencyBasicsApp {
 
         try {
             reporter.awaitStarted();
+            // 停止标志表达业务意图，interrupt 用来唤醒可能正在阻塞的线程。
             reporter.requestStop();
             reporterThread.interrupt();
             reporterThread.join();
@@ -51,6 +54,7 @@ public final class ConcurrencyBasicsApp {
         return () -> {
             for (int count = 0; count < repetitions; count++) {
                 if (Thread.currentThread().isInterrupted()) {
+                    // 中断是协作信号，不会像强制终止那样自动停在任意一行。
                     return;
                 }
                 ledger.record(learner, 1);
@@ -65,6 +69,7 @@ public final class ConcurrencyBasicsApp {
             }
             return true;
         } catch (InterruptedException error) {
+            // 主线程不再等待时，也通知尚未结束的工作线程尽快退出。
             for (Thread worker : workers) {
                 worker.interrupt();
             }

@@ -23,6 +23,7 @@ public final class MemoryModelApp {
 
         try {
             Future<LearningSnapshot> reader = executor.submit(() -> {
+                // latch 只证明读取任务已开始，不代表它已经看见稍后发布的数据。
                 readerReady.countDown();
                 return publisher.await(Duration.ofSeconds(2));
             });
@@ -38,6 +39,7 @@ public final class MemoryModelApp {
                             List.of("happens-before", "volatile", "final")
                     )
             ));
+            // Future.get 不只是等待：任务完成还 happens-before get 返回后的读取。
             writer.get();
             LearningSnapshot snapshot = reader.get();
 
@@ -46,6 +48,7 @@ public final class MemoryModelApp {
             for (int worker = 0; worker < 4; worker++) {
                 updates.add(executor.submit(() -> {
                     for (int index = 0; index < 1_000; index++) {
+                        // 多线程共享的 ++ 不是原子操作；AtomicInteger 把读改写合成一个原子更新。
                         completedUpdates.incrementAndGet();
                     }
                 }));
