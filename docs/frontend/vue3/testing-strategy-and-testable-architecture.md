@@ -1,6 +1,7 @@
 ---
 title: Vue 3 测试策略与可测试架构
-description: 从业务风险出发，使用 Vitest、Vue Test Utils、Pinia、Router 与 Playwright建立分层、稳定的测试体系
+description: 从业务风险出发，使用 Vitest、Vue Test Utils、Pinia、Router 与 Playwright 建立分层、稳定的测试体系
+outline: deep
 ---
 
 # Vue 3 测试策略与可测试架构

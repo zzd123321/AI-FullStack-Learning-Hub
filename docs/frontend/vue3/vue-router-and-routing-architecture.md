@@ -1,6 +1,7 @@
 ---
 title: Vue Router 4 与前端路由架构
 description: 从 URL 状态出发，理解路由匹配、数据加载、导航守卫、权限与浏览器历史
+outline: deep
 ---
 
 # Vue Router 4 与前端路由架构

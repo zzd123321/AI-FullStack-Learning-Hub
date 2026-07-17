@@ -1,6 +1,7 @@
 ---
 title: Vue 3 SSR、Hydration 与同构应用边界
 description: 从一次请求的两端执行出发，理解请求隔离、数据预取、安全状态传输与 Hydration 一致性
+outline: deep
 ---
 
 # Vue 3 SSR、Hydration 与同构应用边界
