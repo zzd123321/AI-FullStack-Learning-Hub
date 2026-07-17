@@ -18,6 +18,64 @@
 
 这是进阶课。进入 FastAPI 前，第一次只需理解：`async def` 调用产生 coroutine，event loop 在 `await` 处让其他 Task 前进，阻塞函数会卡住整条 loop 线程。线程、进程、free-threaded CPython 和复杂同步工具可在遇到对应负载后再返回学习。
 
+## 用两个 HTTP 等待理解 asyncio
+
+顺序执行：
+
+```text
+请求 A 等下游 1 秒
+  → A 完成
+  → 请求 B 再等下游 1 秒
+  → 总计约 2 秒
+```
+
+并发等待：
+
+```text
+Task A 发起 I/O，await 暂停
+  → event loop 运行 Task B
+  → Task B 发起 I/O，await 暂停
+  → 哪个 socket 先 ready 就恢复哪个 Task
+  → 总计接近较慢的一次等待，而不是简单相加
+```
+
+`await` 不是启动线程，也不是自动并行 CPU。它允许当前 coroutine 在等待可协作异步操作时，把 event loop 线程让给其他 ready Task。
+
+## blocking 调用为什么会卡住整个 loop
+
+```python
+async def endpoint():
+    time.sleep(2)  # 阻塞当前 OS 线程，不会向 event loop 让出控制权
+```
+
+这 2 秒内同一 loop 上其他 Task、健康检查和取消处理都无法前进。应使用异步 client 的 `await asyncio.sleep/HTTP I/O`，或把无法改造的阻塞 I/O 放到有容量限制的 thread pool。把函数声明成 `async def` 不会改变其内部 library 的阻塞性质。
+
+## 先按工作类型选工具
+
+| 工作 | 常见选择 | 关键风险 |
+| --- | --- | --- |
+| 大量可协作网络 I/O | asyncio Task | 阻塞 event loop、无限 task |
+| 少量阻塞 I/O 库 | 有界线程池 | 共享状态、线程/连接数 |
+| 纯 Python CPU 密集 | 多进程或原生实现 | 序列化、启动、内存复制 |
+| 外部模型/数据库服务 | async client + 容量/timeout | 下游过载、取消不等于回滚 |
+
+GIL 不等于“线程没有竞态”，也不等于“所有操作原子”。多个线程仍会在字节码和 I/O 边界交错，共享可变状态仍需 lock/queue/ownership 设计。
+
+## 结构化并发解决任务所有权
+
+父操作启动多个子任务后，应在离开作用域前知道它们都已完成、失败或取消：
+
+```text
+进入 TaskGroup
+  → 创建 profile task
+  → 创建 progress task
+  → 任一任务失败，取消兄弟任务
+  → 等待清理完成
+  → 把失败传播给父调用者
+```
+
+随手 `create_task()` 后丢掉引用会产生孤儿任务：请求已经结束，任务仍可能占资源，异常也无人观察。第一次掌握 `await` 让出控制权与 TaskGroup 所有权后，再学习线程、进程和更复杂同步器。
+
 ## 2. 本课目标
 
 完成本课后，应能解释：

@@ -27,6 +27,63 @@
 
 上一课的生成器和推导式已经在调用行为，本课把行为本身变成可命名、可传递的对象。第一次先掌握参数、返回值、局部作用域和默认参数只创建一次；闭包与装饰器应在看懂普通函数调用栈后再学。
 
+## 一次函数调用会创建新的局部命名空间
+
+```python
+def calculate_total(price: int, quantity: int = 1) -> int:
+    subtotal = price * quantity
+    return subtotal
+
+result = calculate_total(30, quantity=2)
+```
+
+运行过程：
+
+```text
+执行 def → 创建 function object，并把名称 calculate_total 绑定它
+调用时 → 根据签名把 30 绑定 price、2 绑定 quantity
+创建本次调用的局部 frame/namespace
+计算 subtotal 并绑定局部名称
+return 把对象交回调用方
+局部 frame 随调用结束退出
+```
+
+parameter 是函数定义中的接收位置，argument 是调用时传入的值。keyword-only 参数的意义不是语法炫技，而是让 `create_user("a", True, False)` 变成可读的 `create_user("a", active=True, admin=False)`。
+
+## 默认参数为什么只创建一次
+
+```python
+def add_tag(tag: str, tags: list[str] = []):  # 错误示例
+    tags.append(tag)
+    return tags
+```
+
+`def` 执行时创建默认 list，并保存在 function object 上；以后每次省略 `tags` 都拿到同一个 list。后端多个请求会共享内容。正确方式：
+
+```python
+def add_tag(tag: str, tags: list[str] | None = None):
+    actual = [] if tags is None else tags
+    actual.append(tag)
+    return actual
+```
+
+这与上一课的名称绑定、可变对象完全是同一规则，不是函数的孤立怪癖。
+
+## 装饰器先理解成“替换函数绑定”
+
+```python
+@logged
+def create_task(...): ...
+```
+
+近似等于：
+
+```python
+create_task = logged(create_task)
+```
+
+以后调用名称 `create_task`，实际先进入 wrapper。认证、事务和路由框架常利用这个边界；wrapper 必须保留元数据、正确转发参数，并让异常按合同传播。第一次学习不要在看不懂普通调用栈前堆多层 decorator。
+
 ## 2. 本课目标
 
 完成本课后，应能解释：

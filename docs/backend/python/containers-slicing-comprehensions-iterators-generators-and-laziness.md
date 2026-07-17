@@ -18,6 +18,60 @@
 
 本课承接对象模型：容器保存的仍然是对象引用，因此切片复制了外层结构，并不会自动复制里面的对象。第一次先会根据“有序、唯一、按键查找”选择 `list`、`set`、`dict`，再理解 `for` 如何消费 iterable；generator 的惰性与一次性消费属于第二层。
 
+## 从一批请求数据选择容器
+
+假设收到学习记录：
+
+```python
+records = [
+    {"user_id": "u1", "topic": "Java"},
+    {"user_id": "u2", "topic": "Python"},
+    {"user_id": "u1", "topic": "FastAPI"},
+]
+```
+
+不同问题需要不同结构：
+
+```text
+保持收到顺序并允许重复 → list
+得到出现过的唯一用户 → set
+按 user_id 快速取得汇总 → dict
+返回不可随意增删的固定坐标/组合 → tuple
+数据很大，只逐条转换 → generator/iterator
+```
+
+容器选择是在表达业务约束，不只是性能技巧。用 set 保存必须稳定展示顺序的数据，会让输出不可依赖；用 list 反复按 ID 查找，又会把清晰的 key 关系隐藏在循环中。
+
+## `for` 到底消费了什么
+
+```python
+for record in records:
+    process(record)
+```
+
+可近似理解为：
+
+```text
+iterator = iter(records)
+  → 反复调用 next(iterator)
+  → 得到一个元素就执行循环体
+  → next 抛 StopIteration 时正常结束
+```
+
+list 是可迭代容器，可以多次创建 iterator；generator 通常自己就是一次性 iterator，消费完不会自动重放：
+
+```python
+values = (parse(row) for row in rows)
+list(values)  # 第一次消费
+list(values)  # 已耗尽，得到空 list
+```
+
+## 惰性把错误时间也推迟了
+
+generator expression 创建时通常不会立刻执行所有 `parse`。错误可能在后续迭代到某一项时才出现。因此“成功返回 generator”不代表其中每条数据已经校验成功；资源是否仍然打开、异常由谁捕获都要覆盖实际消费期。
+
+第一次先掌握 list/set/dict 的业务选择和 iterable/iterator 区别，再使用 generator 优化大数据内存，而不是为了把方括号换成圆括号。
+
 ## 2. 本课目标
 
 完成本课后，应能解释：

@@ -16,6 +16,55 @@
 
 它与 Java 异常课的主线相同：正常结果用 `return`，无法履行函数契约时用异常沿调用栈传播，真正能补充语义或恢复的边界才捕获。第一次先掌握 `raise`、窄范围 `except`、保留 cause 和 `with`；fsync、`ExitStack` 与 `ExceptionGroup` 属于更高可靠性场景。
 
+## 从“读取一个配置文件”观察异常传播
+
+```text
+main
+  → load_settings(path)
+      → Path.read_text()
+          → OS 报告文件不存在
+```
+
+`FileNotFoundError` 抛出后，`read_text` 剩余语句不再执行，调用栈向外寻找匹配的 `except`。若 `load_settings` 知道业务语义，可以翻译并保留原因：
+
+```python
+try:
+    text = path.read_text(encoding="utf-8")
+except OSError as error:
+    raise SettingsLoadError(f"无法读取配置：{path}") from error
+```
+
+最外层 CLI 再决定打印安全消息并返回非零退出码；FastAPI 边界则可能转换为 HTTP problem。底层文件函数不应直接 `sys.exit()`，否则测试和 Web 应用无法复用。
+
+## `with` 解决的是所有控制流下的清理
+
+```python
+with path.open("w", encoding="utf-8") as file:
+    file.write(content)
+```
+
+近似执行：
+
+```text
+调用 __enter__ 取得资源
+  → 执行 with body
+  → 正常返回、raise 或 return 都调用 __exit__
+  → __exit__ 决定是否抑制异常
+```
+
+它保证尽力关闭文件，不保证写入一定原子。进程在写到一半时崩溃，目标文件仍可能损坏；需要“旧文件或完整新文件”时，应写临时文件、flush/fsync（按所需持久性）后原子替换。
+
+## 不要捕获自己无法处理的所有异常
+
+```python
+try:
+    run()
+except Exception:
+    return None
+```
+
+它把程序 bug、格式错误和外部故障都伪装成“没有结果”，还丢失 traceback。只在能恢复、转换语义或最终记录请求失败的边界捕获；包装时使用 `raise ... from ...` 保存 cause。
+
 ## 2. 本课完成后的能力
 
 你应能解释：

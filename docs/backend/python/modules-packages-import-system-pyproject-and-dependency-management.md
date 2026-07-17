@@ -28,6 +28,45 @@
 
 函数帮助拆分一个文件，module/package 则帮助拆分整个程序。第一次只需能解释 `import` 会查找并执行模块、为什么使用 `src` layout，以及 `python -m pip` 与当前解释器的关系。自定义 finder、namespace package 和构建后端细节属于打包排障时的查阅内容。
 
+## `import` 不是复制粘贴文件
+
+执行：
+
+```python
+from learning_config.loader import load_config
+```
+
+大致过程是：
+
+```text
+检查 sys.modules 是否已经有目标 module
+  → 没有则沿 sys.meta_path / module search path 查找 spec
+  → 创建 module object 和独立 namespace
+  → 执行模块顶层代码
+  → 缓存到 sys.modules
+  → 从 module namespace 绑定名称 load_config 到当前 namespace
+```
+
+因此模块顶层的网络请求、连接和昂贵计算会在首次 import 时发生，也可能让测试发现阶段就失败。顶层应以定义、常量和轻量注册为主，资源初始化放到明确应用生命周期。
+
+## 当前工作目录为什么会制造“本机能运行”
+
+直接在源码目录运行脚本时，该目录常进入 `sys.path`，于是旁边文件碰巧可 import。换到测试、wheel 安装或容器工作目录后，这个偶然路径消失。
+
+`src` layout 把 importable package 放在 `src/` 下，迫使开发过程通过 editable install 或构建产物使用项目，减少误把仓库根目录文件当已安装包的机会。
+
+## 三个名字不要混淆
+
+```text
+import name：代码中的 learning_config
+distribution name：pip 安装/pyproject 中的 learning-config
+project/repository directory：磁盘上的任意文件夹名
+```
+
+它们可以不同。`pip install` 管 distribution，`import` 查 module/package；安装成功却 import 失败时，要确认安装给了哪个解释器、distribution 是否真的包含目标 package、当前路径是否有同名遮蔽文件。
+
+第一次学习的稳定流程是：创建 venv → `python -m pip install -e .` → 从仓库外也能 import → `python -m package.module` 启动。不要靠修改 `sys.path` 掩盖打包错误。
+
 ## 2. 本课目标
 
 完成本课后，应能解释：

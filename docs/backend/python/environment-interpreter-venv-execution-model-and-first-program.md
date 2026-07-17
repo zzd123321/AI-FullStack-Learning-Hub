@@ -18,6 +18,44 @@
 
 第一次学习只抓住一条线：**当前终端究竟启动了哪个解释器，这个解释器能看到哪些包，它怎样执行当前项目。** AST、code object 和字节码用于解释过程，不要求现在记忆；能创建虚拟环境并用 `python -m` 稳定运行程序，就完成了主线。
 
+## 先做一次“解释器身份检查”
+
+在终端执行：
+
+```bash
+python -c "import sys; print(sys.executable); print(sys.version)"
+python -m pip --version
+```
+
+两条输出应指向同一套解释器环境。`python -m pip` 的因果关系是：先确定当前 `python`，再让这个解释器加载 pip module；单独运行 `pip` 时，shell 可能找到另一套安装目录中的命令。
+
+创建虚拟环境后：
+
+```text
+python -m venv .venv
+  → 生成项目专用解释器入口和 site-packages
+  → 激活脚本把 .venv/bin（Windows 为 Scripts）放到 PATH 前面
+  → 后续 python/pip 优先指向该环境
+```
+
+虚拟环境不会下载另一份完整 Python 语言规范，也不是 Docker。它主要隔离“这个项目使用哪个解释器入口、能 import 哪些已安装 distribution”。操作系统库、CPU 架构和环境变量仍可能影响程序。
+
+## 从命令到代码执行的最小链路
+
+```text
+shell 查找 python 命令
+  → 操作系统启动 CPython 进程
+  → CPython 读取目标 module/source
+  → parse 为 AST
+  → compile 为 code object/bytecode
+  → evaluation loop 执行
+  → 正常返回 exit code 0，未处理异常通常返回非 0
+```
+
+这解释了两个常见现象：Python 是“解释型语言”不代表源码不编译；出现 `__pycache__` 也不代表生成了可脱离解释器运行的机器码程序。
+
+第一课真正的验收不是看到 Hello，而是能指出当前 `sys.executable`、用 `python -m` 启动包，并让失败通过非零退出码传给终端或 CI。
+
 ## 2. 本课目标
 
 完成本课后，应能准确解释：

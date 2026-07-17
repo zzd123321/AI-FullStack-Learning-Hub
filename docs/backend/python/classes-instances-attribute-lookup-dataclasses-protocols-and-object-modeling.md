@@ -24,6 +24,53 @@ task = {"id": "task-1", "title": "Learn Python", "status": "pending"}
 
 第一次学习先掌握 `class`、实例、`self`、`__init__`、实例属性与组合。descriptor、MRO 和 `__new__` 用来解释 Python 对象机制的边界，不需要在开始 FastAPI 前熟练运用。
 
+## 从“合法状态变化”理解类
+
+字典允许任何代码直接写：
+
+```python
+task["status"] = "whatever"
+```
+
+类可以把变化收进有名字的行为：
+
+```python
+class Task:
+    def __init__(self, title: str) -> None:
+        self.title = title
+        self.status = "pending"
+
+    def complete(self) -> None:
+        if self.status != "pending":
+            raise InvalidTaskState(self.status)
+        self.status = "completed"
+```
+
+调用 `task.complete()` 时，Python 先从实例/类查找 `complete`，得到绑定了当前实例的方法，再把 `task` 作为显式 `self` 传给函数。`self` 不是关键字魔法，而是约定的第一个参数。
+
+## class attribute 与 instance attribute 的风险
+
+```python
+class Task:
+    tags = []  # class object 上的一份共享 list
+```
+
+两个实例若都修改 `tags`，会观察同一 list。每个任务自己的可变状态应在 `__init__` 中创建：
+
+```python
+def __init__(self) -> None:
+    self.tags = []
+```
+
+这仍是名称绑定和可变对象规则，只是名称位于 class/instance namespace。
+
+## dataclass 与 Protocol 解决不同问题
+
+- dataclass 生成初始化、比较和表示等样板，适合数据/value object；它不会自动保护业务不变量；
+- Protocol 描述协作者“能做什么”，让真实实现和测试替身按结构兼容；它不创建对象，也不负责运行时依赖注入。
+
+例如 `TaskService` 组合一个满足 `TaskRepository` Protocol 的对象。Service 管业务流程，Repository 隐藏存取能力；继承不是实现复用的默认答案。
+
 ## 2. 本课目标
 
 完成本课后，应能解释：

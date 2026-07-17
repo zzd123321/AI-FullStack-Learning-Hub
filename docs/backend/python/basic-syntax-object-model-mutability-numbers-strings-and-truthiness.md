@@ -26,6 +26,42 @@ second.append("new")
 
 把上一课和本课连起来：解释器执行 `name = value` 时，不是创建一个叫 name 的盒子并复制 value，而是让名称指向求值产生的对象。第一次学习优先掌握名称绑定、可变性、`==`/`is` 和 `None`；数字与 Unicode 的特殊边界在处理对应业务时再深入。
 
+## 用一段代码建立统一直觉
+
+```python
+first = ["Java"]
+second = first
+second.append("Python")
+second = ["FastAPI"]
+```
+
+逐行发生的是：
+
+```text
+创建 list A ["Java"]，名称 first 绑定 A
+  → second 也绑定 A，没有复制 list
+  → append 原地改变 A，first 和 second 都观察到 ["Java", "Python"]
+  → 创建 list B ["FastAPI"]，second 改为绑定 B
+  → first 仍绑定 A，不会跟着重新绑定
+```
+
+“可变”描述 list A 能否原地变化；“重新赋值”描述名称 second 改绑到另一个对象。它们不是同一件事。
+
+### 与 JavaScript 的相似和差异
+
+JS 对象/数组赋值也会共享引用，这一点直觉可迁移；但 Python 名称不是用 `let/const` 声明的盒子，函数参数、模块名称和属性查找都建立在对象绑定模型上。`is` 比较对象身份，类似但不等同于 JS 对象的 `===`；普通值比较应使用 `==`。
+
+### 为什么 `None` 要用 `is`
+
+```python
+if result is None:
+    ...
+```
+
+`None` 是单例 sentinel，问题是“是否就是这个特殊对象”；`if not result` 还会把 `0`、`""`、`[]` 等合法空值一起判断为假。后端字段允许 0 但用 `value or default` 时，常会错误替换用户输入。
+
+后面的数字、字符串和 truthiness 都应回到两个问题：表达式产生了哪个对象，随后是原地改变对象还是让名称重新绑定。
+
 ## 2. 本课目标
 
 完成本课后，应能解释：
