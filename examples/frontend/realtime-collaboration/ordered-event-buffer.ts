@@ -13,11 +13,20 @@ export class OrderedEventBuffer<T extends SequencedEvent> {
   #nextSequence: number;
 
   constructor(lastAppliedSequence: number, maxBufferedEvents = 1_000) {
+    if (!Number.isSafeInteger(lastAppliedSequence) || lastAppliedSequence < 0) {
+      throw new RangeError('lastAppliedSequence must be a non-negative safe integer');
+    }
+    if (!Number.isSafeInteger(maxBufferedEvents) || maxBufferedEvents <= 0) {
+      throw new RangeError('maxBufferedEvents must be a positive safe integer');
+    }
     this.maxBufferedEvents = maxBufferedEvents;
     this.#nextSequence = lastAppliedSequence + 1;
   }
 
   push(event: T): PushResult<T> {
+    if (!Number.isSafeInteger(event.streamSequence) || event.streamSequence < 0) {
+      throw new RangeError('streamSequence must be a non-negative safe integer');
+    }
     if (event.streamSequence < this.#nextSequence || this.#pending.has(event.streamSequence)) {
       return { type: 'duplicate', event };
     }
@@ -40,6 +49,9 @@ export class OrderedEventBuffer<T extends SequencedEvent> {
   }
 
   reset(lastAppliedSequence: number): void {
+    if (!Number.isSafeInteger(lastAppliedSequence) || lastAppliedSequence < 0) {
+      throw new RangeError('lastAppliedSequence must be a non-negative safe integer');
+    }
     this.#pending.clear();
     this.#nextSequence = lastAppliedSequence + 1;
   }

@@ -27,5 +27,13 @@ assert.equal(state.visible.status, 'published');
 state = rejectCommand(state, 'c2', { ...document, title: 'B!', revision: 2 }, 'forbidden');
 assert.equal(state.visible.status, 'draft');
 assert.equal(state.lastError, 'forbidden');
+assert.throws(
+  () => enqueueCommand(state, { ...first, commandId: 'wrong-doc', documentId: 'doc-2' }),
+  /mismatch/,
+);
+assert.throws(
+  () => confirmServerDocument(state, { ...document, revision: 0 }, null),
+  /backwards/,
+);
 
 console.log('optimistic store examples passed');

@@ -15,5 +15,8 @@ assert.deepEqual(buffer.push({ streamSequence: 11, value: 'eleven' }), {
   ],
 });
 assert.equal(buffer.push({ streamSequence: 12, value: 'duplicate' }).type, 'duplicate');
+assert.throws(() => new OrderedEventBuffer(-1), RangeError);
+assert.throws(() => new OrderedEventBuffer(0, 0), RangeError);
+assert.throws(() => buffer.push({ streamSequence: Number.NaN, value: 'invalid' }), RangeError);
 
 console.log('ordered event buffer examples passed');
