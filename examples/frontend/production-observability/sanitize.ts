@@ -6,7 +6,8 @@ const maximumStringLength = 300;
 function sanitizePrimitive(key: string, value: unknown): Primitive | undefined {
   if (sensitiveKey.test(key)) return '[REDACTED]';
   if (typeof value === 'string') return value.slice(0, maximumStringLength);
-  if (typeof value === 'number') return Number.isFinite(value) ? value : String(value);
+  // 非有限数无法参与可靠聚合，直接丢弃，不把同一字段悄悄改成字符串类型。
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
   if (typeof value === 'boolean') return value;
   return undefined;
 }

@@ -34,12 +34,19 @@ export function createObservableFlagReader(
   context: EvaluationContext,
   flags: Readonly<Record<string, BooleanFlag>>,
 ) {
+  const reportedExposures = new Set<string>();
+
   return (key: string, fallback: boolean): boolean => {
     const flag = flags[key];
     if (!flag) {
-      telemetry.event('feature_flag.evaluated', { key, value: fallback, reason: 'fallback' });
+      const exposureId = `${key}:fallback:${fallback}`;
+      if (!reportedExposures.has(exposureId)) {
+        reportedExposures.add(exposureId);
+        telemetry.event('feature_flag.evaluated', { key, value: fallback, reason: 'fallback' });
+      }
       return fallback;
     }
+    if (flag.key !== key) throw new Error(`Feature flag key mismatch: ${key} !== ${flag.key}`);
     const decision = evaluateBooleanFlag(flag, context);
     const exposure: Attributes = {
       key,
@@ -47,8 +54,12 @@ export function createObservableFlagReader(
       variant: decision.variant,
       reason: decision.reason,
     };
-    // 只在业务真正读取 Flag 时记录曝光，不在配置下载时记录。
-    telemetry.event('feature_flag.evaluated', exposure);
+    // 只在业务真正读取时记录，并在当前 Reader 生命周期内去重重复渲染。
+    const exposureId = `${key}:${decision.variant}:${decision.reason}`;
+    if (!reportedExposures.has(exposureId)) {
+      reportedExposures.add(exposureId);
+      telemetry.event('feature_flag.evaluated', exposure);
+    }
     return decision.value;
   };
 }

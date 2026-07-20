@@ -51,7 +51,10 @@ export function createTelemetry(options: TelemetryOptions): Telemetry {
 
   return {
     event: (name, attributes = {}) => emit('event', name, attributes),
-    metric: (name, value, attributes = {}) => emit('metric', name, { ...attributes, value }),
+    metric(name, value, attributes = {}) {
+      if (!Number.isFinite(value)) throw new TypeError('Metric value must be finite');
+      emit('metric', name, { ...attributes, value });
+    },
     error: (reason, attributes = {}) =>
       emit('error', 'uncaught.error', { ...attributes, ...errorAttributes(reason) }),
     startSpan(name, attributes: Attributes = {}) {

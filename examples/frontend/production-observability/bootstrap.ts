@@ -13,6 +13,9 @@ export function bootstrapProductionRuntime(sessionId: string, targetingKey: stri
   const transport = createBatchTransport({
     endpoint: '/api/telemetry/batch',
     maximumBatchSize: 20,
+    maximumQueueSize: 100,
+    // keepalive/beacon 常有较小传输上限；留出协议和浏览器实现余量。
+    maximumPayloadBytes: 60 * 1024,
     flushIntervalMs: 10_000,
     fetch: window.fetch.bind(window),
   });
@@ -43,7 +46,8 @@ export function bootstrapProductionRuntime(sessionId: string, targetingKey: stri
   return {
     telemetry,
     fetch: instrumentedFetch,
-    flags: { newCheckout: readFlag('new-checkout', false) },
+    // 暴露读取函数，而不是在 Bootstrap 时提前制造一次并不存在的“用户曝光”。
+    flags: { isNewCheckoutEnabled: () => readFlag('new-checkout', false) },
     dispose() {
       removeGlobalCapture();
       transport.dispose();

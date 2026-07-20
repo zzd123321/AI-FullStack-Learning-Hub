@@ -8,8 +8,10 @@ function hash32(value: string): number {
 }
 
 export function deterministicSample(key: string, rate: number): boolean {
-  const normalizedRate = Math.min(1, Math.max(0, rate));
-  return hash32(key) / 0x1_0000_0000 < normalizedRate;
+  if (!Number.isFinite(rate) || rate < 0 || rate > 1) {
+    throw new RangeError('Sampling rate must be a finite number between 0 and 1');
+  }
+  return hash32(key) / 0x1_0000_0000 < rate;
 }
 
 export interface SamplingPolicy {

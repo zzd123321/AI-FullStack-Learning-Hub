@@ -11,7 +11,10 @@ if (!directory || !release || !endpoint || !token) {
   );
 }
 
-for (const name of (await readdir(directory)).filter((file) => file.endsWith('.map'))) {
+const sourceMaps = (await readdir(directory)).filter((file) => file.endsWith('.map'));
+if (sourceMaps.length === 0) throw new Error(`No source maps found in ${directory}`);
+
+for (const name of sourceMaps) {
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
