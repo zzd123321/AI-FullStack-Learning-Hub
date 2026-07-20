@@ -1,22 +1,30 @@
 export interface RealtimeEventSender {
   send(event: unknown): void;
 }
+
+export interface ManagedAudioPlayback {
+  // Stop immediately and report the confirmed played duration for this item.
+  // A WebSocket PCM queue can calculate this from its audio clock and cursor.
+  stopAndGetPlayedMs(itemId: string): number;
+}
+
 export class InterruptionController {
-  #playbackStartedAt: number | null = null;
   #itemId: string | null = null;
+  readonly playback: ManagedAudioPlayback;
+  readonly sender: RealtimeEventSender;
 
-  constructor(readonly audio: HTMLAudioElement, readonly sender: RealtimeEventSender) {}
-
-  markPlaybackStarted(itemId: string, now = performance.now()): void {
-    this.#itemId = itemId;
-    this.#playbackStartedAt = now;
+  constructor(playback: ManagedAudioPlayback, sender: RealtimeEventSender) {
+    this.playback = playback;
+    this.sender = sender;
   }
 
-  interrupt(now = performance.now()): void {
-    if (!this.#itemId || this.#playbackStartedAt === null) return;
-    const audioEndMs = Math.max(0, Math.round(now - this.#playbackStartedAt));
-    this.audio.pause();
-    this.audio.srcObject = null;
+  markPlaybackStarted(itemId: string): void {
+    this.#itemId = itemId;
+  }
+
+  interrupt(): void {
+    if (!this.#itemId) return;
+    const audioEndMs = Math.max(0, Math.round(this.playback.stopAndGetPlayedMs(this.#itemId)));
     this.sender.send({ type: 'response.cancel' });
     this.sender.send({
       type: 'conversation.item.truncate',
@@ -25,6 +33,5 @@ export class InterruptionController {
       audio_end_ms: audioEndMs,
     });
     this.#itemId = null;
-    this.#playbackStartedAt = null;
   }
 }

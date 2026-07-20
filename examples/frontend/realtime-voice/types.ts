@@ -14,6 +14,7 @@ export interface VoiceSessionState {
   readonly sessionId: string | null;
   readonly phase: VoicePhase;
   readonly muted: boolean;
+  readonly audioPlaybackBlocked: boolean;
   readonly activeResponseId: string | null;
   readonly activeAudioItemId: string | null;
   readonly error: string | null;

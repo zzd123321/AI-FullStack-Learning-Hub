@@ -15,13 +15,21 @@ export async function connectVoiceSession(
   onAction: (action: VoiceAction) => void,
 ): Promise<WebRTCSessionHandle> {
   const peer = new RTCPeerConnection();
-  const events = peer.createDataChannel('realtime-events');
+  const events = peer.createDataChannel('oai-events');
   const handlePlaying = () => onAction({ type: 'audio-started' });
   remoteAudio.addEventListener('playing', handlePlaying);
   peer.addTrack(microphoneTrack);
   peer.addEventListener('track', (event) => {
     const [stream] = event.streams;
     remoteAudio.srcObject = stream ?? new MediaStream([event.track]);
+    // Autoplay can still be rejected. Surface the failure so the UI can offer
+    // a user-gesture “resume sound” button instead of pretending audio plays.
+    void remoteAudio.play().catch(() => onAction({ type: 'audio-playback-blocked' }));
+  });
+  peer.addEventListener('connectionstatechange', () => {
+    if (peer.connectionState === 'failed') {
+      onAction({ type: 'fail', message: 'Realtime connection failed' });
+    }
   });
   events.addEventListener('message', (event) => {
     if (typeof event.data !== 'string') return;

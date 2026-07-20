@@ -34,6 +34,6 @@ export function describeMediaError(error: unknown): 'denied' | 'missing' | 'busy
   if (!(error instanceof DOMException)) return 'unavailable';
   if (error.name === 'NotAllowedError' || error.name === 'SecurityError') return 'denied';
   if (error.name === 'NotFoundError' || error.name === 'OverconstrainedError') return 'missing';
-  if (error.name === 'NotReadableError' || error.name === 'AbortError') return 'busy';
+  if (error.name === 'NotReadableError') return 'busy';
   return 'unavailable';
 }
