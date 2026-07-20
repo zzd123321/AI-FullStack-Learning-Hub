@@ -3,6 +3,7 @@ import {
   mayAutomaticallyRetry,
   parseRetryAfter,
   shouldRetryResponse,
+  validateRetryPolicy,
   type RetryPolicy,
 } from "./retry-policy.js";
 
@@ -37,6 +38,7 @@ export async function fetchWithRetry(
   init: RequestInit = {},
   policy: RetryPolicy = DEFAULT_POLICY,
 ): Promise<Response> {
+  validateRetryPolicy(policy);
   const request = new Request(input, init);
   if (!mayAutomaticallyRetry(request) || policy.maximumAttempts <= 1) return fetch(request);
 
