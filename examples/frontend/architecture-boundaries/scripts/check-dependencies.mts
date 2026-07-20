@@ -152,13 +152,17 @@ for (const source of listSourceFiles(sourceRoot)) {
   }
 }
 
+// 已完整检查的节点无需从每个入口重复遍历，避免大型图呈指数级放大。
+const checkedFeatures = new Set<string>();
 function detectCycle(feature: string, path: readonly string[]): void {
+  if (checkedFeatures.has(feature)) return;
   const index = path.indexOf(feature);
   if (index >= 0) {
     errors.push(`feature dependency cycle: ${[...path.slice(index), feature].join(' -> ')}`);
     return;
   }
   for (const target of featureEdges.get(feature) ?? []) detectCycle(target, [...path, feature]);
+  checkedFeatures.add(feature);
 }
 for (const feature of featureEdges.keys()) detectCycle(feature, []);
 

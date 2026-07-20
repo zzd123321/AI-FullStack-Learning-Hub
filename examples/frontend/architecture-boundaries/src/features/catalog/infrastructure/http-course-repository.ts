@@ -2,8 +2,12 @@ import type { CourseRepository } from '../application/load-course.js';
 import type { Course } from '../domain/course.js';
 
 interface HttpCourseRepositoryOptions {
-  readonly apiBaseUrl: string;
+  readonly apiBaseUrl: URL;
   readonly fetch: typeof globalThis.fetch;
+}
+
+function isCourseStatus(value: unknown): value is Course['status'] {
+  return value === 'draft' || value === 'published' || value === 'archived';
 }
 
 function parseCourse(value: unknown): Course {
@@ -11,11 +15,17 @@ function parseCourse(value: unknown): Course {
   const record = value as Record<string, unknown>;
   if (
     typeof record.id !== 'string' ||
+    record.id.trim() === '' ||
     typeof record.title !== 'string' ||
+    record.title.trim() === '' ||
     typeof record.capacity !== 'number' ||
+    !Number.isSafeInteger(record.capacity) ||
+    record.capacity < 0 ||
     typeof record.enrolled !== 'number' ||
+    !Number.isSafeInteger(record.enrolled) ||
+    record.enrolled < 0 ||
     typeof record.startsAt !== 'string' ||
-    !['draft', 'published', 'archived'].includes(String(record.status))
+    !isCourseStatus(record.status)
   ) {
     throw new TypeError('Invalid course response');
   }
@@ -29,7 +39,7 @@ function parseCourse(value: unknown): Course {
     capacity: record.capacity,
     enrolled: record.enrolled,
     startsAt,
-    status: record.status as Course['status'],
+    status: record.status,
   };
 }
 
@@ -38,7 +48,7 @@ export class HttpCourseRepository implements CourseRepository {
 
   async findById(id: string, signal?: AbortSignal): Promise<Course | undefined> {
     const response = await this.options.fetch(
-      `${this.options.apiBaseUrl}/courses/${encodeURIComponent(id)}`,
+      new URL(`courses/${encodeURIComponent(id)}`, this.options.apiBaseUrl),
       {
         headers: { accept: 'application/json' },
         ...(signal ? { signal } : {}),

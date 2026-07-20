@@ -7,15 +7,26 @@ export interface CatalogFeature {
 }
 
 export interface CatalogFeatureOptions {
-  readonly apiBaseUrl: string;
+  readonly apiBaseUrl: URL;
   readonly fetch: typeof globalThis.fetch;
   readonly locale: string;
   readonly now: () => Date;
 }
 
+function copyApiBaseUrl(value: URL): URL {
+  if (value.protocol !== 'http:' && value.protocol !== 'https:') {
+    throw new TypeError('API base URL must use HTTP or HTTPS');
+  }
+  if (!value.pathname.endsWith('/')) {
+    throw new TypeError('API base URL pathname must end with "/"');
+  }
+  // URL 对象可变；Feature 保存副本，避免调用方之后修改同一个实例。
+  return new URL(value.href);
+}
+
 export function createCatalogFeature(options: CatalogFeatureOptions): CatalogFeature {
   const repository = new HttpCourseRepository({
-    apiBaseUrl: options.apiBaseUrl,
+    apiBaseUrl: copyApiBaseUrl(options.apiBaseUrl),
     fetch: options.fetch,
   });
   const loadCourse = new LoadCourse(repository);
