@@ -12,12 +12,16 @@ export interface DsTabChangeDetail {
   readonly selectedId: string;
 }
 
+let tabsInstanceCount = 0;
+
 export class DsTabsElement extends HTMLElement {
-  static readonly observedAttributes = ['selected-id', 'activation', 'label', 'id'];
+  static readonly observedAttributes = ['selected-id', 'activation', 'label'];
   readonly #root = this.attachShadow({ mode: 'open' });
-  readonly #uid = `ds-tabs-${crypto.randomUUID()}`;
+  // 内部 ID 不拼接业务 id，避免空格等字符破坏 ARIA IDREF 关系。
+  readonly #uid = `ds-tabs-${++tabsInstanceCount}`;
   #items: readonly TabDefinition[] = [];
   #state: TabsState | undefined;
+  #reflectingSelection = false;
 
   get items(): readonly TabDefinition[] {
     return this.#items;
@@ -29,12 +33,12 @@ export class DsTabsElement extends HTMLElement {
   }
 
   get selectedId(): string {
-    return this.#state?.selectedId ?? '';
+    return this.#state?.selectedId ?? this.getAttribute('selected-id') ?? '';
   }
 
   set selectedId(value: string) {
-    if (!this.#state) return;
-    this.#commit(selectTab(this.#state, value), false, false);
+    // 即使 items 尚未到达也先保存意图；items setter 稍后会据此建状态。
+    this.setAttribute('selected-id', value);
   }
 
   get activation(): ActivationMode {
@@ -58,8 +62,8 @@ export class DsTabsElement extends HTMLElement {
   }
 
   attributeChangedCallback(name: string): void {
-    if (!this.isConnected) return;
-    if (name === 'label' || name === 'id') this.#render();
+    if (!this.isConnected || (name === 'selected-id' && this.#reflectingSelection)) return;
+    if (name === 'label') this.#render();
     else this.#recreateState();
   }
 
@@ -74,18 +78,21 @@ export class DsTabsElement extends HTMLElement {
       this.getAttribute('selected-id') ?? this.#state?.selectedId,
       this.activation,
     );
-    if (this.getAttribute('selected-id') !== this.#state.selectedId) {
-      this.setAttribute('selected-id', this.#state.selectedId);
-    }
+    this.#reflectSelectedId(this.#state.selectedId);
     this.#render();
+  }
+
+  #reflectSelectedId(selectedId: string): void {
+    if (this.getAttribute('selected-id') === selectedId) return;
+    this.#reflectingSelection = true;
+    this.setAttribute('selected-id', selectedId);
+    this.#reflectingSelection = false;
   }
 
   #commit(next: TabsState, notify: boolean, moveFocus: boolean): void {
     const changed = next.selectedId !== this.#state?.selectedId;
     this.#state = next;
-    if (this.getAttribute('selected-id') !== next.selectedId) {
-      this.setAttribute('selected-id', next.selectedId);
-    }
+    this.#reflectSelectedId(next.selectedId);
     this.#render();
     if (moveFocus) this.#button(next.focusedId)?.focus();
     if (notify && changed) {
@@ -103,8 +110,8 @@ export class DsTabsElement extends HTMLElement {
     return this.#root.querySelector(`[data-tab-id="${CSS.escape(id)}"]`);
   }
 
-  #baseId(): string {
-    return this.id || this.#uid;
+  #domId(kind: 'tab' | 'panel', index: number): string {
+    return `${this.#uid}-${kind}-${index}`;
   }
 
   #render(): void {
@@ -125,21 +132,21 @@ export class DsTabsElement extends HTMLElement {
     list.setAttribute('aria-label', this.label);
     list.setAttribute('part', 'tablist');
 
-    for (const item of state.items) {
+    state.items.forEach((item, index) => {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = item.label;
       button.disabled = item.disabled ?? false;
       button.dataset.tabId = item.id;
-      button.id = `${this.#baseId()}-tab-${item.id}`;
+      button.id = this.#domId('tab', index);
       button.setAttribute('role', 'tab');
       button.setAttribute('part', 'tab');
       button.setAttribute('aria-selected', String(item.id === state.selectedId));
-      button.setAttribute('aria-controls', `${this.#baseId()}-panel-${item.id}`);
+      button.setAttribute('aria-controls', this.#domId('panel', index));
       button.tabIndex = item.id === state.focusedId ? 0 : -1;
       button.addEventListener('click', () => this.#commit(selectTab(state, item.id), true, true));
       list.append(button);
-    }
+    });
 
     list.addEventListener('keydown', (event) => {
       if (!this.#state) return;
@@ -156,15 +163,19 @@ export class DsTabsElement extends HTMLElement {
       this.#commit(next, true, true);
     });
 
-    const selected = state.items.find((item) => item.id === state.selectedId)!;
-    const panel = document.createElement('div');
-    panel.id = `${this.#baseId()}-panel-${selected.id}`;
-    panel.textContent = selected.panel;
-    panel.tabIndex = 0;
-    panel.setAttribute('role', 'tabpanel');
-    panel.setAttribute('part', 'tabpanel');
-    panel.setAttribute('aria-labelledby', `${this.#baseId()}-tab-${selected.id}`);
-    this.#root.replaceChildren(style, list, panel);
+    // 每个 tab 的 aria-controls 都应指向真实存在的 panel；未选中项用 hidden 隐藏。
+    const panels = state.items.map((item, index) => {
+      const panel = document.createElement('div');
+      panel.id = this.#domId('panel', index);
+      panel.textContent = item.panel;
+      panel.hidden = item.id !== state.selectedId;
+      panel.tabIndex = 0;
+      panel.setAttribute('role', 'tabpanel');
+      panel.setAttribute('part', 'tabpanel');
+      panel.setAttribute('aria-labelledby', this.#domId('tab', index));
+      return panel;
+    });
+    this.#root.replaceChildren(style, list, ...panels);
   }
 }
 

@@ -1,7 +1,15 @@
 <script>
   // 放在 <head> 中、主样式之前执行，避免主题闪烁。
   (() => {
-    const saved = localStorage.getItem('theme');
+    // Safari 隐私模式、禁用存储或安全策略都可能让 localStorage 抛错。
+    // 主题脚本处在首屏关键路径上，失败时应降级到系统偏好，而不是阻断页面。
+    let saved = null;
+    try {
+      saved = localStorage.getItem('theme');
+    } catch {
+      // 无持久化能力时仍可正常显示，只是不记住用户选择。
+    }
+
     const theme = saved === 'light' || saved === 'dark'
       ? saved
       : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

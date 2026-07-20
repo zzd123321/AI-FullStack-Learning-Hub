@@ -33,10 +33,11 @@ export function DsTabs({
     return () => current.removeEventListener('ds-change', listener);
   }, [onChange]);
 
+  // 未传 selectedId 时让元素自行选择第一个可用项，不制造空字符串状态。
   return (
     <ds-tabs
       ref={element}
-      selected-id={selectedId}
+      selected-id={selectedId || undefined}
       activation={activation}
       label={label}
     />

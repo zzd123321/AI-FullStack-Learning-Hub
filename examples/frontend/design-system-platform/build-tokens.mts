@@ -63,7 +63,7 @@ function validateTokenValue(path: string, token: Token): void {
     isObject(token.$value) &&
     typeof token.$value.value === 'number' &&
     Number.isFinite(token.$value.value) &&
-    typeof token.$value.unit === 'string'
+    (token.$value.unit === 'px' || token.$value.unit === 'rem')
   ) return;
   throw new Error(`Invalid or unsupported ${token.$type ?? 'untyped'} token: ${path}`);
 }
@@ -84,17 +84,47 @@ function cssValue(path: string): string {
   throw new Error(`Unsupported token value: ${path}`);
 }
 
-const expected = new Map([
+const lightContract = new Map([
   ['--ds-color-text-default', cssValue('semantic.light.text.default')],
   ['--ds-color-surface-canvas', cssValue('semantic.light.surface.canvas')],
+  ['--ds-color-action-primary-background', cssValue('semantic.light.action.primary.background')],
+  ['--ds-color-action-primary-background-hover', cssValue('semantic.light.action.primary.backgroundHover')],
+  ['--ds-color-action-primary-foreground', cssValue('semantic.light.action.primary.foreground')],
   ['--ds-button-padding-inline', cssValue('component.button.paddingInline')],
+  ['--ds-button-padding-block', cssValue('component.button.paddingBlock')],
   ['--ds-button-radius', cssValue('component.button.radius')],
+]);
+const darkContract = new Map([
+  ['--ds-color-text-default', cssValue('semantic.dark.text.default')],
+  ['--ds-color-surface-canvas', cssValue('semantic.dark.surface.canvas')],
+  ['--ds-color-action-primary-background', cssValue('semantic.dark.action.primary.background')],
+  ['--ds-color-action-primary-background-hover', cssValue('semantic.dark.action.primary.backgroundHover')],
+  ['--ds-color-action-primary-foreground', cssValue('semantic.dark.action.primary.foreground')],
 ]);
 const css = await readFile(resolve(directory, 'tokens.css'), 'utf8');
 const paths = listTokenPaths(source);
 for (const path of paths) validateTokenValue(path, resolveToken(path));
-for (const [name, value] of expected) {
-  assert.match(css, new RegExp(`${name}:\\s*${value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}`));
+
+function cssBlock(selector: string): string {
+  // 本示例的生成 CSS 不含嵌套大括号，因此可用这个小型提取器做契约检查。
+  // 完整构建器应直接比较生成产物，而不是用正则解析任意 CSS。
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 's').exec(css);
+  if (!match) throw new Error(`Missing generated CSS block: ${selector}`);
+  return match[1]!;
 }
 
-console.log(`Token graph verified (${paths.length} tokens, ${expected.size} CSS contract values).`);
+function verifyDeclarations(block: string, expected: ReadonlyMap<string, string>): void {
+  for (const [name, value] of expected) {
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.match(block, new RegExp(`${escapedName}:\\s*${escapedValue}(?:;|\\s*$)`));
+  }
+}
+
+verifyDeclarations(cssBlock(":root,\n[data-theme='light']"), lightContract);
+verifyDeclarations(cssBlock("[data-theme='dark']"), darkContract);
+
+console.log(
+  `Token graph verified (${paths.length} tokens, ${lightContract.size + darkContract.size} CSS contract values).`,
+);
