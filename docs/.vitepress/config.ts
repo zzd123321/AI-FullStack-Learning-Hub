@@ -326,7 +326,14 @@ export default defineConfig({
             {
               text: 'AI、机器学习、深度学习与生成式 AI',
               link: '/ai/foundations/ai-ml-dl-generative-ai'
-            }
+            },
+            { text: '标量、向量、矩阵与张量', link: '/ai/math/scalars-vectors-matrices-tensors' },
+            { text: '线性组合、线性变换、基与矩阵乘法', link: '/ai/math/linear-combinations-transformations-and-basis' },
+            { text: '向量长度、距离、正交与余弦相似度', link: '/ai/math/norms-distances-orthogonality-and-cosine-similarity' },
+            { text: '特征值、特征向量与主成分分析', link: '/ai/math/eigenvalues-eigenvectors-and-pca' },
+            { text: '随机变量、概率分布、期望与条件概率', link: '/ai/math/random-variables-distributions-and-conditional-probability' },
+            { text: '协方差、相关系数、分布与大数定律', link: '/ai/math/covariance-correlation-distributions-and-law-of-large-numbers' },
+            { text: '导数、梯度与链式法则', link: '/ai/math/derivatives-gradients-and-chain-rule' }
           ]
         }
       ],
@@ -341,7 +348,10 @@ export default defineConfig({
             },
             { text: 'Token、上下文窗口与 Prompt 预算', link: '/ai-application/tokens-context-and-prompts' },
             { text: '结构化输出与工具调用', link: '/ai-application/structured-output-and-tool-calling' },
-            { text: 'Embedding 与向量检索', link: '/ai-application/embeddings-vector-retrieval' }
+            { text: 'Embedding 与向量检索', link: '/ai-application/embeddings-vector-retrieval' },
+            { text: 'RAG 架构、上下文治理与引用校验', link: '/ai-application/rag-citations-and-context' },
+            { text: '评估、幻觉发现与质量回归', link: '/ai-application/evaluation-and-hallucination-governance' },
+            { text: 'Agent、确定性工作流与状态管理', link: '/ai-application/agents-workflows-and-state' }
           ]
         }
       ],
