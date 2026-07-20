@@ -17,7 +17,8 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof EnrollmentCommandError) {
       const status = error.code === 'unauthenticated' ? 401
-        : error.code === 'not-found' ? 404 : 409
+        : error.code === 'forbidden' ? 403
+          : error.code === 'not-found' ? 404 : 409
       return NextResponse.json({ error: error.code }, { status })
     }
     console.error('POST enrollment failed', error)

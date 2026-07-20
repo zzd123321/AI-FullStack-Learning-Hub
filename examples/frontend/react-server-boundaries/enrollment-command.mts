@@ -1,11 +1,14 @@
 import 'server-only'
-import { requireSession } from './auth.mjs'
+import { AuthenticationError, requireSession } from './auth.mjs'
 import { lessonRepository } from './repository.mjs'
 
 export class EnrollmentCommandError extends Error {
-  constructor(readonly code: 'unauthenticated' | 'not-found' | 'sold-out') {
+  readonly code: 'unauthenticated' | 'forbidden' | 'not-found' | 'sold-out'
+
+  constructor(code: EnrollmentCommandError['code']) {
     super(code)
     this.name = 'EnrollmentCommandError'
+    this.code = code
   }
 }
 
@@ -15,11 +18,14 @@ export async function enrollLesson(input: {
   let session
   try {
     session = await requireSession()
-  } catch {
-    throw new EnrollmentCommandError('unauthenticated')
+  } catch (error) {
+    if (error instanceof AuthenticationError) {
+      throw new EnrollmentCommandError('unauthenticated')
+    }
+    throw error
   }
   if (!session.roles.includes('student')) {
-    throw new EnrollmentCommandError('unauthenticated')
+    throw new EnrollmentCommandError('forbidden')
   }
 
   try {

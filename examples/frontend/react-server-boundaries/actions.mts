@@ -23,6 +23,7 @@ export async function enrollLessonAction(
     if (error instanceof EnrollmentCommandError) {
       const message = {
         unauthenticated: '请重新登录后报名。',
+        forbidden: '当前账号没有报名权限。',
         'not-found': '课程不存在或不可报名。',
         'sold-out': '课程名额已满。',
       }[error.code]
