@@ -6,6 +6,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig([
+  // 生成物和第三方文件没有人工维护价值，统一从所有配置中排除。
   globalIgnores([
     'dist/',
     'coverage/',
@@ -26,6 +27,7 @@ export default defineConfig([
       sourceType: 'module',
       globals: globals.browser,
       parserOptions: {
+        // 使用与编辑器一致的 TS Project Service，让规则拿到真实类型信息。
         parser: tseslint.parser,
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
@@ -45,11 +47,13 @@ export default defineConfig([
     },
   },
   {
+    // 普通 JS 仍执行基础 lint，只关闭那些必须依赖 TypeScript 类型图的规则。
     name: 'learning/plain-javascript-without-type-information',
     files: ['**/*.{js,mjs,cjs}'],
     extends: [tseslint.configs.disableTypeChecked],
   },
   {
+    // Node 工具和浏览器源码拥有不同的全局变量，不能混成一个环境。
     name: 'learning/node-tooling-javascript',
     files: ['*.config.{js,mjs,cjs}', 'scripts/**/*.{js,mjs,cjs}'],
     extends: [eslint.configs.recommended],
