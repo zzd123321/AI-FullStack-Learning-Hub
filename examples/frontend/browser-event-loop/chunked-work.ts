@@ -12,6 +12,9 @@ export async function filterInChunks<T>(
   options: ChunkedWorkOptions = {},
 ): Promise<T[]> {
   const budgetMs = options.budgetMs ?? 8;
+  if (!Number.isFinite(budgetMs) || budgetMs <= 0) {
+    throw new RangeError("budgetMs must be a positive finite number");
+  }
   const result: T[] = [];
   let sliceStartedAt = performance.now();
 
@@ -21,7 +24,9 @@ export async function filterInChunks<T>(
     if (value !== undefined && predicate(value, index)) result.push(value);
 
     if (performance.now() - sliceStartedAt >= budgetMs) {
+      // 只在时间片边界通知进度，避免每个元素都引发一次 UI 更新。
       options.onProgress?.(index + 1, values.length);
+      // 这里必须 await；仅创建 Promise 不会暂停当前循环。
       await yieldToMain();
       sliceStartedAt = performance.now();
     }

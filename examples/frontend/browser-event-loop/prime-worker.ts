@@ -31,7 +31,8 @@ self.addEventListener("message", (event: MessageEvent<unknown>) => {
     const response: PrimeResponse = {
       type: "prime-error",
       requestId: event.data.requestId,
-      message: error instanceof Error ? error.message : "Unknown worker error",
+      // 协议限制错误文本长度；不要把任意内部对象或超长堆栈发回主线程。
+      message: (error instanceof Error ? error.message : "Unknown worker error").slice(0, 500),
     };
     self.postMessage(response);
   }

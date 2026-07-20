@@ -25,6 +25,8 @@ export function isPrimeRequest(value: unknown): value is PrimeRequest {
   return (
     record.type === "find-primes" &&
     typeof record.requestId === "string" &&
+    record.requestId.length > 0 &&
+    record.requestId.length <= 128 &&
     typeof record.maximum === "number" &&
     Number.isSafeInteger(record.maximum) &&
     record.maximum >= 2 &&
@@ -35,11 +37,18 @@ export function isPrimeRequest(value: unknown): value is PrimeRequest {
 export function isPrimeResponse(value: unknown): value is PrimeResponse {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  if (typeof record.requestId !== "string") return false;
-  if (record.type === "prime-error") return typeof record.message === "string";
+  if (
+    typeof record.requestId !== "string" ||
+    record.requestId.length === 0 ||
+    record.requestId.length > 128
+  ) return false;
+  if (record.type === "prime-error") {
+    return typeof record.message === "string" && record.message.length <= 500;
+  }
   return (
     record.type === "prime-result" &&
-    typeof record.count === "number" &&
-    (typeof record.largest === "number" || record.largest === null)
+    Number.isSafeInteger(record.count) && Number(record.count) >= 0 &&
+    (record.largest === null ||
+      (Number.isSafeInteger(record.largest) && Number(record.largest) >= 2))
   );
 }
