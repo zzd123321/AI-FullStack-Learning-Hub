@@ -17,18 +17,26 @@ export async function networkFirst(
   request: Request,
   cacheName: string,
   fallbackUrl?: string,
+  cacheNetworkResponse = true,
+  fallbackCacheName?: string,
 ): Promise<Response> {
   const cache = await caches.open(cacheName);
   try {
     const response = await fetch(request);
     if (response.status >= 500) throw new TypeError(`Network response failed: ${response.status}`);
-    await putIfAllowed(cache, request, response);
+    if (cacheNetworkResponse) await putIfAllowed(cache, request, response);
     return response;
   } catch (error) {
-    const cached = await cache.match(request);
-    if (cached) return cached;
+    if (cacheNetworkResponse) {
+      const cached = await cache.match(request);
+      if (cached) return cached;
+    }
     if (fallbackUrl) {
-      const fallback = await caches.match(fallbackUrl);
+      // Prefer the current version's precache so an older offline shell cannot
+      // accidentally pair with this worker's routing and asset contract.
+      const fallback = fallbackCacheName
+        ? await (await caches.open(fallbackCacheName)).match(fallbackUrl)
+        : await caches.match(fallbackUrl);
       if (fallback) return fallback;
     }
     throw error;

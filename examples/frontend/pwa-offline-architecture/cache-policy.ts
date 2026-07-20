@@ -8,6 +8,7 @@ export interface RouteDecision {
   readonly strategy: CacheStrategy;
   readonly cacheName?: string;
   readonly fallbackUrl?: string;
+  readonly cacheNetworkResponse?: boolean;
 }
 
 export type RequestDescriptor = Pick<Request, 'method' | 'url' | 'mode' | 'destination'>;
@@ -17,12 +18,17 @@ export function decideRoute(request: RequestDescriptor, appOrigin: string): Rout
   const url = new URL(request.url);
   if (url.origin !== appOrigin) return { strategy: 'network-only' };
   if (request.mode === 'navigate') {
-    return { strategy: 'network-first', cacheName: 'pages', fallbackUrl: '/offline.html' };
+    // A generic navigation may contain identity data. Use the precached offline
+    // page as fallback, but do not persist arbitrary HTML by default.
+    return {
+      strategy: 'network-first', cacheName: 'pages', fallbackUrl: '/offline.html',
+      cacheNetworkResponse: false,
+    };
   }
   if (url.pathname.startsWith('/assets/') && /\.[a-f0-9]{8,}\./.test(url.pathname)) {
     return { strategy: 'cache-first', cacheName: 'immutable-assets' };
   }
-  if (request.destination === 'image') {
+  if (request.destination === 'image' && url.pathname.startsWith('/public-media/')) {
     return { strategy: 'stale-while-revalidate', cacheName: 'images' };
   }
   return { strategy: 'network-only' };
@@ -31,7 +37,10 @@ export function decideRoute(request: RequestDescriptor, appOrigin: string): Rout
 export function mayStore(response: Response): boolean {
   const cacheControl = response.headers.get('Cache-Control') ?? '';
   const directives = cacheControl.split(',').map((value) => value.trim().toLowerCase());
-  return response.ok && response.type !== 'opaque'
+  const vary = response.headers.get('Vary') ?? '';
+  return response.ok && response.status !== 206 && response.type !== 'opaque'
     && !response.headers.has('Set-Cookie')
-    && !directives.includes('no-store');
+    && !directives.includes('no-store')
+    && !directives.includes('private')
+    && !vary.split(',').some((value) => value.trim() === '*');
 }

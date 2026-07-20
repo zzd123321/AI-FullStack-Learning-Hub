@@ -2,6 +2,7 @@ export type OutboxStatus = 'pending' | 'dead-letter';
 
 export interface MutationIntent {
   readonly id: string;
+  readonly principalId: string;
   readonly idempotencyKey: string;
   readonly operation: string;
   readonly payload: unknown;
@@ -24,19 +25,33 @@ export type SendResult =
 
 export async function flushOutbox(
   store: OutboxStore,
+  principalId: string,
   send: (intent: MutationIntent) => Promise<SendResult>,
+  maximumAttempts = 5,
 ): Promise<void> {
+  if (!principalId) throw new Error('A principal ID is required');
+  if (!Number.isSafeInteger(maximumAttempts) || maximumAttempts < 1) {
+    throw new RangeError('maximumAttempts must be a positive integer');
+  }
   const intents = [...await store.list()]
-    .filter((intent) => intent.status === 'pending')
+    .filter((intent) => intent.status === 'pending' && intent.principalId === principalId)
     .sort((a, b) => a.createdAt - b.createdAt);
   for (const intent of intents) {
+    if (intent.attempts >= maximumAttempts) {
+      await store.put({
+        ...intent, status: 'dead-letter', lastError: 'Retry budget exhausted',
+      });
+      continue;
+    }
     let result: SendResult;
     try {
       result = await send(intent);
     } catch (error) {
+      const attempts = intent.attempts + 1;
       await store.put({
         ...intent,
-        attempts: intent.attempts + 1,
+        attempts,
+        status: attempts >= maximumAttempts ? 'dead-letter' : 'pending',
         lastError: error instanceof Error ? error.message : 'Unexpected sync failure',
       });
       break;
@@ -52,17 +67,33 @@ export async function flushOutbox(
       });
       continue;
     }
-    await store.put({ ...intent, attempts: intent.attempts + 1, lastError: result.message });
+    const attempts = intent.attempts + 1;
+    await store.put({
+      ...intent,
+      attempts,
+      status: attempts >= maximumAttempts ? 'dead-letter' : 'pending',
+      lastError: result.message,
+    });
     break;
   }
 }
 
 export class OutboxFlusher {
-  #running: Promise<void> | null = null;
+  readonly #runningByPrincipal = new Map<string, Promise<void>>();
 
-  flush(store: OutboxStore, send: (intent: MutationIntent) => Promise<SendResult>): Promise<void> {
-    if (this.#running) return this.#running;
-    this.#running = flushOutbox(store, send).finally(() => { this.#running = null; });
-    return this.#running;
+  flush(
+    store: OutboxStore,
+    principalId: string,
+    send: (intent: MutationIntent) => Promise<SendResult>,
+  ): Promise<void> {
+    const running = this.#runningByPrincipal.get(principalId);
+    if (running) return running;
+    const next = flushOutbox(store, principalId, send).finally(() => {
+      if (this.#runningByPrincipal.get(principalId) === next) {
+        this.#runningByPrincipal.delete(principalId);
+      }
+    });
+    this.#runningByPrincipal.set(principalId, next);
+    return next;
   }
 }
