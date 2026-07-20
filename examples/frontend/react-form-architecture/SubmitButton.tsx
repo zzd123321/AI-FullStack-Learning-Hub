@@ -1,10 +1,18 @@
 import { useFormStatus } from 'react-dom'
 
-export function SubmitButton() {
+interface SubmitButtonProps {
+  idleLabel?: string
+  pendingLabel?: string
+}
+
+export function SubmitButton({
+  idleLabel = '保存课程',
+  pendingLabel = '保存中……',
+}: SubmitButtonProps) {
   const { pending } = useFormStatus()
   return (
     <button type="submit" disabled={pending} aria-disabled={pending}>
-      {pending ? '保存中……' : '保存课程'}
+      {pending ? pendingLabel : idleLabel}
     </button>
   )
 }

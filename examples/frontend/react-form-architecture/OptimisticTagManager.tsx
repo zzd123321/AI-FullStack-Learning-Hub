@@ -1,5 +1,6 @@
 import { useOptimistic, useState } from 'react'
 import { createTag } from './lesson-service'
+import { SubmitButton } from './SubmitButton'
 import type { OptimisticTag, Tag } from './types'
 
 export function OptimisticTagManager({ initialTags }: { initialTags: Tag[] }) {
@@ -44,7 +45,7 @@ export function OptimisticTagManager({ initialTags }: { initialTags: Tag[] }) {
             required
           />
         </label>
-        <button type="submit">添加</button>
+        <SubmitButton idleLabel="添加" pendingLabel="添加中……" />
       </form>
       {error && <p role="alert">{error}</p>}
     </section>

@@ -1,20 +1,69 @@
 import type { Lesson, LessonValues, Tag } from './types.js'
 
 export class ApiError extends Error {
+  readonly status: number
+
   constructor(
     message: string,
-    readonly status: number,
+    status: number,
   ) {
     super(message)
     this.name = 'ApiError'
+    this.status = status
   }
 }
 
-async function expectJson<T>(response: Response): Promise<T> {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+async function readJson(response: Response): Promise<unknown> {
   if (!response.ok) {
     throw new ApiError('服务器暂时无法处理请求，请稍后重试。', response.status)
   }
-  return response.json() as Promise<T>
+  return response.json()
+}
+
+function parseLesson(value: unknown): Lesson {
+  if (!isRecord(value)) throw new Error('课程接口返回了无法识别的数据。')
+  if (
+    typeof value.id !== 'string' ||
+    typeof value.title !== 'string' ||
+    typeof value.summary !== 'string' ||
+    (value.level !== 'beginner' &&
+      value.level !== 'intermediate' &&
+      value.level !== 'advanced') ||
+    !Array.isArray(value.tags) ||
+    !value.tags.every((tag) => typeof tag === 'string') ||
+    typeof value.featured !== 'boolean' ||
+    typeof value.updatedAt !== 'string'
+  ) {
+    throw new Error('课程接口返回了无法识别的数据。')
+  }
+
+  return {
+    id: value.id,
+    title: value.title,
+    summary: value.summary,
+    level: value.level,
+    tags: value.tags,
+    featured: value.featured,
+    updatedAt: value.updatedAt,
+  }
+}
+
+function parseAvailability(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.available !== 'boolean') {
+    throw new Error('标题检查接口返回了无法识别的数据。')
+  }
+  return value.available
+}
+
+function parseTag(value: unknown): Tag {
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string') {
+    throw new Error('标签接口返回了无法识别的数据。')
+  }
+  return { id: value.id, name: value.name }
 }
 
 export async function saveLesson(
@@ -30,7 +79,7 @@ export async function saveLesson(
     credentials: 'same-origin',
     body: JSON.stringify(values),
   })
-  return expectJson<Lesson>(response)
+  return parseLesson(await readJson(response))
 }
 
 export async function checkTitleAvailability(
@@ -42,8 +91,7 @@ export async function checkTitleAvailability(
     signal,
     credentials: 'same-origin',
   })
-  const body = await expectJson<{ available: boolean }>(response)
-  return body.available
+  return parseAvailability(await readJson(response))
 }
 
 export async function createTag(name: string): Promise<Tag> {
@@ -53,7 +101,7 @@ export async function createTag(name: string): Promise<Tag> {
     credentials: 'same-origin',
     body: JSON.stringify({ name }),
   })
-  return expectJson<Tag>(response)
+  return parseTag(await readJson(response))
 }
 
 export async function uploadLessonAsset(formData: FormData): Promise<void> {
@@ -62,5 +110,7 @@ export async function uploadLessonAsset(formData: FormData): Promise<void> {
     credentials: 'same-origin',
     body: formData,
   })
-  await expectJson<unknown>(response)
+  if (!response.ok) {
+    throw new ApiError('服务器暂时无法处理上传，请稍后重试。', response.status)
+  }
 }

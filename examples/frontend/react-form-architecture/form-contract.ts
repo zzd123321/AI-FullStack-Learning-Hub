@@ -9,10 +9,15 @@ function stringValue(formData: FormData, name: string): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function isLessonLevel(value: string): value is LessonValues['level'] {
+  return value === 'beginner' || value === 'intermediate' || value === 'advanced'
+}
+
 export function parseLessonForm(formData: FormData): ParseResult {
   const title = stringValue(formData, 'title')
   const summary = stringValue(formData, 'summary')
   const rawLevel = stringValue(formData, 'level')
+  const level = isLessonLevel(rawLevel) ? rawLevel : null
   const tags = formData
     .getAll('tags')
     .filter((value): value is string => typeof value === 'string')
@@ -24,14 +29,14 @@ export function parseLessonForm(formData: FormData): ParseResult {
   if (summary.length < 20 || summary.length > 500) {
     errors.summary = '简介需要 20～500 个字符。'
   }
-  if (!['beginner', 'intermediate', 'advanced'].includes(rawLevel)) {
+  if (level === null) {
     errors.level = '请选择有效难度。'
   }
   if (tags.length === 0) {
     errors.tags = '至少选择一个标签。'
   }
 
-  if (Object.keys(errors).length > 0) {
+  if (level === null || Object.keys(errors).length > 0) {
     return { ok: false, errors }
   }
 
@@ -40,7 +45,8 @@ export function parseLessonForm(formData: FormData): ParseResult {
     values: {
       title,
       summary,
-      level: rawLevel as LessonValues['level'],
+      // 上面的运行时类型守卫已经把字符串收窄为合法领域值。
+      level,
       tags,
       featured: formData.get('featured') === 'on',
     },

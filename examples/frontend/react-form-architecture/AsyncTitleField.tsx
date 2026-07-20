@@ -16,6 +16,14 @@ export function AsyncTitleField({
 
   useEffect(() => () => controllerRef.current?.abort(), [])
 
+  function handleChange(): void {
+    // 输入一旦变化，上一标题的“可用/已占用”结论就已经失效。
+    controllerRef.current?.abort()
+    controllerRef.current = null
+    requestIdRef.current += 1
+    setAvailability('idle')
+  }
+
   async function handleBlur(event: React.FocusEvent<HTMLInputElement>) {
     const title = event.currentTarget.value.trim()
     controllerRef.current?.abort()
@@ -33,10 +41,10 @@ export function AsyncTitleField({
       if (requestId === requestIdRef.current) {
         setAvailability(available ? 'available' : 'taken')
       }
-    } catch (requestError) {
+    } catch {
       if (
         requestId === requestIdRef.current
-        && !(requestError instanceof DOMException && requestError.name === 'AbortError')
+        && !controller.signal.aborted
       ) {
         setAvailability('error')
       }
@@ -63,6 +71,7 @@ export function AsyncTitleField({
         required
         aria-invalid={Boolean(error) || availability === 'taken'}
         aria-describedby="title-help title-error title-availability"
+        onChange={handleChange}
         onBlur={handleBlur}
       />
       <small id="title-help">3～80 个字符；离开输入框后检查重名。</small>
