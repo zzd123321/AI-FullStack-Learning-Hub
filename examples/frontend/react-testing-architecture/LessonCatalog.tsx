@@ -13,16 +13,23 @@ export function LessonCatalog({ service }: { service: EnrollmentService }) {
 
   useEffect(() => {
     const controller = new AbortController()
+    let ignore = false
     setState({ status: 'loading' })
     service.listLessons(controller.signal).then(
-      (lessons) => setState({ status: 'ready', lessons }),
-      (error: unknown) => {
-        if (!(error instanceof DOMException && error.name === 'AbortError')) {
+      (lessons) => {
+        if (!ignore) setState({ status: 'ready', lessons })
+      },
+      () => {
+        if (!ignore && !controller.signal.aborted) {
           setState({ status: 'error' })
         }
       },
     )
-    return () => controller.abort()
+    return () => {
+      // Abort 节约资源，ignore 则阻止不支持取消的 Client 回写过期结果。
+      ignore = true
+      controller.abort()
+    }
   }, [retryKey, service])
 
   if (state.status === 'loading') return <p role="status">正在加载课程……</p>

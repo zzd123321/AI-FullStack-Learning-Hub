@@ -5,9 +5,9 @@ import type { Lesson, Session } from './types'
 
 type SubmitState =
   | { status: 'idle' }
-  | { status: 'pending' }
-  | { status: 'success'; enrollmentId: string }
-  | { status: 'error'; message: string }
+  | { status: 'pending'; lessonId: string }
+  | { status: 'success'; lessonId: string; enrollmentId: string }
+  | { status: 'error'; lessonId: string; message: string }
 
 export function EnrollmentPanel({
   lesson,
@@ -19,27 +19,54 @@ export function EnrollmentPanel({
   service: EnrollmentService
 }) {
   const [state, setState] = useState<SubmitState>({ status: 'idle' })
-  const controllerRef = useRef<AbortController | null>(null)
+  const requestRef = useRef<{
+    lessonId: string
+    controller: AbortController
+  } | null>(null)
+  // 同一组件实例切换课程时，上一课程的提交状态不属于当前 UI。
+  const currentState = state.status === 'idle' || state.lessonId === lesson.id
+    ? state
+    : { status: 'idle' as const }
   const eligibility = checkEnrollmentEligibility(lesson, session)
   const blockedMessage = eligibilityMessage(eligibility)
 
-  useEffect(() => () => controllerRef.current?.abort(), [])
+  // lesson.id 变化和组件卸载都会释放上一课程的请求。
+  useEffect(() => {
+    const currentLessonId = lesson.id
+    return () => {
+      if (requestRef.current?.lessonId === currentLessonId) {
+        requestRef.current.controller.abort()
+      }
+    }
+  }, [lesson.id])
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!eligibility.allowed || state.status === 'pending') return
+    if (!eligibility.allowed || currentState.status === 'pending') return
 
-    controllerRef.current?.abort()
+    requestRef.current?.controller.abort()
     const controller = new AbortController()
-    controllerRef.current = controller
-    setState({ status: 'pending' })
+    requestRef.current = { lessonId: lesson.id, controller }
+    setState({ status: 'pending', lessonId: lesson.id })
     try {
       const receipt = await service.enroll(lesson.id, controller.signal)
-      setState({ status: 'success', enrollmentId: receipt.enrollmentId })
-    } catch (error) {
-      if (!(error instanceof DOMException && error.name === 'AbortError')) {
-        setState({ status: 'error', message: '报名失败，请稍后重试。' })
+      // 即使测试替身或第三方 Client 忽略 Abort，失效任务也不能再写 UI。
+      if (controller.signal.aborted) return
+      setState({
+        status: 'success',
+        lessonId: lesson.id,
+        enrollmentId: receipt.enrollmentId,
+      })
+    } catch {
+      if (!controller.signal.aborted) {
+        setState({
+          status: 'error',
+          lessonId: lesson.id,
+          message: '报名失败，请稍后重试。',
+        })
       }
+    } finally {
+      if (requestRef.current?.controller === controller) requestRef.current = null
     }
   }
 
@@ -51,15 +78,15 @@ export function EnrollmentPanel({
       <form onSubmit={handleSubmit}>
         <button
           type="submit"
-          disabled={!eligibility.allowed || state.status === 'pending'}
+          disabled={!eligibility.allowed || currentState.status === 'pending'}
         >
-          {state.status === 'pending' ? '报名中……' : '立即报名'}
+          {currentState.status === 'pending' ? '报名中……' : '立即报名'}
         </button>
       </form>
-      {state.status === 'success' && (
-        <p role="status">报名成功，编号：{state.enrollmentId}</p>
+      {currentState.status === 'success' && (
+        <p role="status">报名成功，编号：{currentState.enrollmentId}</p>
       )}
-      {state.status === 'error' && <p role="alert">{state.message}</p>}
+      {currentState.status === 'error' && <p role="alert">{currentState.message}</p>}
     </section>
   )
 }

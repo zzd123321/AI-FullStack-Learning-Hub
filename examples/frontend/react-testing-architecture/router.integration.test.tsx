@@ -25,8 +25,13 @@ describe('lesson route', () => {
   })
 
   it('未知课程由 Route Error Boundary 接管', async () => {
-    const router = createTestRouter(createService(), ['/lessons/missing'])
+    const service = createService({
+      getLesson: vi.fn(async () => {
+        throw new Response('Not Found', { status: 404 })
+      }),
+    })
+    const router = createTestRouter(service, ['/lessons/missing'])
     renderWithUser(<RouterProvider router={router} />)
-    expect(await screen.findByRole('alert')).toHaveTextContent('页面暂时不可用')
+    expect(await screen.findByRole('alert')).toHaveTextContent('课程不存在')
   })
 })

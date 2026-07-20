@@ -29,7 +29,8 @@ function createRouteObjects(service: EnrollmentService): RouteObject[] {
     try {
       const receipt = await service.enroll(params.lessonId, request.signal)
       return { receipt }
-    } catch {
+    } catch (error: unknown) {
+      if (request.signal.aborted) throw error
       return { error: '报名失败，请重试。' }
     }
   }
@@ -48,8 +49,8 @@ function createRouteObjects(service: EnrollmentService): RouteObject[] {
 }
 
 function LessonRoute() {
-  const lesson = useLoaderData() as Lesson
-  const actionData = useActionData() as ActionData | undefined
+  const lesson = useLoaderData<Lesson>()
+  const actionData = useActionData<ActionData>()
   const navigation = useNavigation()
   const pending = navigation.state !== 'idle'
   return (
