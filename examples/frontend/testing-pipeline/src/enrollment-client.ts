@@ -14,6 +14,26 @@ export class EnrollmentApiError extends Error {
   }
 }
 
+export interface EnrollmentRequestOptions {
+  /**
+   * 使用应用配置解析出的绝对 API 基址，例如 `https://example.com/api/`。
+   * 显式注入后，浏览器、Node 测试和 SSR 不必各自猜测当前 origin。
+   */
+  readonly apiBaseUrl: string;
+  readonly signal?: AbortSignal;
+}
+
+function parseApiBaseUrl(value: string): URL {
+  const url = new URL(value);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new TypeError('API base URL must use HTTP or HTTPS');
+  }
+  if (!url.pathname.endsWith('/')) {
+    throw new TypeError('API base URL pathname must end with "/"');
+  }
+  return url;
+}
+
 function parseReceipt(value: unknown): EnrollmentReceipt {
   if (typeof value !== 'object' || value === null) {
     throw new TypeError('Invalid enrollment response');
@@ -47,16 +67,21 @@ async function readErrorMessage(response: Response): Promise<string> {
 export async function enrollInCourse(
   courseId: string,
   idempotencyKey: string,
-  signal?: AbortSignal,
+  options: EnrollmentRequestOptions,
 ): Promise<EnrollmentReceipt> {
-  const response = await fetch(`/api/courses/${encodeURIComponent(courseId)}/enroll`, {
+  const endpoint = new URL(
+    `courses/${encodeURIComponent(courseId)}/enroll`,
+    parseApiBaseUrl(options.apiBaseUrl),
+  );
+
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       'idempotency-key': idempotencyKey,
     },
     body: JSON.stringify({ courseId }),
-    ...(signal ? { signal } : {}),
+    ...(options.signal ? { signal: options.signal } : {}),
   });
 
   if (!response.ok) {
