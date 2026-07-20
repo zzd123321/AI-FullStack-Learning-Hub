@@ -1,4 +1,4 @@
-import { adaptOpenAIEvent, type GenerationEvent } from './provider-event-adapter.js';
+import { parseGenerationEvent, type GenerationEvent } from './generation-events.js';
 import { ServerSentEventParser } from './sse-parser.js';
 
 export async function streamGeneration(
@@ -16,20 +16,29 @@ export async function streamGeneration(
   });
   if (!response.ok) throw new Error(`Generation request failed with ${response.status}`);
   if (!response.body) throw new Error('Streaming response body is unavailable');
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.toLowerCase().startsWith('text/event-stream')) {
+    throw new Error('Generation endpoint did not return an SSE stream');
+  }
 
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
   const parser = new ServerSentEventParser();
+  let reachedEnd = false;
   try {
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
       for (const frame of parser.push(value)) {
-        const event = adaptOpenAIEvent(frame.data, requestId);
+        const event = parseGenerationEvent(frame.data, requestId);
         if (event) onEvent(event);
       }
     }
     parser.finish();
+    reachedEnd = true;
   } finally {
+    // A parser/callback failure does not imply the producer stopped. Cancel the
+    // body so the browser can release the connection and apply backpressure.
+    if (!reachedEnd) await reader.cancel().catch(() => undefined);
     reader.releaseLock();
   }
 }

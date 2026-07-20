@@ -1,7 +1,9 @@
 export function safeExternalUrl(raw: string, base = location.origin): string | null {
   try {
     const url = new URL(raw, base);
-    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+    const isWebUrl = url.protocol === 'https:' || url.protocol === 'http:';
+    const hasEmbeddedCredentials = url.username !== '' || url.password !== '';
+    return isWebUrl && !hasEmbeddedCredentials ? url.href : null;
   } catch {
     return null;
   }
@@ -17,4 +19,5 @@ export function openExternalLink(anchor: HTMLAnchorElement, url: string): void {
   anchor.href = safe;
   anchor.target = '_blank';
   anchor.rel = 'noopener noreferrer';
+  anchor.referrerPolicy = 'no-referrer';
 }

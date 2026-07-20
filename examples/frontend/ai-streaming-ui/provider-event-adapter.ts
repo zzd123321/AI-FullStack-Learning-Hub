@@ -1,12 +1,7 @@
-export type GenerationEvent =
-  | { readonly type: 'started'; readonly requestId: string }
-  | { readonly type: 'text-delta'; readonly requestId: string; readonly delta: string }
-  | { readonly type: 'tool-call'; readonly requestId: string; readonly callId: string; readonly name: string }
-  | { readonly type: 'completed'; readonly requestId: string; readonly at: number }
-  | { readonly type: 'failed'; readonly requestId: string; readonly message: string; readonly at: number };
+import type { GenerationEvent } from './generation-events.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export function adaptOpenAIEvent(
@@ -24,12 +19,18 @@ export function adaptOpenAIEvent(
     case 'response.output_text.delta':
       if (typeof event.delta !== 'string') throw new TypeError('Text delta is missing');
       return { type: 'text-delta', requestId, delta: event.delta };
-    case 'response.output_item.added': {
+    case 'response.output_item.done': {
       const item = event.item;
       if (!isRecord(item) || item.type !== 'function_call') return null;
-      if (typeof item.call_id !== 'string' || typeof item.name !== 'string') {
+      if (
+        typeof item.call_id !== 'string' || item.call_id === ''
+        || typeof item.name !== 'string' || item.name === ''
+        || typeof item.arguments !== 'string'
+      ) {
         throw new TypeError('Function call identity is missing');
       }
+      // `output_item.added` arrives before arguments finish streaming. Waiting
+      // for `output_item.done` prevents the UI from approving partial input.
       return { type: 'tool-call', requestId, callId: item.call_id, name: item.name };
     }
     case 'response.completed':
@@ -37,8 +38,10 @@ export function adaptOpenAIEvent(
     case 'error':
       return {
         type: 'failed', requestId,
-        message: isRecord(event.error) && typeof event.error.message === 'string'
-          ? event.error.message : 'Generation failed',
+        code: 'provider_error',
+        // The trusted backend should log provider details and expose a stable,
+        // user-safe message instead of forwarding internal diagnostics.
+        message: 'Generation failed',
         at: now(),
       };
     default:

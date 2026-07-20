@@ -1,4 +1,4 @@
-import type { GenerationEvent } from './provider-event-adapter.js';
+import type { GenerationEvent } from './generation-events.js';
 import type { AssistantPart, GenerationState } from './types.js';
 
 export type TaskAction =
@@ -26,13 +26,22 @@ export function reduceGeneration(state: GenerationState, action: TaskAction): Ge
   if (action.requestId !== state.requestId) return state;
   if (['completed', 'failed', 'cancelled'].includes(state.status)) return state;
   switch (action.type) {
-    case 'started': return { ...state, status: 'streaming' };
-    case 'text-delta': return { ...state, status: 'streaming', parts: appendText(state.parts, action.delta) };
-    case 'tool-call': return {
-      ...state,
-      status: 'waiting-tool',
-      parts: [...state.parts, { type: 'tool', callId: action.callId, name: action.name, status: 'awaiting-approval' }],
-    };
+    case 'started':
+      return state.status === 'submitting' ? { ...state, status: 'streaming' } : state;
+    case 'text-delta':
+      return action.delta === ''
+        ? state
+        : { ...state, status: 'streaming', parts: appendText(state.parts, action.delta) };
+    case 'tool-call': {
+      // Delivery can be retried. The protocol identity makes this update
+      // idempotent instead of rendering two approval cards.
+      if (state.parts.some((part) => part.type === 'tool' && part.callId === action.callId)) return state;
+      return {
+        ...state,
+        status: 'waiting-tool',
+        parts: [...state.parts, { type: 'tool', callId: action.callId, name: action.name, status: 'awaiting-approval' }],
+      };
+    }
     case 'completed': return { ...state, status: 'completed', completedAt: action.at };
     case 'failed': return { ...state, status: 'failed', error: action.message, completedAt: action.at };
     case 'cancel': return { ...state, status: 'cancelled', completedAt: action.at };

@@ -9,6 +9,7 @@ export type ToolStatus =
   | 'awaiting-approval'
   | 'running'
   | 'succeeded'
+  | 'rejected'
   | 'failed';
 
 export type GenerationStatus =

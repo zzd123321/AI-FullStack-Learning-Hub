@@ -7,8 +7,23 @@ export interface ServerSentEvent {
 export class ServerSentEventParser {
   #buffer = '';
   #pendingCarriageReturn = false;
+  #isFirstChunk = true;
+  readonly maximumBufferedCharacters: number;
+
+  constructor(maximumBufferedCharacters = 1_000_000) {
+    if (!Number.isSafeInteger(maximumBufferedCharacters) || maximumBufferedCharacters <= 0) {
+      throw new RangeError('maximumBufferedCharacters must be a positive safe integer');
+    }
+    this.maximumBufferedCharacters = maximumBufferedCharacters;
+  }
 
   push(chunk: string): readonly ServerSentEvent[] {
+    // The SSE grammar permits one leading UTF-8 BOM. TextDecoderStream has
+    // already decoded bytes, so the parser removes the resulting character.
+    if (this.#isFirstChunk) {
+      this.#isFirstChunk = false;
+      if (chunk.startsWith('\uFEFF')) chunk = chunk.slice(1);
+    }
     let text = this.#pendingCarriageReturn ? `\r${chunk}` : chunk;
     this.#pendingCarriageReturn = text.endsWith('\r');
     if (this.#pendingCarriageReturn) text = text.slice(0, -1);
@@ -16,11 +31,19 @@ export class ServerSentEventParser {
     const events: ServerSentEvent[] = [];
     let boundary = this.#buffer.indexOf('\n\n');
     while (boundary >= 0) {
+      if (boundary > this.maximumBufferedCharacters) {
+        throw new RangeError('SSE event exceeds the configured buffer limit');
+      }
       const block = this.#buffer.slice(0, boundary);
       this.#buffer = this.#buffer.slice(boundary + 2);
       const parsed = parseBlock(block);
       if (parsed) events.push(parsed);
       boundary = this.#buffer.indexOf('\n\n');
+    }
+    // Complete small frames in one large network chunk are accepted. Only the
+    // still-incomplete frame is allowed to consume this much retained memory.
+    if (this.#buffer.length > this.maximumBufferedCharacters) {
+      throw new RangeError('SSE event exceeds the configured buffer limit');
     }
     return events;
   }

@@ -5,11 +5,15 @@ export interface ConversationTurn {
   readonly status: 'pending' | 'confirmed' | 'failed';
   readonly providerResponseId: string | null;
 }
+
 export function shouldPersist(turn: ConversationTurn): boolean {
   return turn.status === 'confirmed';
 }
 
-export function retryUserTurn(turn: ConversationTurn): ConversationTurn {
+// Retrying transport delivery keeps the same client ID so the backend can
+// deduplicate it. Regenerating an assistant answer is a different operation:
+// it should create a new assistant branch with a new ID.
+export function retryFailedUserDelivery(turn: ConversationTurn): ConversationTurn {
   if (turn.role !== 'user' || turn.status !== 'failed') throw new Error('Only failed user turns can retry');
-  return { ...turn, status: 'pending' };
+  return { ...turn, status: 'pending', providerResponseId: null };
 }

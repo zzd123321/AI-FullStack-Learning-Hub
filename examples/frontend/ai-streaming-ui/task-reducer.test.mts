@@ -13,6 +13,10 @@ state = reduceGeneration(state, {
   type: 'tool-call', requestId: 'r1', callId: 'call-1', name: 'search_courses',
 });
 assert.equal(state.status, 'waiting-tool');
+const afterDuplicateTool = reduceGeneration(state, {
+  type: 'tool-call', requestId: 'r1', callId: 'call-1', name: 'search_courses',
+});
+assert.equal(afterDuplicateTool, state);
 state = reduceGeneration(state, { type: 'cancel', requestId: 'r1', at: 20 });
 assert.equal(state.status, 'cancelled');
 const afterCancel = reduceGeneration(state, { type: 'text-delta', requestId: 'r1', delta: '迟到' });
