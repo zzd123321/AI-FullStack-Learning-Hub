@@ -1,39 +1,40 @@
 ---
-title: 渲染性能、并发特性与 Suspense
-description: 从测量、Render 与 Commit 成本出发，掌握 Memo、Transition、Deferred Value、Suspense、代码分割、虚拟列表、Streaming SSR 与 Hydration
+title: React 渲染性能、并发与 Suspense
+description: 从真实成本和测量证据出发，理解 Memo、Transition、Deferred Value、虚拟列表、Suspense 与流式 Hydration
+outline: deep
 ---
 
-# 渲染性能、并发特性与 Suspense
+# React 渲染性能、并发与 Suspense
 
-> 资料基线：React 19.2。本文只使用稳定版 API；`<ViewTransition>`、Transition Type 等 Canary/Experimental 能力不作为生产基线。React Compiler 已有正式文档，但是否启用取决于项目构建配置，不能假设所有 React 19 项目都会自动编译优化。
+> 资料基线：React 19.2，只使用稳定 API。React Compiler 已有正式文档，但是否启用取决于构建配置；安装 React 19 不会自动让任意项目获得编译器优化。
 
-## 1. 学习目标
+性能课程很容易变成“记住 `memo`、`useMemo` 和 `useCallback`”。但页面慢可能发生在网络、JavaScript、React Render、DOM Commit、Layout 或 Paint 中。没有先定位成本，缓存很可能只增加复杂度，Transition 也可能只是把同样昂贵的工作推迟。
 
-完成本节后，你应该能够：
+本课遵循一个顺序：
 
-- 区分调度、Render、Commit、Layout Effect、Paint 与 Passive Effect。
-- 用 React DevTools、`<Profiler>` 和浏览器性能工具定位瓶颈。
-- 区分“减少工作量”和“降低更新优先级”。
-- 判断 `memo`、`useMemo`、`useCallback` 是否真正有效。
-- 避免对象、函数、Context 和错误比较器破坏 Memo 化。
-- 用 `useTransition` 分离紧急输入与非紧急界面更新。
-- 用 `useDeferredValue` 让消费方显示可中断的滞后值。
-- 理解并发渲染的可中断、可丢弃与纯渲染要求。
-- 正确放置 Suspense、Error Boundary 与嵌套 Skeleton。
-- 用 `lazy` 和动态 Import 建立代码分割与预加载策略。
-- 用虚拟列表减少大量 DOM、布局和绘制成本。
-- 理解 Streaming SSR、Selective Hydration 和 Hydration 一致性。
-- 建立从真实用户指标到 Profiler Commit 的性能治理闭环。
+```text
+用户真的感到慢吗？
+      ↓
+时间花在哪一层？
+      ↓
+能否直接删除工作和 DOM？
+      ↓
+是否有重复计算值得复用？
+      ↓
+工作无法删除时，是否需要调整优先级与展示顺序？
+```
 
-## 2. 性能优化先建立成本模型
+## 先建立一张成本地图
 
-React 页面慢可能来自不同层：
+从一次访问到下一帧显示，可能经过：
 
 ```text
 Network / Server
-  ↓ HTML、JS、CSS、Data 到达
+  ↓ HTML、JS、CSS、数据到达
 JavaScript
-  ↓ 事件处理、数据转换、React Render
+  ↓ Event Handler、解析、领域计算
+React Render
+  ↓ 调用组件、计算下一棵 UI
 React Commit
   ↓ DOM Mutation、Ref、Layout Effect
 Browser Rendering
@@ -41,228 +42,195 @@ Browser Rendering
 Next Paint
 ```
 
-“组件 Render 次数多”只是线索，不等于问题。一个返回两行 JSX 的重复 Render 可能不到 0.1ms；一次大数组排序、Markdown 解析、同步 JSON 处理、Layout Thrashing 或 5,000 个 DOM 节点才可能真正阻塞交互。
+“某组件 Render 了十次”只是线索，不是结论。十次很小的纯组件可能不足 1ms；一次 Markdown 解析、10,000 行排序、强制同步布局或 5,000 个 DOM 节点就可能让交互明显卡顿。
 
-优化动作分为三类：
+优化手段可以分成三类：
 
-1. **删除工作**：减少请求、计算、组件、DOM、样式和 Effect 链。
-2. **复用工作**：缓存数据、计算、组件输出或已加载模块。
-3. **调度工作**：Transition/Deferred Value 允许紧急交互先完成。
+- 删除工作：减少请求、计算、DOM、Effect 链和不必要的组件范围；
+- 复用工作：缓存数据、纯计算、组件结果或已经加载的模块；
+- 调度工作：让紧急输入先显示，把非紧急 Render 放到可中断的后台。
 
-第三类不会减少 CPU 总量。它改善的是响应性和展示顺序，而不是把 200ms 计算变成 20ms。
+Transition 和 Deferred Value 属于第三类。它们能改善响应性，却不会自动把 200ms 算法变成 20ms。
 
-## 3. React 更新流水线
+## React 在 Render 和 Commit 之间做了什么
 
-### 3.1 Schedule
+State、Reducer、Context、外部 Store 或 Router 变化后，React 安排一次更新。
 
-State、Reducer、Context、外部 Store 或 Router 更新让 React 安排工作。自动批处理可把同一任务中的多个更新合并，减少不必要的 Commit，但业务不能依赖某个中间 DOM 状态一定出现。
+### Render 是可重试的纯计算
 
-### 3.2 Render Phase
+Render 阶段调用组件和 Hooks，生成下一棵 UI 描述。并发模式下，这段工作可以：
 
-React 调用组件和 Hooks，生成下一棵 UI 描述并进行 Reconciliation。Render 必须是纯计算：
+- 被更紧急的输入打断；
+- 从最新 State 重新开始；
+- 完成后仍被丢弃，不进入 DOM；
+- 在开发 Strict Mode 中额外执行以检查纯度。
 
-- 可以被调用多次。
-- 可以在提交前被更高优先级工作打断。
-- 被打断的结果可能直接丢弃。
-- Strict Mode 开发环境会额外调用以暴露不纯逻辑。
+所以组件函数、`useMemo` 计算和 State Updater 中不能发送订单、修改模块全局对象或注册订阅。相同输入必须得到相同结果，副作用属于 Event、Action 或 Effect。
 
-因此不能在组件函数、`useMemo` 计算或 State Updater 里发送请求、修改全局对象、记录不可重复订单。副作用属于事件、Action 或 Effect。
+### Commit 是不可中断的宿主更新
 
-### 3.3 Commit Phase
+React 选定一份已完成结果后，同步提交 DOM 变化、更新 Ref，并执行 Layout Effect。Commit 不能被另一按键从中打断。大量 DOM Mutation 或沉重 `useLayoutEffect` 会直接推迟 Paint。
 
-React 把已完成结果一次性提交到宿主环境：更新 DOM、处理 Ref，并运行 Layout Effect。Commit 不是可中断的；过多 DOM Mutation 或同步 Layout Effect 会直接推迟浏览器 Paint。
-
-### 3.4 Paint 与 Effect
-
-浏览器随后进行 Style、Layout、Paint 和 Composite。`useLayoutEffect` 在 Paint 前运行，适合必须同步测量/修正布局的少数场景；重计算会阻塞 Paint。`useEffect` 通常在 Paint 后运行，但其精确时机不应作为业务协议。
+普通 Effect 的精确时机可能受更新来源影响，业务代码不应把“必定在某次 Paint 后”当协议。只有必须在下一次 Paint 前测量和修正视觉布局时，才使用会阻塞绘制的 Layout Effect。
 
 ```text
 Event
-→ Schedule
-→ Render（并发工作可中断/重试）
-→ Commit（同步）
-→ Layout Effect
-→ Browser Paint
-→ Passive Effect
+  → Schedule
+  → Render（可中断、重试、丢弃）
+  → Commit（同步）
+  → Layout Effect
+  → Browser Paint
+  → Effect（不要依赖绝对时序）
 ```
 
-## 4. 先测量，再优化
+并发渲染不是多线程同时修改 DOM。React 仍只提交一份一致结果，它只是能暂停或放弃尚未提交的 Render 工作。
 
-### 4.1 三层证据
+## 测量要从用户问题逐层下钻
 
-- **Field/RUM**：真实用户、真实设备和真实网络，回答“谁在什么场景慢”。
-- **Browser Performance**：主线程 Long Task、Event、Style/Layout/Paint、Network，回答“时间花在哪里”。
-- **React Profiler**：Commit、组件 Render 和交互，回答“React 子树为什么更新、成本多大”。
+三类工具回答不同问题：
 
-Core Web Vitals 当前关注 LCP、INP、CLS。INP 在真实页面生命周期中观察交互到下一次 Paint 的延迟；“良好”阈值是第 75 百分位不超过 200ms。平均值会掩盖低端设备和尾部延迟，应按页面、设备与交互维度切分。
+| 证据 | 回答的问题 |
+| --- | --- |
+| RUM / Field Data | 哪些真实用户、设备、页面和交互慢 |
+| Browser Performance Trace | 主线程时间在 JS、Layout、Paint 还是网络 |
+| React DevTools Profiler | 哪棵 React 子树在某次 Commit 中重新 Render，成本多大 |
 
-### 4.2 `<Profiler>` 指标
+Core Web Vitals、Long Task 和用户任务完成时间能帮助确定真实影响。平均值经常掩盖低端设备和尾部延迟，应按页面、设备、版本和交互切分分布。
 
-本课建立一个有上限的内存缓冲区：
+### React Profiler 读什么
+
+性能指标类型与有上限缓冲区：
 
 <<< ../../../examples/frontend/react-performance-concurrency/types.ts
 
 <<< ../../../examples/frontend/react-performance-concurrency/profiler-metrics.ts
 
-`onRender` 的核心字段：
+`<Profiler onRender>` 常用字段：
 
 | 字段 | 含义 |
 | --- | --- |
-| `phase` | `mount`、`update` 或 `nested-update` |
-| `actualDuration` | 这次实际 Render 子树耗时 |
-| `baseDuration` | 不考虑优化时整棵子树最近成本估计 |
-| `startTime` | React 开始本次 Render 的时间 |
-| `commitTime` | 本次 Commit 的时间；同一 Commit 的 Profiler 相同 |
+| `phase` | `mount`、`update` 或嵌套更新 |
+| `actualDuration` | 本次确实执行的子树 Render 时间 |
+| `baseDuration` | 最近各组件成本汇总出的未优化最坏估计 |
+| `startTime` | React 开始当前 Render 的时间 |
+| `commitTime` | 本次 Commit 时间，同一 Commit 的 Profiler 可据此分组 |
 
-若 `actualDuration` 显著低于 `baseDuration`，说明 Memo 化跳过了一部分工作。不要把每次回调直接同步上传；回调本身也有成本，应采样、缓冲并批量发送。
+若 `actualDuration` 长期显著低于 `baseDuration`，说明 Memo Bailout 跳过了部分工作。但 Profiler 回调本身也有成本，不应每次同步上传；示例只放入有限缓冲区并返回副本，避免外部修改内部数组。
 
-开发模式含 Strict Mode、Source Map 和额外检查，时间不能当作生产结论。标准生产构建默认禁用 Profiler，需要专门的 Profiling Build 才能采集相应数据。
+开发模式包含 Strict Mode、警告和 Source Map，不能直接当生产结论。普通生产构建通常不包含 Profiler 计时能力，需要专用 Profiling Build。优化前后还应保持设备、数据和操作路径一致。
 
-## 5. 组件为什么重新 Render
+## 先删除工作，再谈缓存
 
-函数组件会在以下情况重新执行：
+组件重新执行可能因为自身 State、父组件 Render、Context 更新、外部 Store Snapshot 变化、Suspense 重试或开发检查。重新 Render 不等于 DOM 必然修改，但 Render 计算已经发生。
 
-- 自身 State/Reducer 更新。
-- 父组件重新 Render，且没有有效 Memo Bailout。
-- 读取的 Context Value 改变。
-- 订阅的外部 Store Snapshot 改变。
-- Suspense 重试、错误恢复、开发 Strict Mode 等框架流程。
+在加 Memo 前先检查：
 
-重新 Render 不等于 DOM 一定变化。React 可能算出相同结果，Commit 时不修改 DOM；但 Render 计算成本已经发生。
+1. 临时 State 是否被提升到整个页面根部；
+2. 派生值是否被重复存进 State，再用 Effect 同步；
+3. 是否存在 `Effect → setState → Render → Effect` 链；
+4. Context 是否塞入每次新建的大对象；
+5. Wrapper 是否可接收 `children`，让自身 State 不必重建子内容；
+6. 不可见的大量 DOM 是否应分页或窗口化；
+7. 昂贵工作是否可以预计算、移到服务器或 Web Worker。
 
-State Setter 传入与当前值 `Object.is` 相同的值通常可跳过更新，但不能把这种优化当业务语义。更重要的是避免错误的源状态和 Effect 循环。
+React 只能在自己的 Fiber 工作单元之间让出。如果单个组件函数执行一个连续 200ms 的普通 JavaScript 循环，Transition 无法在循环内部暂停它。必须拆分算法、减少数据、分块处理或移出主线程。
 
-## 6. 先做结构性优化
+静态数据也是例子。延迟分析模块中的目录从不变化，所以统计结果直接在模块首次加载时计算一次：
 
-在手动 Memo 前优先检查：
+<<< ../../../examples/frontend/react-performance-concurrency/HeavyAnalytics.tsx
 
-1. 临时 State 是否被不必要地提升到页面根部。
-2. Wrapper 是否可以接收 `children`，让自己的 State 更新不必重建 Child JSX。
-3. 是否存在 `Effect → setState → Render → Effect` 链。
-4. 派生值是否被重复存进 State，再用 Effect 同步。
-5. Context 是否放入每次都新建的大对象，导致所有消费者更新。
-6. 大量不可见 DOM 是否应该分页或虚拟化。
-7. 单个组件内部是否有无法让出的巨大同步循环。
+这比每个组件实例各自维护 `useMemo(..., [])` 更直接，也让所有权更清楚。
 
-React 的可中断调度发生在 Fiber 工作单元之间。若一个组件函数内部执行 200ms 同步解析，React 不能在这段普通 JavaScript 中途让出；应拆分、预计算、分块，或移动到 Web Worker/服务端。
+## Memo 只在“跳过比重算便宜”时有价值
 
-## 7. `memo`：跳过 Props 未变的组件
+### `memo` 跳过 Props 未变的组件
 
-`memo(Component)` 默认逐项使用 `Object.is` 比较 Props。它只是性能提示：React 仍可能重新 Render；组件自身 State 和读取的 Context 更新也不会被 `memo` 挡住。
+`memo(Component)` 默认逐项使用 `Object.is` 比较 Props。它是性能提示，不是正确性边界：组件自己的 State 和读取的 Context 变化仍会让它 Render，React 也可能在其他框架流程中重新执行。
 
-有效 Memo 化需要同时满足：
+Memo 较可能有效，需要同时满足：
 
-- 组件 Render 确实昂贵或更新非常频繁。
-- 多数更新中 Props 保持引用稳定。
-- 比较成本低于重新 Render 成本。
-- 组件 Render 纯净，跳过执行不影响正确性。
-
-一个每次新建的对象、数组、函数或 JSX `children` 足以破坏整层 Memo：
+- 组件确实昂贵或更新频繁；
+- 大多数父更新中 Props 引用不变；
+- 比较成本低于重算成本；
+- Render 完全纯净。
 
 ```tsx
-// 每次 Parent Render 都创建新引用
+// 每次 Parent Render 都创建两个新引用，会破坏子组件 Memo。
 <Chart options={{ theme: 'dark' }} onSelect={() => select(id)} />
 ```
 
-优先把常量移到模块级、传递更小的 Primitive Props、把 State 放到更局部的位置。只有测量确认需要时，再用 `useMemo/useCallback` 稳定引用。
+优先传更小的 Primitive Props、把常量移到模块外、让 State 靠近使用处。测量仍证明昂贵时，再稳定对象或 Callback。
 
-### 自定义比较器的风险
+自定义比较器风险更高。返回 `true` 表示新旧 Props 的所有可观察行为都等价，函数 Props 也必须比较，否则回调可能继续捕获旧 State。无边界深比较还可能比 Render 更慢。
 
-`memo(Component, arePropsEqual)` 返回 `true` 意味着“新旧 Props 产生完全等价的可观察行为”。必须比较函数，因为函数可能闭包捕获旧 State。漏掉 Callback 会产生“界面是新的、事件读取旧值”的幽灵 Bug。
+### `useMemo` 缓存纯计算结果
 
-无边界深比较可能比 Render 更慢，也会随数据结构增长突然冻结页面。应在生产性能面板中比较“比较器耗时”和“被跳过的 Render 耗时”。
-
-## 8. `useMemo` 与 `useCallback`
-
-### `useMemo`
-
-缓存计算结果：
-
-```ts
-const visible = useMemo(() => filter(items, query), [items, query])
+```tsx
+const visible = useMemo(
+  () => filter(items, query),
+  [items, query],
+)
 ```
 
-依赖使用 `Object.is` 比较。计算必须纯；Strict Mode 开发环境可能调用两次。React 也可能因热更新、首次挂载 Suspense 等原因丢弃缓存，所以它不能承担业务正确性和资源生命周期。
+它适合已经测量为昂贵、且依赖经常保持不变的纯计算。React 可能因为热更新、首次挂载 Suspend 等原因丢弃缓存，所以缓存不能承担资源生命周期或业务正确性。
 
-### `useCallback`
+### `useCallback` 缓存函数身份
 
-缓存函数引用，本质上类似 `useMemo(() => fn, deps)`。它主要在以下情况有价值：
+它主要用于：
 
-- 传给被 `memo` 包装且确实昂贵的子组件。
-- 作为另一个 Hook 的依赖且无法移除。
-- 自定义 Hook 需要给调用者稳定 Action。
+- 传给确实依赖稳定 Props 的 Memo 子组件；
+- 作为另一个 Hook 无法移除的依赖；
+- 自定义 Hook 对外提供身份稳定的 Action。
 
-给所有函数套 `useCallback` 不会减少函数书写或闭包创建的概念成本，还增加依赖维护和比较工作。
+给每个 Handler 套 `useCallback` 会增加依赖和比较成本，并不自动减少子组件 Render。先确认函数身份变化正是被测量到的原因。
 
-### React Compiler
+### React Compiler 改变手写 Memo 的数量，不改变原则
 
-React Compiler 能在构建期自动 Memo 化值与组件，通常减少手写 `memo/useMemo/useCallback`。但需要明确安装、配置和验证；React 版本号本身不会自动开启它。
+React Compiler 可以在构建期自动 Memo 化组件和值，但需要安装、配置并验证输出。即使启用，组件和 Hook 仍必须纯，State 所有权、DOM 数量和算法复杂度也不会被自动修复。应通过 Compiler 诊断、DevTools 标记和 Profiler 确认收益，而不是同时保留所有手写缓存作为“保险”。
 
-启用 Compiler 后仍需：
+## 紧急输入与昂贵结果不必同一优先级
 
-- 遵守组件与 Hook 纯度规则。
-- 用 React DevTools 的 Memo 标记和 Profiler 验证结果。
-- 保留有语义价值的 State/Ref，不把 `useMemo` 当持久存储。
-- 仅在 Annotation Mode 等需要时使用 `"use memo"`，默认 Infer Mode 通常不需要到处标记。
+用户打字时，输入框必须立即显示最新字符；庞大结果列表可以稍后追上。这里不是要少算一次，而是先提交紧急反馈。
 
-## 9. `useDeferredValue`：让消费方滞后
-
-完整搜索数据与纯函数：
+目录数据和纯搜索函数：
 
 <<< ../../../examples/frontend/react-performance-concurrency/catalog.ts
 
 <<< ../../../examples/frontend/react-performance-concurrency/search-lessons.ts
 
-输入框必须用紧急 State 立即更新；把 Query 本身放进 Transition 会导致受控输入无法及时反映按键。`useDeferredValue(query)` 返回供昂贵消费方使用的滞后版本：
+### `useDeferredValue` 延迟消费方
+
+调用方只有一个最新 `query`，没有“结果 State Setter”可以包进 Transition。这时把消费方使用的值延迟：
+
+```tsx
+const deferredQuery = useDeferredValue(query)
+```
+
+完整搜索实验：
 
 <<< ../../../examples/frontend/react-performance-concurrency/PerformanceLab.tsx
 
-一次输入更新大致经历：
+一次输入大致发生：
 
 ```text
-Urgent Render：input = 新 query，结果仍使用旧 deferredQuery
-→ Commit，让按键立即可见
-→ Background Render：尝试使用新 deferredQuery 计算结果
-   ├─ 又有输入：丢弃并从最新值重试
-   └─ 无更高优先级工作：Commit 新结果
+紧急 Render：input 使用新 query，列表仍使用旧 deferredQuery
+      ↓ Commit，按键立即可见
+后台 Render：尝试用新 deferredQuery 计算结果
+      ├─ 又有新输入 → 放弃并从最新值重试
+      └─ 完成 → Commit 新列表
 ```
 
-它没有固定 Debounce 延迟；浏览器空闲后立即尝试背景 Render。它也不会阻止网络请求，若 Query 驱动 Fetch，仍需缓存、防抖或取消策略。
+Deferred Value 没有固定 Debounce 时间，紧急 Render 后会尽快开始背景工作。它也不会减少网络请求；若查询驱动 Fetch，仍需要缓存、取消或真正的请求防抖。
 
-`query !== deferredQuery` 可显示“结果稍旧”的非阻塞反馈，例如降低透明度。不要让用户误以为旧列表已经匹配当前输入。
+`query !== deferredQuery` 表示列表暂时陈旧，应给出文字或视觉反馈，不能让用户误以为旧结果已匹配新输入。传入的值最好是 Primitive 或 Render 外创建的稳定对象；每次新建 `{ query }` 会制造无意义背景更新。
 
-传给 `useDeferredValue` 的对象应保持稳定。若 Render 时立即创建 `{ query }`，每次引用都不同，会制造无意义的背景更新；优先传 Primitive 或组件外创建的稳定对象。
+如果当前更新本身已经在 Transition 中，Deferred Value 会直接使用新值，不再额外产生一轮延迟。
 
-## 10. 虚拟列表：不创建看不见的 DOM
+### `useTransition` 延迟你拥有的更新
 
-Memo 只能减少 React 计算，不能消除已有 10,000 个 DOM 节点的 Layout、Style、内存和辅助技术负担。大列表通常需要分页或窗口化。
+当组件拥有目标 State Setter 时，可以标记这次更新为非紧急：
 
-本课实现固定行高、Overscan 的最小窗口算法：
-
-<<< ../../../examples/frontend/react-performance-concurrency/VirtualLessonList.tsx
-
-```text
-start = floor(scrollTop / rowHeight) - overscan
-end   = start + viewportRows + 2 × overscan
-offset = start × rowHeight
-```
-
-外层滚动容器保留总高度，内层只渲染视口附近行并平移到正确位置。Overscan 避免快速滚动看到空白。
-
-生产场景还要处理：
-
-- 动态行高的测量和缓存。
-- ResizeObserver 与容器尺寸变化。
-- 键盘导航、焦点移出窗口后的策略。
-- `aria-setsize/aria-posinset`、读屏与查找行为。
-- 滚动锚定、反向列表、追加数据。
-- SSR 初始窗口与 Hydration 一致性。
-
-应优先采用经过验证的虚拟化库；本实现用于看清算法和可访问性边界。
-
-## 11. `useTransition`：标记非紧急更新
-
-```ts
+```tsx
 const [isPending, startTransition] = useTransition()
 
 startTransition(() => {
@@ -270,268 +238,207 @@ startTransition(() => {
 })
 ```
 
-传入函数会立即执行，但其中同步安排的 State Update 被标记为 Transition。Background Render 可被输入、点击等更紧急更新打断并重新开始。
+传入函数会立即执行，但其中同步安排的 State Update 是可中断的 Transition。它适合 Tab、大面板、复杂图表和支持 Suspense 的导航，不适合受控输入、焦点反馈或必须立即读取新 DOM 的操作。
 
-Transition 适合：
+React 19.2 会让 `startTransition(async () => ...)` 的 Pending 覆盖异步 Action，但当前在 `await` 之后直接调用 Setter，仍需再包一层 `startTransition` 才能把该 Setter 标成 Transition。自建异步命令也仍要处理响应乱序。多个同时发生的 Transition 可能共享 Pending，不能把一个 Boolean 当成每个领域请求的精确状态机。
 
-- Tab、路由和大面板切换。
-- 更新复杂图表或筛选结果。
-- 希望保留已显示内容、避免突然切回大 Spinner 的 Suspense 更新。
+## 虚拟列表从根本上减少 DOM
 
-不适合：
+Memo 只能跳过部分 React 计算，无法消除 10,000 个真实 DOM 节点带来的 Style、Layout、Paint、内存和辅助技术成本。大列表通常先考虑分页或窗口化。
 
-- 控制文本输入的 State。
-- 需要 DOM 已同步更新后马上测量的操作。
-- 掩盖 500ms 单函数同步计算。
+固定行高的最小实现：
 
-React 19.2 中，`startTransition(async () => { await ... })` 可以跟踪异步 Action 的 Pending，但 `await` 之后直接安排的 State 目前仍需再包一层 `startTransition` 才会被标记为 Transition。自行编写并发请求还必须处理乱序；常见 Form/Action 抽象会替你处理一部分排序问题。
+<<< ../../../examples/frontend/react-performance-concurrency/VirtualLessonList.tsx
 
-多个同时进行的 Transition 当前可能被批在一起，不能用单个 `isPending` 精确表达每个领域请求。
+```text
+requestedStart = floor(scrollTop / rowHeight) - overscan
+start = clamp(requestedStart, 0, maxStart)
+end = start + viewportRows + 2 × overscan
+offset = start × rowHeight
+```
 
-## 12. Suspense 是“等待边界”
+外层容器保留总滚动高度，内层只渲染视口附近的行。Overscan 避免快速滚动时暴露空白；当筛选让列表突然变短时，还必须把旧滚动位置限制到新数据的有效窗口，否则会出现“明明有结果却一片空白”。
 
-`<Suspense fallback={...}>` 在子树 Render 时遇到支持 Suspense 的等待源后展示 Fallback。稳定版支持的典型来源包括：
+生产虚拟化还要处理动态行高、ResizeObserver、键盘焦点、读屏集合信息、滚动锚定、反向列表和 SSR 初始窗口。优先使用经过验证的库；本例的价值是看清算法和边界。
 
-- `lazy()` 加载组件代码。
-- 使用 `use()` 读取缓存 Promise。
-- Relay、Next.js 等集成 Suspense 的框架/数据源。
+## Suspense 协调“尚未准备好”的子树
 
-Suspense **不会**自动发现 `useEffect` 或事件处理器里的 Fetch。官方也明确指出，无框架的数据源集成协议仍不稳定、未文档化；不要在业务项目随意实现“Throw Promise 缓存库”。
+`<Suspense fallback={...}>` 只会响应支持 Suspense 的等待源。稳定来源包括：
 
-### Boundary 设计
+- `lazy()` 加载组件代码；
+- `use()` 读取缓存 Promise；
+- Relay、Next.js 等支持 Suspense 的框架或数据源。
 
-Boundary 应跟产品认可的加载顺序一致，不应机械地包住每个组件：
+Effect 中 Fetch 发生在 Commit 后，Suspense 不会自动发现它。React 官方仍不建议业务项目自行实现依赖“Render 时 Throw Promise”的无框架数据源协议；优先使用框架提供的缓存和失效机制。
+
+### Boundary 是产品的 Reveal 边界
 
 ```text
 Page Shell（立即显示）
-├─ Header（立即显示）
-└─ Suspense：主要内容 Skeleton
-   ├─ Summary
-   └─ Suspense：次要推荐 Skeleton
-      └─ Recommendations
+├── Header（立即显示）
+└── Suspense：主要内容 Skeleton
+    ├── Summary
+    └── Suspense：推荐内容 Skeleton
+        └── Recommendations
 ```
 
-同一 Boundary 内的子树一起 Reveal；嵌套 Boundary 可逐步 Reveal。Fallback 应保持近似布局，避免 CLS，也不能自己依赖同一未完成资源。
+同一 Boundary 内的内容一起 Reveal，嵌套 Boundary 可以逐步展示。Fallback 应保持近似布局，避免 CLS，也不能依赖同一未完成资源。
 
-首次挂载前发生 Suspend 时，React 不保留那次未提交的 State；资源准备好后从头重试。已显示子树再次 Suspend 时，除非更新来自 Transition/Deferred Value，否则最近 Boundary 可能重新显示 Fallback。隐藏已显示内容时，React 会清理 Layout Effect，恢复后重新运行。
+首次挂载前 Suspend 的树没有已提交 State，准备好后从头重试。已经显示的树再次 Suspend 时，如果更新不是 Transition 或 Deferred Value，边界可能重新显示 Fallback；React 隐藏它时会清理 Layout Effect，恢复后再运行。
 
-### Suspense 不处理错误
+Suspense 只表示等待，不处理 Reject 或 Lazy Chunk 失败。错误需要 Error Boundary：
 
-Promise Reject 或 Lazy Import 失败需要 Error Boundary，Fallback 只表达“尚未准备好”。代码分割边界应通常组合：
+<<< ../../../examples/frontend/react-performance-concurrency/ErrorBoundary.tsx
+
+典型组合是：
 
 ```tsx
 <ErrorBoundary>
-  <Suspense fallback={<Skeleton />}>
+  <Suspense fallback={<PanelSkeleton />}>
     <LazyPanel />
   </Suspense>
 </ErrorBoundary>
 ```
 
-本课 Error Boundary：
+## Lazy、预加载与 Transition 怎样协作
 
-<<< ../../../examples/frontend/react-performance-concurrency/ErrorBoundary.tsx
-
-## 13. `lazy`、代码分割与预加载
-
-延迟分析模块：
-
-<<< ../../../examples/frontend/react-performance-concurrency/HeavyAnalytics.tsx
-
-Transition、Lazy、Suspense 和 Error Boundary 的完整组合：
+延迟模块与工作区：
 
 <<< ../../../examples/frontend/react-performance-concurrency/ConcurrentWorkspace.tsx
 
-`lazy(load)` 必须在模块顶层声明。若在组件内声明，每次 Render 都会创建新的组件类型，导致 State 重置。React 会缓存 Load Promise 及其解析后的 Module；动态导入模块通常需要 Default Export。
+`lazy(load)` 必须在模块顶层声明。在组件内调用会让每次 Render 得到新组件类型，导致子树 State 重置。动态 Import 通常需要模块 Default Export，React 会缓存加载 Promise 与解析结果。
 
-`onPointerEnter/onFocus` 提前调用同一个 Import，可在用户表达意图后开始下载。预加载策略要有证据：
+示例在 Pointer Enter 或键盘 Focus 时调用同一个 Import，让用户表达意图后提前下载。预加载不能越多越好：过早加载所有 Chunk 等于没有代码分割，还会竞争关键网络资源；Chunk 过碎也增加请求和调度开销。
 
-- 过早加载所有 Chunk 等同于没有分割，还竞争关键网络资源。
-- Chunk 太碎会增加调度和请求开销。
-- 登录后高概率访问的下一页面可在空闲或意图时预取。
-- Chunk 文件名应内容哈希、长期缓存；HTML/Manifest 更新要兼容旧 Chunk。
-- 部署后旧页面请求已删除 Chunk 时，需要可恢复的刷新/版本策略。
+分析模块第一次尚未加载时，Tab State 更新放入 Transition。React 可以继续显示已揭示的概览内容，并用 Pending 文案反馈切换，等顶层分析模块准备好后再提交。嵌套的新 Suspense Boundary 仍可显示自己的局部 Skeleton。
 
-Transition 会尽量保留已经显示的 Overview，直到 Analytics 顶层内容准备好，同时 `isPending` 在 Tab 上反馈。新出现的嵌套 Boundary 仍可立即显示自己的 Skeleton，这让页面能渐进 Reveal。
+部署还要考虑内容哈希、长期缓存、旧 HTML 请求已删除 Chunk 的恢复策略。Chunk 加载失败不能永久停在 Skeleton，应进入 Error Boundary 并提供安全恢复路径。
 
-## 14. 完整客户端应用
+## 完整客户端应用
 
-应用组合：
+组合入口：
 
 <<< ../../../examples/frontend/react-performance-concurrency/App.tsx
 
-纯客户端入口：
-
 <<< ../../../examples/frontend/react-performance-concurrency/main.tsx
 
-这套示例刻意同时使用：
+这里每个工具解决不同层的问题：
 
-- `useDeferredValue`：调用方只有 Value，没有结果 State Setter。
-- `useMemo`：避免 Deferred Query 未变时重复搜索。
-- `memo`：滚动窗口移动时跳过 Props 未变的 Row。
-- Virtualization：从根本上限制 DOM 数量。
-- Profiler：验证优化是否真的降低 Actual Duration。
-- Transition：把 Tab 切换标记为非紧急。
-- Lazy/Suspense：按需加载并协调等待界面。
+| 工具 | 解决的问题 |
+| --- | --- |
+| `useMemo` | Deferred Query 未变时复用搜索计算 |
+| `useDeferredValue` | 输入优先，昂贵消费方稍后追上 |
+| Virtualization | 限制真实 DOM、Layout 与 Paint 工作量 |
+| `memo` | 窗口移动时尝试跳过 Props 未变的行 |
+| Profiler | 验证 React 子树实际成本 |
+| Transition | 非紧急视图切换可中断 |
+| Lazy/Suspense | 按需加载并组织等待界面 |
 
-每个工具解决不同问题，不能互相替代。
+它们不能互相替代。对同一问题同时堆上所有 Hook，通常说明尚未定位成本。
 
-## 15. Streaming SSR 与 Selective Hydration
+## Streaming SSR 让 Shell 不必等待整页
 
-传统 `renderToString()` 必须等整棵树完成才返回 HTML，也不支持等待数据的流式 Reveal。Streaming SSR 让服务器先发送 Shell，再把 Suspense 子树的 HTML 和替换指令逐段发送。
+传统 `renderToString` 必须一次生成字符串，无法利用 Suspense 分段 Reveal。Streaming SSR 可以先发送 Shell 和 Fallback，随后把已准备好的 Boundary 内容继续写入流。
 
-Node 流式入口：
+Node 流式示例：
 
 <<< ../../../examples/frontend/react-performance-concurrency/streaming-server.tsx
 
 关键回调：
 
-- `onShellReady`：Shell 已可输出，适合面向浏览器尽快开始流。
-- `onAllReady`：所有内容完成，适合爬虫、静态生成或不希望流式输出的客户端。
-- `onShellError`：Shell 本身无法生成，只能返回替代错误页。
-- `onError`：记录子树/流式错误，并设置最终状态策略，不能把 Stack 返回用户。
-- `abort()`：超时或客户端断开时停止工作，让未完成 Boundary 交给客户端恢复。
+- `onShellReady`：Shell 可以开始发送给浏览器；
+- `onAllReady`：全部内容完成，适合某些爬虫或非流式客户端；
+- `onShellError`：Shell 本身失败，需要返回替代错误文档；
+- `onError`：记录流式子树错误并影响状态策略；
+- `abort()`：超时或连接关闭时停止服务端工作，让未完成边界交给客户端恢复。
 
-生产服务器还必须处理 Backpressure、CSP Nonce、Asset Manifest、Bot 策略、代理缓冲、压缩刷新和请求级日志。框架通常已经处理这些细节，业务团队不应只为“用上流式”而自建不完整 SSR Server。
+React 19.2 会短暂批处理服务端 Suspense Boundary 的 Reveal，使服务端与客户端展示行为更一致。这不是业务可依赖的固定毫秒延迟，Boundary 仍应按产品展示顺序设计。
 
-### Selective Hydration
+生产 SSR 还要处理 Backpressure、CSP Nonce、Asset Manifest、代理缓冲、压缩、Bot、请求级日志和安全序列化。框架通常已经协调这些细节，不应只为“用上 Streaming”搭一个不完整服务器。
 
-流式 HTML 到达后页面可先展示，但事件处理要等对应 JavaScript Hydrate。React 借助 Suspense 边界按资源与用户交互优先级 Hydrate：用户先点击的区域可优先获得交互能力，而不必等待整页所有 Chunk。
+### Selective Hydration 让交互区域先可用
 
-客户端 Hydration 入口：
+流式 HTML 到达后可以先显示，但事件处理需要对应 JavaScript Hydrate。React 能结合 Suspense Boundary、代码资源和用户交互优先 Hydrate 某些区域，而不必等待整页 Chunk。
+
+客户端入口：
 
 <<< ../../../examples/frontend/react-performance-concurrency/hydrate-client.tsx
 
-`hydrateRoot` 要求客户端首次 Render 与服务端 HTML 匹配。以下内容常造成不一致：
+`hydrateRoot` 要求客户端首次 Render 与服务端 HTML 匹配。常见破坏来源：
 
-- Render 中读取 `Date.now()`、`Math.random()`、随机 UUID。
-- 服务端/客户端 Locale、Timezone 不同。
-- Render 中直接读取 `window`、LocalStorage 或屏幕宽度。
-- 服务端数据与客户端 Bootstrap Data 不是同一 Snapshot。
-- 无效 HTML 嵌套被浏览器自动修正。
-- CDN/扩展改写 HTML。
+- Render 中调用 `Date.now()`、`Math.random()` 或 UUID；
+- 服务端与客户端 Locale、Timezone 不同；
+- Render 直接读取 `window`、LocalStorage 或屏幕宽度；
+- Bootstrap Data 不是服务端渲染使用的同一 Snapshot；
+- 无效 HTML 被浏览器自动修正；
+- CDN 或扩展改写 HTML。
 
-`suppressHydrationWarning` 只适合已知且不可避免的单层文本差异，是逃生口，不会递归修复结构，也不应掩盖普通 Bug。`onRecoverableError` 应接入监控并附带 Route、Release 和 Component Stack。
+`suppressHydrationWarning` 只是已知、不可避免的浅层文本差异逃生口，不会递归修复结构。`onRecoverableError` 应接入监控并附带 Route、Release 和 Component Stack；“可恢复”也可能意味着 React 放弃服务端 DOM 并重建，不能统一忽略。
 
-## 16. 服务端组件、SSR 与 Suspense 不要混淆
+### 不要把几个服务端概念混为一谈
 
-- **SSR**：服务器把 React Tree 变为 HTML，客户端通常还要 Hydrate 同一组件逻辑。
-- **Streaming SSR**：HTML 分段发送，配合 Suspense 渐进 Reveal。
-- **Server Component**：组件逻辑只在服务端运行，结果以特殊 Payload 交给客户端树；不是普通 HTML SSR 的同义词。
-- **Code Splitting**：按需加载客户端 JS Module；不等于按需获取数据。
-- **Suspense**：协调“子树尚未准备好”的展示边界；本身不规定数据缓存协议。
+- SSR：服务器把 React Tree 生成 HTML，客户端通常 Hydrate 同一 UI；
+- Streaming SSR：HTML 分段发送，与 Suspense Reveal 协作；
+- Server Component：组件逻辑只在服务端执行，以特殊 Payload 组合客户端树；
+- Code Splitting：按需加载客户端 JavaScript Module；
+- Suspense：定义等待子树的展示边界，本身不定义数据缓存协议。
 
-实际项目应优先采用 Router/Framework 提供的整合方案，因为缓存、路由、错误、Head、Status Code、Asset 和 Hydration 必须一致协作。
+实际项目优先使用 Router/Framework 整合方案，因为缓存、路由、错误、Status、Head、Asset 与 Hydration 必须共同设计。
 
-## 17. 浏览器渲染成本仍然存在
+## React Profiler 看不到全部浏览器成本
 
-React Profiler 看不到全部成本。一次 Commit 很快，随后 Layout/Paint 很慢，可能来自：
+Commit 很快但页面仍卡，常见原因可能在 React 之后：
 
-- 深层 DOM 和复杂 CSS Selector。
-- 读取 Layout 后写 Style，再读 Layout 的强制同步布局。
-- 大面积阴影、滤镜、透明层和 Paint。
-- 图片没有尺寸导致 Layout Shift。
-- 动画修改 `top/left/width` 而非优先使用 Transform/Opacity。
+- 深层 DOM 和昂贵 CSS Selector；
+- 读 Layout、写 Style、再读 Layout 造成强制同步布局；
+- 大面积阴影、滤镜和透明层；
+- 图片缺少尺寸引起 Layout Shift；
+- 动画频繁修改几何属性；
 - 过多合成层占用 GPU 内存。
 
-使用 Chrome Performance 的 Main、Rendering、Layers 和 Paint Profiler 对照 React Commit。不要仅凭 React DevTools 宣布问题解决。
+使用浏览器 Performance、Rendering、Layers 和 Paint 工具，把 React Commit 与 Style/Layout/Paint 对齐。`content-visibility: auto` 可以跳过部分离屏渲染，但 DOM、Fiber 和内存仍存在，不等价于虚拟列表。
 
-`content-visibility: auto` 可跳过离屏子树的部分渲染工作，但 DOM、React Fiber 和内存仍存在，也需要合理的 Intrinsic Size。它不是完整虚拟化的等价替代。
+## 怎样验证优化没有只改变代码外观
 
-## 18. 常见反模式
+正确性先覆盖：
 
-### 到处 Memo
-
-比较和缓存也有成本，依赖错误还会制造旧值。没有 Profiler 证据时，先保持代码简单和状态局部。
-
-### 用 Transition 包住一切
-
-用户输入、焦点、展开按钮等即时反馈应紧急更新。过度 Transition 会让界面像“没点上”，也让 Pending 状态难以归因。
-
-### 用 `setTimeout` 模拟优先级
-
-Timeout 只是把任务放到未来队列，没有 React Pending、可中断 Render 和 Suspense 协调语义。Debounce 可用于减少请求，但不等于 Transition。
-
-### Effect Fetch 期待触发 Suspense
-
-Effect 在 Commit 后才运行，Suspense 只响应 Render 阶段的受支持等待源。两套模型不要混用。
-
-### 一个根级 Spinner 包住所有内容
-
-任何局部 Suspend 都让导航、标题和旧内容消失，导致闪烁与布局跳变。Boundary 应对齐产品的 Reveal Sequence。
-
-### Hydration Error 统一忽略
-
-不一致可能导致 React 放弃部分服务端 DOM、重建客户端树、事件绑定错位或性能退化。开发和生产监控都应追踪。
-
-## 19. 测试与性能预算
-
-### 正确性测试
-
-- 快速连续输入时，Input 始终显示最新 Query。
-- Deferred 结果最终与最新 Query 一致，旧结果有明确 Stale 标识。
-- 连续切换 Tab 时最终选择正确，Pending 不阻塞按钮。
-- Lazy Chunk 失败进入 Error Boundary，而非永久 Skeleton。
-- 虚拟列表滚动后位置、Key 和可访问集合信息正确。
+- 快速输入时 Input 永远显示最新 Query；
+- Deferred 结果最终追上最新值，陈旧期间有明确提示；
+- 列表筛选后即使旧滚动位置很深，也不会出现错误空白；
+- 连续切换视图后最终选择正确，Pending 不阻塞紧急操作；
+- Lazy Chunk Reject 进入 Error Boundary；
 - 服务端 HTML 与 Hydration 首帧一致。
 
-### 性能回归
+性能回归再固定用户路径、设备/限速和数据规模，记录：
 
-在稳定硬件/限速下记录固定用户路径：
+- 真实用户交互延迟分布；
+- 指定 Profiler 子树的 `actualDuration`；
+- 同一场景最大 DOM 节点数；
+- 初始与异步 Chunk 体积；
+- Lazy Boundary 可见时间与失败率；
+- Hydration Recoverable Error 数量。
 
-1. 输入搜索词。
-2. 滚动结果列表。
-3. 首次进入 Analytics。
-4. 返回并再次进入，验证 Chunk Cache。
+单次微基准很容易受 JIT、后台进程和 DevTools 影响。应多次运行、保留优化前基线，并确认浏览器 Layout/Paint 和真实用户指标也改善。Render 次数更少并不自动等于体验更好。
 
-预算应绑定用户结果，例如：
+## 本节小结
 
-- 搜索交互的 P75 INP。
-- 指定 Profiler 子树的 Update Actual Duration。
-- 同一查询最大 DOM 节点数。
-- Route 初始/异步 Chunk 大小。
-- Lazy Boundary 可见时间和失败率。
-- Hydration Recoverable Error 数量必须为零或有明确白名单。
+React 性能优化首先是定位问题，而不是背缓存 Hook。Render 是可中断、可重试的纯计算，Commit 和浏览器绘制仍可能同步阻塞。最有效的优化往往是缩小 State、删除 Effect 链、减少算法工作和限制 DOM 数量。
 
-单次微基准易受 JIT、开发工具和后台进程影响；应多次运行、比较分布并保留变更前基线。
+Memo 复用已经证明昂贵的重复计算；Transition 与 Deferred Value 调整紧急和非紧急更新的顺序，却不减少总工作；Suspense 定义受支持等待源的 Reveal Boundary；Streaming SSR 与 Selective Hydration利用这些边界改善内容和交互到达顺序。所有收益都必须由 Profiler、浏览器 Trace 和真实用户数据共同证明。
 
-## 20. 决策清单
+下一课进入 [React 测试策略与可测试架构](./testing-strategy-and-testable-architecture.md)，把纯逻辑、组件交互、Router/Action、异步稳定性、可访问性和端到端关键路径组织成分层验证体系。
 
-遇到卡顿时按顺序确认：
+## 延伸阅读
 
-1. Field Data 证明哪个页面、设备和交互慢？
-2. 时间在 Network、JS、React Render、Commit、Layout 还是 Paint？
-3. 能否删除 Effect 链、缩小 State、分页或减少 DOM？
-4. 昂贵工作是否集中在单个不可让出的同步函数？
-5. Memo 的 Props 在多数更新中是否稳定，比较是否更便宜？
-6. 输入等紧急 State 是否与昂贵消费方分离？
-7. 应使用 Setter 范围的 Transition，还是消费 Value 的 Deferred Value？
-8. Suspense 数据源是否真的受支持，Boundary 是否对齐 Reveal 设计？
-9. Lazy Chunk 的加载、错误、预取和部署版本是否可恢复？
-10. SSR Snapshot 是否确定且能与客户端首帧完全一致？
-11. React Profiler 改善后，浏览器 Layout/Paint 是否也改善？
-12. 优化是否在真实设备与 P75/P95 指标中成立？
-
-## 21. 官方资料
-
-- [React `<Profiler>`](https://react.dev/reference/react/Profiler)
-- [React `memo`](https://react.dev/reference/react/memo)
-- [React `useMemo`](https://react.dev/reference/react/useMemo)
-- [React `useCallback`](https://react.dev/reference/react/useCallback)
-- [React `useTransition`](https://react.dev/reference/react/useTransition)
-- [React `useDeferredValue`](https://react.dev/reference/react/useDeferredValue)
-- [React `<Suspense>`](https://react.dev/reference/react/Suspense)
-- [React `lazy`](https://react.dev/reference/react/lazy)
-- [React Compiler Introduction](https://react.dev/learn/react-compiler/introduction)
-- [React `renderToPipeableStream`](https://react.dev/reference/react-dom/server/renderToPipeableStream)
-- [React `hydrateRoot`](https://react.dev/reference/react-dom/client/hydrateRoot)
-- [web.dev Interaction to Next Paint](https://web.dev/articles/inp)
-
-## 22. 本节小结
-
-React 性能问题要先区分 Render 计算、Commit、DOM 数量、浏览器 Layout/Paint 与网络等待。Memo 只可能跳过部分 React 计算；Transition 和 Deferred Value 改善调度响应性，不减少算法总工作；Suspense 管理等待内容的 Reveal Boundary，不会自动发现任意 Effect Fetch。
-
-因此优化顺序应是：用真实交互定位成本，删除不必要工作和 DOM，缩小 State/Effect 边界，再用 Memo、并发调度、窗口化或代码分割解决已证明的瓶颈。最终结果必须同时通过 React Profiler、浏览器 Trace 和生产用户指标验证。
-
-## 23. 下一节预告
-
-下一节进入 **React 测试策略与可测试架构**：系统设计纯逻辑单测、组件交互测试、Router/Action 集成测试、Mock 边界、异步稳定性、可访问性断言与端到端关键路径。
+- [React：`<Profiler>`](https://react.dev/reference/react/Profiler)
+- [React：`memo`](https://react.dev/reference/react/memo)
+- [React：`useMemo`](https://react.dev/reference/react/useMemo)
+- [React：`useCallback`](https://react.dev/reference/react/useCallback)
+- [React：`useTransition`](https://react.dev/reference/react/useTransition)
+- [React：`useDeferredValue`](https://react.dev/reference/react/useDeferredValue)
+- [React：`<Suspense>`](https://react.dev/reference/react/Suspense)
+- [React：`lazy`](https://react.dev/reference/react/lazy)
+- [React：React Compiler](https://react.dev/learn/react-compiler/introduction)
+- [React：`renderToPipeableStream`](https://react.dev/reference/react-dom/server/renderToPipeableStream)
+- [React：`hydrateRoot`](https://react.dev/reference/react-dom/client/hydrateRoot)
+- [web.dev：Interaction to Next Paint](https://web.dev/articles/inp)

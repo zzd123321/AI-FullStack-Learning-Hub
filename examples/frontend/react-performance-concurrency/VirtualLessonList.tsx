@@ -35,8 +35,11 @@ const LessonRow = memo(function LessonRow({
 
 export function VirtualLessonList({ lessons }: { lessons: readonly LessonSummary[] }) {
   const [scrollTop, setScrollTop] = useState(0)
-  const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN)
   const visibleCount = Math.ceil(VIEWPORT_HEIGHT / ROW_HEIGHT) + OVERSCAN * 2
+  const requestedStart = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN)
+  // 筛选后列表可能突然变短；把旧滚动位置限制到新数据的有效窗口。
+  const maxStart = Math.max(0, lessons.length - visibleCount)
+  const start = Math.min(requestedStart, maxStart)
   const end = Math.min(lessons.length, start + visibleCount)
   const visibleLessons = lessons.slice(start, end)
 

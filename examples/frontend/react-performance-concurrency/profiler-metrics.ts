@@ -9,5 +9,6 @@ export function recordProfilerMetric(metric: ProfilerMetric): void {
 }
 
 export function readProfilerMetrics(): readonly ProfilerMetric[] {
-  return buffer
+  // 不把内部可变数组引用交给调用者；即使被强制类型转换也无法篡改缓冲区。
+  return buffer.slice()
 }

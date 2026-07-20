@@ -17,23 +17,24 @@ export function ConcurrentWorkspace() {
   return (
     <section aria-busy={isPending}>
       <h2>Transition 与代码分割</h2>
-      <div role="tablist" aria-label="工作区">
+      <div role="group" aria-label="工作区视图">
         <button
-          role="tab"
-          aria-selected={tab === 'overview'}
+          type="button"
+          aria-pressed={tab === 'overview'}
           onClick={() => selectTab('overview')}
         >
           概览
         </button>
         <button
-          role="tab"
-          aria-selected={tab === 'analytics'}
+          type="button"
+          aria-pressed={tab === 'analytics'}
           onPointerEnter={loadAnalytics}
           onFocus={loadAnalytics}
           onClick={() => selectTab('analytics')}
         >
-          {isPending ? '分析（加载中）' : '分析'}
+          分析
         </button>
+        {isPending && <span role="status">正在切换视图……</span>}
       </div>
 
       <ErrorBoundary>
