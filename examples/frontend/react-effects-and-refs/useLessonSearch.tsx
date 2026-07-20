@@ -16,6 +16,7 @@ export function useLessonSearch(keyword: string, gateway: LessonGateway) {
     }
 
     const controller = new AbortController()
+    // 每次 Effect 都有自己的 ignore。Cleanup 只会收回这一轮请求的写权限。
     let ignore = false
     setState({ status: 'loading' })
 
@@ -31,7 +32,9 @@ export function useLessonSearch(keyword: string, gateway: LessonGateway) {
     )
 
     return () => {
+      // ignore 保证旧 Promise 即使继续完成，也不能更新新页面。
       ignore = true
+      // abort 尽量停止仍在进行的网络与解析工作，减少资源浪费。
       controller.abort()
     }
   }, [gateway, keyword, reloadToken])

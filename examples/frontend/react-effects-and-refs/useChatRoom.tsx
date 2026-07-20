@@ -16,6 +16,8 @@ export function useChatRoom({
   createConnection,
   onNotification
 }: UseChatRoomOptions): void {
+  // muted 和 onNotification 始终读取最近一次已提交的值，
+  // 但它们变化时不应让聊天室断开重连。
   const notifyConnected = useEffectEvent((connectedRoomId: string) => {
     if (!muted) onNotification(`已连接房间：${connectedRoomId}`)
   })
@@ -26,6 +28,7 @@ export function useChatRoom({
     connection.connect()
 
     return () => {
+      // 先停止接收回调，再释放连接，保证 Setup 与 Cleanup 对称。
       unsubscribe()
       connection.disconnect()
     }
