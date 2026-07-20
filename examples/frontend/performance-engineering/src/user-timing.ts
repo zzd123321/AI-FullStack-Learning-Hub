@@ -26,7 +26,11 @@ export function observeApplicationMeasures(
   if (!PerformanceObserver.supportedEntryTypes.includes('measure')) return () => undefined;
 
   const observer = new PerformanceObserver((list) => {
-    for (const entry of list.getEntries()) report(entry.name, entry.duration);
+    for (const entry of list.getEntries()) {
+      report(entry.name, entry.duration);
+      // measure 缓冲区没有固定上限；长会话中消费后应主动清理。
+      performance.clearMeasures(entry.name);
+    }
   });
   observer.observe({ type: 'measure', buffered: true });
 

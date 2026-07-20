@@ -14,6 +14,10 @@ export interface MainThreadSample {
   readonly renderDuration: number;
 }
 
+interface ObserverCallbackOptions {
+  readonly droppedEntriesCount?: number;
+}
+
 function toSample(entry: LongFrameEntry): MainThreadSample {
   const endTime = entry.startTime + entry.duration;
   const renderStart = entry.renderStart ?? endTime;
@@ -28,7 +32,7 @@ function toSample(entry: LongFrameEntry): MainThreadSample {
 }
 
 export function observeWorstMainThreadFrames(
-  report: (samples: readonly MainThreadSample[]) => void,
+  report: (samples: readonly MainThreadSample[], droppedEntriesCount: number) => void,
 ): () => void {
   if (typeof PerformanceObserver === 'undefined') return () => undefined;
 
@@ -42,17 +46,27 @@ export function observeWorstMainThreadFrames(
   if (!entryType) return () => undefined;
 
   let worst: MainThreadSample[] = [];
-  const observer = new PerformanceObserver((list) => {
+  let droppedEntriesCount = 0;
+  // 浏览器已经会传第三个 options 参数，但较旧的 TypeScript DOM 声明只写了两个参数。
+  const callback = (
+    list: PerformanceObserverEntryList,
+    _observer: PerformanceObserver,
+    options?: ObserverCallbackOptions,
+  ) => {
+    // 浏览器时间线缓冲区有上限；丢失数量决定这批诊断数据是否可信。
+    droppedEntriesCount += options?.droppedEntriesCount ?? 0;
     worst = [...worst, ...list.getEntries().map((entry) => toSample(entry))]
       .sort((left, right) => right.duration - left.duration)
       .slice(0, 5);
-  });
+  };
+  const observer = new PerformanceObserver(callback);
   observer.observe({ type: entryType, buffered: true });
 
   const flush = () => {
-    if (worst.length === 0) return;
-    report(worst);
+    if (worst.length === 0 && droppedEntriesCount === 0) return;
+    report(worst, droppedEntriesCount);
     worst = [];
+    droppedEntriesCount = 0;
   };
   const flushWhenHidden = () => {
     if (document.visibilityState === 'hidden') flush();
