@@ -1,4 +1,5 @@
 export const LESSON_OPEN_EVENT = "learning:lesson-open";
+const SAFE_LESSON_ID = /^[a-z0-9][a-z0-9-]{1,79}$/;
 
 export interface LessonOpenDetail {
   readonly version: 1;
@@ -21,5 +22,6 @@ export function isLessonOpenEvent(event: Event): event is CustomEvent<LessonOpen
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
   return record.version === 1 && typeof record.lessonId === "string" &&
+    SAFE_LESSON_ID.test(record.lessonId) &&
     (record.source === "card" || record.source === "list");
 }
