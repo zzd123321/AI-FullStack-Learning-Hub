@@ -1,4 +1,4 @@
-import { parsePushPayload } from './push-payload.js';
+import { parsePushPayload, resolveSameOriginRoute } from './push-payload.js';
 
 interface LifetimeEvent extends Event {
   waitUntil(promise: Promise<unknown>): void;
@@ -19,7 +19,7 @@ interface WindowClientLike {
   navigate(url: string): Promise<WindowClientLike | null>;
 }
 
-interface PushWorkerScope {
+export interface PushWorkerScope {
   readonly location: Location;
   readonly registration: ServiceWorkerRegistration;
   readonly clients: {
@@ -52,8 +52,8 @@ export function installPushHandlers(scope: PushWorkerScope): void {
       const route = typeof data === 'object' && data !== null
         && typeof (data as { route?: unknown }).route === 'string'
         ? (data as { route: string }).route : '/';
-      const target = new URL(route, scope.location.origin);
-      if (target.origin !== scope.location.origin) return;
+      const target = resolveSameOriginRoute(route, scope.location.origin);
+      if (!target) return;
       const windows = await scope.clients.matchAll({ type: 'window', includeUncontrolled: true });
       const existing = windows.find((client) => new URL(client.url).origin === target.origin);
       if (existing) {

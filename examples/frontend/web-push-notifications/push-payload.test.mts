@@ -9,6 +9,9 @@ assert.equal(parsePushPayload({
   version: 1, notificationId: 'n2', title: '危险跳转', route: '//evil.example', category: 'system',
 }), null);
 assert.equal(parsePushPayload({
-  version: 2, notificationId: 'n3', title: '未知版本', route: '/', category: 'system',
+  version: 1, notificationId: 'n3', title: '反斜杠跳转', route: '/\\evil.example', category: 'system',
+}), null);
+assert.equal(parsePushPayload({
+  version: 2, notificationId: 'n4', title: '未知版本', route: '/', category: 'system',
 }), null);
 console.log('web push payload examples passed');

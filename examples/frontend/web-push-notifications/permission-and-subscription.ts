@@ -38,15 +38,19 @@ function sameKey(left: ArrayBuffer | null, right: ArrayBuffer): boolean {
 }
 
 export async function ensurePushSubscription(
+  registration: ServiceWorkerRegistration,
   vapidPublicKey: string,
   api: SubscriptionApi,
 ): Promise<PushSubscription> {
   if (Notification.permission !== 'granted') throw new Error('Notification permission is not granted');
-  const registration = await navigator.serviceWorker.ready;
   const applicationServerKey = decodeVapidPublicKey(vapidPublicKey);
   let subscription = await registration.pushManager.getSubscription();
   if (subscription && !sameKey(subscription.options.applicationServerKey, applicationServerKey)) {
+    const oldEndpoint = subscription.endpoint;
     await subscription.unsubscribe();
+    // Remove the old server record during planned key rotation instead of
+    // waiting for a future delivery attempt to discover a 404/410 response.
+    await api.remove(oldEndpoint);
     subscription = null;
   }
   subscription ??= await registration.pushManager.subscribe({
@@ -57,11 +61,16 @@ export async function ensurePushSubscription(
   return subscription;
 }
 
-export async function disablePush(api: SubscriptionApi): Promise<void> {
-  const registration = await navigator.serviceWorker.ready;
+export async function disablePush(
+  registration: ServiceWorkerRegistration,
+  api: SubscriptionApi,
+): Promise<void> {
   const subscription = await registration.pushManager.getSubscription();
   if (!subscription) return;
+
   const endpoint = subscription.endpoint;
-  await subscription.unsubscribe();
+  // Stop server-side delivery first. If the browser-side unsubscribe then
+  // fails, user intent is still respected and a later reconciliation can retry.
   await api.remove(endpoint);
+  await subscription.unsubscribe();
 }

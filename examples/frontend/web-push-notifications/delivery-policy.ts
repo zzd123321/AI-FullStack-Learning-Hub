@@ -10,6 +10,9 @@ export type DeliveryDecision =
   | { readonly send: false; readonly reason: 'category-disabled' | 'quiet-hours' };
 
 function isQuietHour(hour: number, start: number, end: number): boolean {
+  if (![start, end].every((value) => Number.isInteger(value) && value >= 0 && value <= 23)) {
+    throw new RangeError('Invalid quiet-hour boundary');
+  }
   if (start === end) return false;
   return start < end ? hour >= start && hour < end : hour >= start || hour < end;
 }
