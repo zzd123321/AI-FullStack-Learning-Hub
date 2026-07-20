@@ -15,12 +15,12 @@ description: 从模型 API 走向 RAG、Agent、MCP、评估和安全
 4. [Embedding、文档切分、向量检索与重排序：构建可靠的召回层](./embeddings-vector-retrieval.md)
 5. [RAG 架构、上下文治理与引用校验：让回答有据可查](./rag-citations-and-context.md)
 6. [评估、幻觉发现与质量回归：建立可持续的质量门禁](./evaluation-and-hallucination-governance.md)
+7. [Agent、确定性工作流与状态管理：构建可恢复的执行系统](./agents-workflows-and-state.md)
 
 后续课程将依次覆盖：
 
-1. Agent、确定性工作流与状态管理。
-2. MCP 的客户端、服务端与安全边界。
-3. 安全、成本、可观测性和部署。
+1. MCP 的客户端、服务端与安全边界。
+2. 安全、成本、可观测性和部署。
 
 每节课都会区分稳定的工程原则与快速变化的模型、SDK、协议细节。涉及外部服务的示例统一从环境变量读取密钥，不把凭据提交到仓库。
 
