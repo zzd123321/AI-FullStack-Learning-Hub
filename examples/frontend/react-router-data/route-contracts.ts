@@ -29,6 +29,15 @@ export function validateLessonForm(formData: FormData):
 
 export function safeReturnTo(value: FormDataEntryValue | null): string {
   if (typeof value !== 'string') return '/lessons'
-  if (!value.startsWith('/') || value.startsWith('//')) return '/lessons'
-  return value
+  if (!value.startsWith('/')) return '/lessons'
+
+  try {
+    // 使用固定同源基准解析，可同时拦截 //evil.example 和反斜杠等变体。
+    const base = new URL('https://app.example')
+    const target = new URL(value, base)
+    if (target.origin !== base.origin) return '/lessons'
+    return `${target.pathname}${target.search}${target.hash}`
+  } catch {
+    return '/lessons'
+  }
 }

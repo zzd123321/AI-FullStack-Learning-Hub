@@ -74,6 +74,8 @@ export async function loginAction({ request }: ActionFunctionArgs) {
     await login(email, password, request.signal)
     return redirect(returnTo)
   } catch (cause: unknown) {
+    // 导航取消不等于登录失败，应继续交给 Router 处理失效请求。
+    if (request.signal.aborted) throw cause
     return data({
       error: cause instanceof Error ? cause.message : '登录失败'
     }, { status: 401 })

@@ -13,11 +13,12 @@ export function RouteErrorBoundary() {
     )
   }
 
-  const message = error instanceof Error ? error.message : '发生未知错误'
+  // 未预期异常应进入监控；不要把内部错误详情直接展示给最终用户。
+  console.error('route error', error)
   return (
     <main>
       <h1>页面暂时不可用</h1>
-      <p role="alert">{message}</p>
+      <p role="alert">请稍后重试，或返回首页。</p>
       <Link to="/">返回首页</Link>
     </main>
   )

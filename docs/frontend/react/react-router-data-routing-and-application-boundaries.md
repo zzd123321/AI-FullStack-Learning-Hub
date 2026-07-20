@@ -1,94 +1,58 @@
 ---
 title: React Router 数据路由与应用边界
-description: 使用 React Router 数据模式组织嵌套路由、Loader、Action、Pending UI、错误边界、URL 状态、鉴权与并发
+description: 从一次导航的完整数据流出发，理解路由树、Loader、Action、Pending、错误、鉴权与并发
+outline: deep
 ---
 
 # React Router 数据路由与应用边界
 
-> 资料基线：React Router 8.2 Data Mode。React Router 近年的包入口、类型生成与模式边界变化较快；实际项目必须以锁文件对应版本的官方文档为准。旧版本常从 `react-router-dom` 导入，当前文档示例主要从 `react-router` 导入，不能只改包名而忽略迁移说明。
+> 资料基线：React Router 8.2 Data Mode。React Router 的版本、包入口和框架能力变化较快；实际项目应以锁文件对应的官方文档为准。v6 项目常从 `react-router-dom` 导入，当前 v8 文档主要从 `react-router` 导入，升级时不能只机械替换包名。
 
-## 1. 学习目标
+上一课提到：如果筛选、分页和当前实体需要刷新保留、支持浏览器前进后退、还能分享链接，它们就不应只存在组件 State 中，而应属于 URL。
 
-完成本节后，你应该能够：
-
-- 区分 React Router 的 Framework、Data 与 Declarative Mode。
-- 用 Route Tree 同时组织 URL、Layout、数据、写操作和错误边界。
-- 正确设计 Index、Layout、Dynamic、Optional 和 Splat Route。
-- 在 Loader 中使用 Request URL、Params 和 AbortSignal。
-- 把筛选、分页、排序等导航状态放进 URL。
-- 使用 Action 与 `<Form>` 处理写操作和服务端校验。
-- 使用 `useNavigation` 和 `useFetcher` 设计全局与局部 Pending UI。
-- 理解 Action 后 Loader Revalidation 与服务器数据一致性。
-- 使用 Route Error Boundary 处理 Response 与程序异常。
-- 避免把父 Loader 当成串行鉴权中间件。
-- 防止开放重定向、越权、CSRF 和重复提交。
-- 理解 Data Router 的取消、竞态和服务端幂等边界。
-- 判断何时使用 Data Mode，何时采用 Framework Mode。
-- 使用 Memory Router/Route Stub 测试 Loader、Action 和导航流程。
-
-## 2. 路由不只是“URL 对应组件”
-
-传统 SPA 往往在组件挂载后 Fetch：
+这正是路由架构的起点。Router 不只是“看到某个路径就显示某个组件”，它还协调页面身份、数据读取、写操作、等待反馈、错误隔离和导航取消。
 
 ```text
-匹配 URL → Render 空页面 → Effect Fetch → Loading → 内容
+用户导航或提交表单
+        ↓
+Router 匹配一条 Route Branch
+        ↓
+运行 Loader 或 Action
+        ↓
+处理数据、Redirect 或 Error
+        ↓
+提交新的 Route UI
+        ↓
+写操作完成后重新验证相关 Loader
 ```
 
-数据路由把页面进入所需的工作提升到路由层：
+理解这条管线后，就能知道为什么页面数据不必默认写成 `useEffect + loading + error`。
 
-```text
-Navigation
-→ Match Route Branch
-→ Run Loaders / Action
-→ Handle Redirect or Error
-→ Commit Route UI with Data
-→ Revalidate affected Loaders after Mutation
-```
+## 先选择 Router 承担多少职责
 
-路由树因此同时表达：
+React Router 8 提供三种递增模式。它们不是三个互不相干的产品，而是逐层增加能力和约定。
 
-- URL 层级与页面身份。
-- 持久 Layout 和 Outlet。
-- 页面进入前需要的数据。
-- Form 写操作和校验。
-- Pending、错误与重定向。
-- 数据失效和重新验证。
+| 模式 | 顶层 API | 适合 |
+| --- | --- | --- |
+| Declarative | `<BrowserRouter>`、`<Routes>` | 已有独立数据层，只需要匹配、链接与导航的 SPA |
+| Data | `createBrowserRouter`、`<RouterProvider>` | 自定义 SPA，希望使用 Loader、Action、Pending 与错误边界 |
+| Framework | Route Module 与框架工具链 | 需要类型生成、代码分割、SSR、预渲染、流式和部署适配的新项目 |
 
-这比在每个页面复制 `useEffect + loading + error + navigate` 更容易统一取消、竞态和导航语义。
+本课选择 Data Mode，因为它能把数据路由的核心机制直接展开，又不要求先接受完整框架目录约定。这不表示生产项目都应自己搭建 SSR；有服务端渲染和强类型 Route Module 需求时，应优先评估 Framework Mode。
 
-## 3. 三种模式先选清楚
-
-### Declarative Mode
-
-使用 `<BrowserRouter>`、`<Routes>`、`<Route>` 声明匹配和导航。适合已有数据层、只需要客户端路由的 SPA。它不提供完整 Loader/Action 数据协调。
-
-### Data Mode
-
-使用 `createBrowserRouter()` 和 `<RouterProvider>`。Route Object 可定义 Loader、Action、Error Boundary、Revalidation 等。适合自定义 Vite SPA、想使用数据路由但不采用完整框架约定的项目。
-
-### Framework Mode
-
-在 Data Mode 上增加 Route Module、类型生成、自动代码分割、SSR/预渲染、流式、部署适配等框架能力。生产新项目需要服务端渲染、强类型 Route Module 和完整数据生命周期时优先评估。
-
-本课选择 Data Mode，便于看清底层契约；它不代表所有项目都应手写 Router/SSR 基础设施。
-
-## 4. 完整入口与 Router 所有权
-
-浏览器入口：
+浏览器入口只负责挂载稳定 Router：
 
 <<< ../../../examples/frontend/react-router-data/main.tsx
 
-Router 在模块顶层创建，而不是组件 Render 内：
+Router 在模块顶层创建：
 
 <<< ../../../examples/frontend/react-router-data/router.tsx
 
-如果每次 App Render 都 `createBrowserRouter()`，会重建 Router 实例、丢失内部状态、重复订阅 History。Router 配置通常是应用结构，应保持稳定。
+不要在组件每次 Render 时调用 `createBrowserRouter()`。Router 实例拥有 History 订阅、导航状态和 Loader 数据，反复创建会重置这些内部状态。测试则应为每个用例创建独立 Memory Router，避免不同用例共享导航历史。
 
-测试需要隔离时，每例创建独立 Memory Router，而不是复用生产 Browser Router Singleton。
+## Route Tree 同时描述 URL 与 UI 生命周期
 
-## 5. Route Tree 与 UI Tree 对齐
-
-示例 Route Branch：
+示例路由可以画成：
 
 ```text
 /
@@ -103,560 +67,268 @@ Router 在模块顶层创建，而不是组件 Render 内：
     └── * → NotFoundPage
 ```
 
-URL `/lessons/react-state/edit` 同时匹配 Root、Pathless Protected、Lessons 和 Edit 四层。父组件通过 `<Outlet />` 渲染匹配的子级。
+访问 `/lessons/react-state/edit` 时，Root、Protected、Lessons 和 Edit 四层同时匹配。每个父 Layout 用 `<Outlet />` 留出子路由位置。导航只改变叶子节点时，上层 Layout 可以继续保留。
 
-路由嵌套不只是拼路径，还决定：
+因此嵌套路由还决定：
 
-- 哪些 Layout 在子导航时保留。
-- 哪些 Loader 属于匹配 Branch。
-- Pending 和 Error 在哪里展示。
-- 相对 Link/Action 如何解析。
+- 哪些界面在子导航时持续存在；
+- 哪些 Loader 属于当前匹配分支；
+- Error 应由哪一层接住；
+- 相对 Link 与 Form Action 如何解析；
+- 哪个边界适合显示 Pending UI。
 
-不要为了目录整齐建立与 UI/URL 生命周期无关的深层路由。
+### 常见 Route 形态
 
-## 6. Index、Layout、Prefix 与 Splat
+- Index Route 使用 `{ index: true }`，在父 URL 精确匹配时填充默认 Outlet；它没有自己的 path。
+- Pathless Layout 有 Component 和 children，但没有 path；它增加 UI/数据边界，不增加 URL Segment。
+- Prefix Route 有 path 和 children，却没有 Component；它只为子路由增加路径前缀。
+- `:lessonId` 是 Dynamic Segment，值通过 Params 进入 Loader/Action。
+- `:lang?` 是 Optional Segment；过多可选层级会让规范 URL 变得含糊。
+- `*` 是 Splat，匹配剩余路径，适合在语义正确的子树中放置 404。
 
-### Index Route
+路由树应尽量贴合 URL 和 UI 的真实持久层级，而不是为了文件夹整齐增加无意义嵌套。
 
-`{ index: true }` 在父 URL 精确匹配时渲染默认 Outlet 内容。它没有 path，也不能有 children。`/lessons` 显示“请选择课程”，而不是空 Outlet。
+## Loader 是路由的数据读取边界
 
-### Layout Route
-
-没有 path、只有 Component 和 children 的 Route 不增加 URL Segment。本课 ProtectedLayout 就是 Pathless Layout。
-
-### Prefix Route
-
-有 path、无 Component 的 Route 只给 children 增加路径前缀，不产生额外 Layout。
-
-### Dynamic Segment
-
-`:lessonId` 进入 Loader/Action Params。Params 来自外部 URL，TypeScript 的 string 类型不代表值合法；必须检查缺失、格式和权限。
-
-### Optional Segment
-
-`:lang?` 表示可选 Segment。可选层级过多会让 URL 解析和 Canonical 复杂，应谨慎使用。
-
-### Splat
-
-`*` 匹配剩余路径，常用于 404 或文件路径。读取 Params 时 Key 是 `"*"`。Catch-all Route 应放在语义正确的子树，才能保留对应 Layout。
-
-## 7. Root Layout 与全局导航状态
-
-<<< ../../../examples/frontend/react-router-data/RootLayout.tsx
-
-`useNavigation()` 暴露当前全局导航状态：
+传统组件请求常经历：
 
 ```text
-idle → submitting → loading → idle
+先渲染空页面 → Effect 发请求 → 再渲染 Loading → 最后渲染内容
 ```
 
-普通 Link 导航通常是 idle → loading → idle；提交 Action 后通常是 submitting → loading（Loader Revalidation）→ idle。
-
-Root 可以显示全局进度条，但不要在每次短导航中替换整个页面为 Spinner。保留旧 UI 并给出非阻塞反馈，能减少布局跳变，也让用户知道从哪里发起导航。
-
-`navigation.location` 是目标位置；Pending UI 可据此判断哪个 Link 或筛选正在进行。
-
-## 8. Loader 是 Route 读取边界
-
-Route 数据、查询、表单错误与 Session 的领域类型集中定义：
-
-<<< ../../../examples/frontend/react-router-data/types.ts
-
-Loader 接收 Web Standard Request 和 Route Params：
+Data Router 在提交目标页面前运行匹配 Loader。Loader 接收 Web 标准 `Request` 和 Params：
 
 ```ts
 async function loader({ request, params }: LoaderFunctionArgs) {
   const url = new URL(request.url)
-  const data = await fetchSomething(params.id, request.signal)
+  const data = await getSomething(params.id, request.signal)
   return { data }
 }
 ```
 
-本课所有 Loader/Action：
+示例的路由数据与表单错误类型：
+
+<<< ../../../examples/frontend/react-router-data/types.ts
+
+所有 Loader 与 Action：
 
 <<< ../../../examples/frontend/react-router-data/loaders-and-actions.tsx
 
-Loader 的职责：
+Loader 的职责包括：
 
-- 解析和验证 Params/Search Params。
-- 调用服务或 BFF 获取该 Route 数据。
-- 返回可序列化的页面数据。
-- 抛出 Redirect 或 Response Error。
-- 把 `request.signal` 传给底层请求。
+- 解析和验证 Params 与 Search Params；
+- 调用 Service/BFF 获取当前 Route 需要的数据；
+- 返回组件可消费的结果；
+- 必要时抛出 Redirect 或带状态码的 Response；
+- 把 `request.signal` 继续传给底层请求。
 
-不要在 Loader 中修改模块全局 Store 来“缓存”。数据模式已有导航与 Revalidation 语义；需要跨导航 Cache 时使用明确数据策略/缓存层。
+Loader 不应偷偷修改模块级 Store 来“缓存”。如果需要跨导航缓存和失效策略，应使用明确的数据缓存层或 Framework 能力。
 
-## 9. Request Signal 与取消
+### URL 参数都是运行时输入
 
-用户从课程 A 快速导航到 B，A Loader 可能仍在请求。Data Router 会在导航失效时取消对应 Request，底层 Fetch 必须接收 Signal：
+`:lessonId` 的 TypeScript 类型即使是 `string`，也不代表它存在、格式正确或当前用户有权限。示例用 `requiredParam` 处理缺失值，Service 用 `encodeURIComponent` 构造请求路径；后端仍必须校验实体存在性和授权。
 
-```ts
-await getLesson(lessonId, request.signal)
-```
-
-完整服务：
-
-<<< ../../../examples/frontend/react-router-data/lesson-service.ts
-
-Abort 能：
-
-- 减少无用网络和解析。
-- 让旧导航更快释放资源。
-- 防止被取消的 Loader 正常提交到新 Branch。
-
-但取消浏览器请求不能撤销服务器已经执行的写操作。Action 的 POST/PUT 需要幂等、版本或 Idempotency Key 保护。
-
-## 10. HTTP 错误应保留状态语义
-
-通用读取函数：
-
-<<< ../../../examples/frontend/react-router-data/http.ts
-
-它把非 2xx 转成带 Status 的 Response，让最近 Error Boundary 区分 404、401、500。错误处理不能把所有失败压成 `new Error('失败')`，否则路由层丢失 HTTP 语义。
-
-生产中还应：
-
-- 校验 JSON Schema，而不是只做 Type Assertion。
-- 区分网络错误、超时、Abort、业务校验与程序缺陷。
-- 只把安全的用户消息放入 Response。
-- 服务端日志记录 request ID 和原始 Cause，不把内部堆栈泄漏给浏览器。
-
-## 11. Search Params 是导航状态
-
-筛选解析器：
+Search Params 也一样。课程查询解析器把原始字符串收敛到领域类型：
 
 <<< ../../../examples/frontend/react-router-data/route-contracts.ts
 
-课程列表使用 GET Form：
+非法 `status` 被归一为 `all`，关键词统一 Trim。分页还应限制最小值、最大值和重复参数。页面不要到处直接读取未经处理的 `URLSearchParams`，否则同一参数会出现多套规则。
+
+### HTTP 边界既要保留状态码，也要校验 JSON
+
+通用读取函数先保留非 2xx 的 HTTP 语义：
+
+<<< ../../../examples/frontend/react-router-data/http.ts
+
+它只返回 `unknown`，因为 `response.json()` 的结果不受 TypeScript 保证。领域 Service 再验证课程字段：
+
+<<< ../../../examples/frontend/react-router-data/lesson-service.ts
+
+这样 404、401、500 可以交给 Route Error Boundary，而“服务器返回 200 但字段结构错误”会作为契约异常进入监控。直接写 `response.json() as Lesson` 不会生成运行时检查。
+
+## URL 是已应用的导航状态
+
+课程筛选使用 GET Form：
 
 <<< ../../../examples/frontend/react-router-data/LessonsLayout.tsx
 
-提交后字段进入 URL：
+提交后表单字段进入 URL：
 
 ```text
 /lessons?keyword=React&status=published
 ```
 
-收益：
+于是刷新、Back/Forward、收藏、分享链接和服务端直接访问都能得到同一查询。Router 根据新 URL 重新运行 Loader，不需要 Context 与 URL 之间的双向 Effect。
 
-- 刷新不丢筛选。
-- Back/Forward 恢复历史。
-- 链接可分享和收藏。
-- Loader/SSR 能直接根据 URL 取相同数据。
-- 不需要 Context 与 URL 双向 Effect。
+示例输入使用 `defaultValue`：用户提交前，DOM 中的字段是临时草稿；提交后，URL 才成为已经应用的筛选条件。若产品要求每次键入都更新 URL，需要额外考虑 Debounce、History Replace、中文 IME 组合输入、请求取消和光标稳定，不能只在 `onChange` 中无条件 Push 一条新历史。
 
-Search Params 是不可信字符串。缺失、重复、非法 Enum 和超大分页必须归一化。解析函数返回领域类型，页面不要到处直接读取 Raw URLSearchParams。
+## Action 是路由的写操作边界
 
-## 12. Uncontrolled GET Form 与 URL Source of Truth
-
-示例 Input 使用 `defaultValue={query.keyword}`，提交后 Router 导航到新 URL，Loader 返回新的 query。这样 DOM Form 是提交前草稿，URL 是已应用筛选。
-
-若要求每次键入实时更新 URL，可使用 `useSearchParams` 或 `useSubmit`，但要处理：
-
-- Debounce。
-- History Replace，避免每个字符一条历史。
-- IME 中文输入组合事件。
-- Pending 请求取消。
-- 焦点与光标稳定。
-
-不要同时让 Local State、Context 和 URL 都自称筛选 Source of Truth。
-
-## 13. Action 是 Route 写操作边界
-
-Action 处理非 GET Form：
+Loader 回答“进入这个 URL 需要读什么”，Action 回答“向这个 Route 提交后要改什么”。React Router 的 `<Form>` 使用浏览器表单语义触发 Action：
 
 ```text
 Form Submit
-→ Route Action
-→ Validation / Mutation
-→ Action Data or Redirect
-→ Matched Loaders Revalidate
-→ UI receives fresh server state
+  → Router 进入 submitting
+  → 匹配目标 Route Action
+  → 解析并校验 FormData
+  → 调用写服务
+  → 返回数据、Error 或 Redirect
+  → 重新验证页面上的 Loader
+  → Router 回到 idle
 ```
-
-编辑 Action：
-
-- 读取 `request.formData()`。
-- 验证标题和正文。
-- 失败返回 400 + 字段错误和值。
-- 成功 PUT 后 Redirect 到详情页。
-
-验证失败不是程序异常，不必抛 Error Boundary；它是该表单可预期 Action Data。
-
-## 14. `<Form>` 与服务端校验
 
 编辑页面：
 
 <<< ../../../examples/frontend/react-router-data/LessonEditPage.tsx
 
-`useActionData()` 读取最近一次 Action 返回的校验结果。失败后使用提交值回填，而不是退回旧 Loader Data。
+服务端校验失败时，Action 返回 400 和用户已输入值，页面显示字段错误；成功时 Redirect 到详情页。`FormData` 与 URL 一样不可信，长度、类型、枚举、实体权限都要在真正执行写操作的边界验证。
 
-服务端校验必须存在，即使浏览器有 `required`、minLength 或客户端 Schema：
+### 为什么 Action 后通常不手工 Patch 每个页面
 
-- 请求可以绕过 UI。
-- 权限和唯一性只能由服务端可靠判断。
-- 多用户并发时客户端数据可能过期。
+Action 成功后，Data Router 会重新验证当前页面的 Loader。课程发布后，详情 Loader 和列表 Loader 都可以重新读取服务器事实来源，不必在多个 Context 中手动同步标题、状态和列表缓存。
 
-字段错误用 `aria-describedby` 关联 Input；Form Error 应用 `role="alert"` 或明确焦点策略。完整无障碍表单还需 Error Summary 和提交后聚焦首个错误。
+重新验证不是无限免费的。大型应用可以使用缓存层或 `shouldRevalidate` 精确控制，但优化必须建立在明确失效规则上。过早跳过 Revalidation 很容易留下陈旧数据。
 
-## 15. Action 后为什么通常不手动更新列表
+### Navigation Form 与 Fetcher Form
 
-Data Router 在 Action 完成后 Revalidate 当前匹配 Loader，使 UI 回到服务器真实状态。无需：
+两者都会调用 Route Action，主要差异是是否发生导航：
 
-```tsx
-await updateLesson()
-setLesson(localCopy)
-navigate(...)
-refetchList()
-```
+- `<Form>` 适合保存后前往详情、登录后跳回原页面等会改变位置的操作；
+- `<fetcher.Form>` 适合原地发布、收藏、行内编辑等不改变 URL 的操作。
 
-Router 协调 Mutation、Navigation 和 Loader Freshness，减少本地 Cache 与服务器分歧。
-
-但 Revalidation 不是万能缓存策略。大页面可能有昂贵父 Loader，可用 `shouldRevalidate` 精确控制，但必须证明跳过后数据仍正确。错误地优化会显示陈旧权限或列表。
-
-## 16. Navigation Form 与 Fetcher Form
-
-### Navigation Form
-
-编辑保存成功后应跳回详情页，因此使用 `<Form method="post">`。它参与全局 `useNavigation()` 状态。
-
-### Fetcher Form
-
-发布课程应留在当前详情页，不需要 Navigation，因此使用 `fetcher.Form`：
+详情页用 Fetcher 原地发布：
 
 <<< ../../../examples/frontend/react-router-data/LessonDetailPage.tsx
 
-Fetcher 拥有独立：
+Fetcher 有自己独立的 `idle → submitting → loading → idle` 状态和返回数据，不会把整个页面伪装成正在导航。Action 完成后仍会参与 Loader Revalidation。
 
-- state：idle/submitting/loading。
-- formData。
-- data。
+## Pending UI 应对应实际等待范围
 
-它仍调用 Route Action，并在成功后触发必要 Revalidation，但不会改变 URL。适合 Inline Toggle、收藏、删除行和 Combobox 加载。
+根 Layout 可以通过 `useNavigation()` 显示全局导航反馈：
 
-不要为避免导航而在普通组件里手写 Fetch + 本地 Cache Patch；Fetcher 已提供并发和 Revalidation 协调。
+<<< ../../../examples/frontend/react-router-data/RootLayout.tsx
 
-## 17. Pending UI 要有正确粒度
+普通 Link 导航通常经历 `idle → loading → idle`；带 Action 的导航提交通常经历 `submitting → loading → idle`。页面不必每次都用全屏 Spinner 替换旧内容，保留当前 UI 并显示非阻塞进度通常更稳定。
 
-三层常见反馈：
+更局部的反馈应靠近触发点：
 
-| 粒度 | API | 示例 |
-| --- | --- | --- |
-| 全局导航 | `useNavigation()` | 顶部进度条 |
-| 当前表单导航 | navigation.formAction/formData | 保存按钮 |
-| 局部非导航操作 | `fetcher.state` | 单行发布按钮 |
+- 搜索表单显示“筛选中”；
+- 保存按钮显示“保存中”并防止重复提交；
+- Fetcher 发布按钮只禁用自己；
+- `navigation.location` 可用来识别目标 URL，而不是只看一个全局 Boolean。
 
-示例 `saving = navigation.state === 'submitting'` 在页面只有一个 Navigation Form 时足够；复杂 Root 同时观察多个表单时还应比较 `navigation.formAction`，否则可能把无关按钮标为 Saving。
+Pending State 由 Router 的真实状态派生。不要另设 `isLoading`，再尝试用 Effect 与 Router 对齐。
 
-Pending UI 应：
+## Route Error Boundary 是故障隔离层
 
-- 阻止同一不可幂等操作重复提交。
-- 保留用户已输入内容。
-- 明确局部操作，不让整个页面闪烁。
-- 超快请求避免视觉抖动，慢请求及时反馈。
-- Error 后允许安全重试。
-
-## 18. Error Boundary 是 Route Tree 的故障隔离
+Loader、Action 或 Route Render 抛出的错误，会沿匹配 Route Tree 向上寻找最近的 Error Boundary。示例在根路由提供兜底：
 
 <<< ../../../examples/frontend/react-router-data/RouteErrorBoundary.tsx
 
-Route Error Boundary 会处理：
+它区分两类错误：
 
-- Loader 抛出的 Response/Error。
-- Action 抛出的 Response/Error。
-- Route Component Render Error。
+- `isRouteErrorResponse(error)`：可预期的 HTTP 语义，如 404、401、500；
+- 普通异常：程序缺陷、错误 JSON 或意外运行时失败，应记录到监控并向用户显示安全的通用信息。
 
-错误从发生 Route 向祖先冒泡，最近有 ErrorBoundary 的 Route 接管；未受影响的祖先 Layout 可以保留。
+不要把服务器堆栈、SQL、Token 或内部错误消息直接显示在页面上。大型路由树可在课程、设置等子树放置更近的 Error Boundary，让局部失败不必摧毁整个应用外壳。
 
-建议边界层次：
+404 也有两种来源：Catch-all Route 表示 URL 根本没有匹配；Loader 抛出 404 表示 Route 结构有效，但指定实体不存在。后者应保留当前业务 Layout，给出更贴近上下文的返回路径。
 
-- Root：全应用兜底、报告未知错误。
-- 业务 Layout：保留导航，替换失败工作区。
-- 关键叶子：局部资源 404 或编辑失败。
+## 鉴权 Loader 改善导航体验，但后端才执行授权
 
-错误页本身应简单，不依赖同一失败 API。不要直接向用户显示未知 Error Stack 或服务端敏感消息。
-
-## 19. 404 有两类
-
-### URL 没有 Route 匹配
-
-Catch-all `*` 渲染 NotFoundPage。
-
-### Route 匹配，但实体不存在
-
-`/lessons/missing` 匹配详情 Route，API 返回 404，Loader 抛 Response，由 Route Error Boundary 处理。
-
-两者都应显示合适页面；SSR/Framework Mode 还应返回真实 HTTP 404。SPA 静态 Host 通常对所有前端路径先返回 index.html，其 HTTP Status 可能仍是 200，这是部署层限制，需在服务端/边缘渲染中解决 SEO 语义。
-
-## 20. 鉴权 Loader 是导航体验，不是安全边界
-
-认证服务：
+会话 Service：
 
 <<< ../../../examples/frontend/react-router-data/auth-service.ts
 
-Pathless Protected Loader 未登录时 Redirect：
+Protected Layout 读取会话：
 
 <<< ../../../examples/frontend/react-router-data/ProtectedLayout.tsx
 
-重要事实：匹配 Branch 的 Loader 可以并行执行，父 Loader 不是会先完成再允许子 Loader 的 Express Middleware。Protected Loader Redirect 时，Child Loader 可能已经发起请求。
-
-因此：
-
-- 每个后端 API 必须独立验证 Session、权限和租户。
-- 不能依赖前端父 Route 防止敏感数据返回。
-- 需要严格串行鉴权/共享上下文时，使用 Framework Middleware/BFF 或让子 Loader 调用受保护数据端点。
-- Redirect Loader 改善 UX，不是授权实现。
-
-本课 API 默认由服务器正确鉴权。即使 Child 请求并行发出，未授权服务器也不能返回课程数据。
-
-## 21. Login Redirect 与开放重定向
-
-登录前保存：
-
-```text
-/login?returnTo=/lessons/react-state
-```
-
-登录 Action 成功后回到原页面。但 returnTo 来自用户输入，若允许 `https://evil.example` 或 `//evil.example`，就形成开放重定向。
-
-`safeReturnTo()` 只接受单斜杠开头的站内路径，其余回退 `/lessons`。生产还可限制到允许的 Route 前缀。
-
-登录 Action 同样不能只相信前端：
-
-- Session Cookie 使用 HttpOnly、Secure、合适 SameSite。
-- 状态改变请求有 CSRF 防护。
-- 登录限速并防账号枚举。
-- Redirect 前重新验证目标权限。
-- URL 不放 Token、密码或敏感信息。
-
-完整登录页面：
+未登录时，`protectedLoader` 把目标 Path 和 Query 编码到登录地址，登录 Action 完成后再跳回：
 
 <<< ../../../examples/frontend/react-router-data/LoginPage.tsx
 
-## 22. Params、Query、FormData 都是不可信输入
+这里有两个必须分开的概念。
 
-类型 `params.lessonId?: string` 反映它可能缺失。`requiredParam()` 只验证存在；生产还需验证格式、长度、Canonical 和权限。
+第一，前端 Loader 的 Redirect 只是用户体验边界。攻击者可以绕过前端直接请求 API，所以 `/api/lessons`、更新和发布接口必须在服务器再次认证并授权。
 
-FormData 可能包含：
+第二，同一匹配 Branch 的 Loader 可以并行运行。不能假设父 `protectedLoader` 完成后，子 `lessonsLoader` 才开始；因此父 Loader 不是传统串行中间件。React Router v8 已提供 Middleware，可在匹配处理前后执行共享鉴权、日志和上下文逻辑，但它也不能替代后端 API 授权。项目若采用 Middleware，应按 v8 官方契约统一设计，而不是把 Loader 执行顺序当安全保证。
 
-- 缺失字段。
-- 同名多值。
-- File 而非 string。
-- 超大内容。
-- 未知 intent。
+### 登录回跳必须防止开放重定向
 
-示例对值显式 `String()` 并校验长度，只用于说明边界。严谨项目使用共享 Schema Validator，但服务端仍必须再次验证。
+隐藏字段仍可由攻击者修改。若服务器或 Action 无条件 `redirect(returnTo)`，`//evil.example`、反斜杠变体或完整外部 URL 可能把用户带到钓鱼站点。
 
-## 23. 相对导航由 Route 层级决定
+示例用 URL Parser 解析并验证同源，只返回规范化的 Path、Query 和 Hash；否则退回 `/lessons`。更严格的产品可以改成允许路由白名单。
 
-详情中的：
+### CSRF、越权与重复写入
 
-```tsx
-<Link to="edit">编辑</Link>
-```
+Cookie 会话下的写操作必须考虑 SameSite Cookie、Origin 检查和 CSRF Token 等服务端防护。React Router 新版本能提供额外请求来源保护，但应用仍需根据部署和认证方式建立服务端策略。
 
-从 `/lessons/:lessonId` 进入 `edit` 子路径。
+禁用按钮只改善交互，不能保证写操作只发生一次。发布、购买等操作还要使用版本条件、唯一约束或 Idempotency Key。所有 `lessonId` 权限检查也必须在后端针对当前用户执行。
 
-编辑页：
+## 导航取消与竞态
 
-```tsx
-<Link to=".." relative="path">取消</Link>
-```
+用户从课程 A 快速切到 B 时，A Loader 可能仍在请求。Router 会让失效导航的 `request.signal` Abort，Service 必须把该 Signal 传给 Fetch。
 
-明确按 URL Path 返回详情。React Router 还支持按 Route Hierarchy 解析相对导航，Layout Route 不一定增加 Path。复杂嵌套中要测试目标，不要只凭文件目录猜 `..`。
+Abort 能减少无用网络与解析，并阻止失效 Loader 正常提交到新分支。登录 Action 的 Catch 也要让取消继续抛出，不能把它误报为“邮箱或密码错误”。
 
-优先使用 Link/NavLink/Form；只有倒计时、外部系统回调等命令式场景才使用 `useNavigate()`。普通点击用 navigate 会失去原生链接语义，如新标签页、复制地址和可访问性。
+但取消客户端请求不能撤销服务器已经执行的 PUT/POST。写操作的并发正确性仍需要：
 
-## 24. `location.state` 不是持久状态
+- 乐观锁或版本号；
+- 幂等键与服务端去重；
+- 清晰的冲突响应；
+- 必要时在 UI 中提示数据已被他人修改。
 
-Navigation 可携带内存 `state`，适合：
+Router 负责导航竞态，不等于服务器事务系统。
 
-- 从哪个列表进入详情。
-- 非关键过渡提示。
-- Back 时恢复短暂 UI 上下文。
+## 相对导航跟随 Route 层级
 
-它不适合：
+`<Link to="edit">` 从当前详情 Route 进入编辑子路径；`<Link to=".." relative="path">` 按 URL Path 返回上一段。相对链接能让父路径重构更容易，但要明确是按 Route 层级还是按 Path Segment 解析，Splat 和 Pathless Layout 中尤其需要测试。
 
-- 刷新后必须存在的数据。
-- 可分享筛选。
-- 权限凭据。
-- 服务端渲染所需信息。
+普通跳转优先使用 Link/NavLink，因为它保留新标签页、复制链接、键盘访问和浏览器语义。`useNavigate` 适合非链接式流程，例如计时结束或完成命令后跳转，不要把所有 `<a>` 都改成 Button + Navigate。
 
-可分享、可刷新状态放 URL；实体从 Loader 获取；秘密留在安全 Session。
+`location.state` 只存在当前 History Entry，刷新、直接访问和分享链接都不可靠。它适合返回焦点位置、背景页面等短期导航上下文，不适合权限、订单或必须恢复的业务状态。
 
-## 25. 并发与竞态管理
+## Data Mode 与 Framework Mode 的边界
 
-Data Router 模拟浏览器文档导航语义：新导航会取消过时 Loader，旧 Revalidation 结果不会随意覆盖更新结果。Fetcher 也有自己的并发协调。
+Data Mode 很适合已有 Vite SPA：应用自行决定打包、API、部署和类型策略，同时获得 Loader/Action 数据生命周期。
 
-但客户端 Router 无法消除服务器竞态：
+当需求增长到以下范围，应认真评估 Framework Mode：
 
-- 两个 POST 都可能到达服务器。
-- Abort 到达时数据库已经提交。
-- 不同 Tab/设备可同时编辑。
-- 最后写入可能覆盖他人更新。
+- SSR、预渲染与流式响应；
+- Route Module 类型生成；
+- 自动路由级代码分割；
+- Server Loader/Action 与部署适配；
+- Middleware、Headers、Meta 和数据序列化的统一约定。
 
-服务端需要：
+手写 Data Router 示例能解释机制，却不应成为重复实现框架基础设施的理由。无论选择哪种模式，URL 状态、输入验证、取消、错误边界和服务器授权原则都不变。
 
-- Idempotency Key。
-- 乐观锁/版本字段/ETag If-Match。
-- 事务与唯一约束。
-- 权限在写入时重新检查。
+## 如何验证路由行为
 
-前端在 409 Conflict 后应显示冲突恢复，而不是静默覆盖。
+Loader 与 Action 可以先作为函数测试：
 
-## 26. Router Data 与客户端 Cache
+- 使用带 URL、FormData 和 AbortSignal 的真实 `Request`；
+- 验证非法 Params、Query 和 FormData；
+- 验证 400/401/404、Redirect 与成功数据；
+- Abort 后底层 Service 收到同一个 Signal；
+- `returnTo` 拒绝外部 URL 与编码变体。
 
-React Router 管理的是 Navigation Data 生命周期，不必再把 Loader Data 复制到 Context。文档状态解释中，很多所谓客户端状态可以直接使用：
+集成测试使用 Memory Router 或官方 Route Stub，覆盖：
 
-- Loader Data 代替组件 Fetch Cache。
-- Action + Revalidation 代替手工同步服务器状态。
-- URL Search Params 代替筛选 Context。
-- Fetcher 代替局部 Mutation 状态机。
+1. 初始 URL 匹配正确 Layout 和 Loader；
+2. Link 导航期间出现恰当 Pending UI；
+3. GET Form 更新 URL 并重新加载列表；
+4. 编辑校验错误保留输入；
+5. Fetcher 发布不改变 URL，完成后数据重新验证；
+6. 未登录导航到 Login，成功后安全回跳；
+7. 子 Route 错误被最近边界接住；
+8. 快速导航会取消旧 Loader。
 
-仍需专用数据 Cache 的场景：
+可访问性测试还应确认当前 NavLink 状态、表单 Label、字段错误关联、焦点恢复和导航完成后的页面标题。不要只断言内部 Hook 返回值。
 
-- 同一数据跨不相关 Route 长期缓存。
-- 复杂 Background Refresh/Stale Time。
-- Offline、乐观更新和规范化实体。
-- WebSocket Push 与多源合并。
+## 完整示例与验证边界
 
-可以集成数据缓存，但必须定义 Router Loader 与 Cache 谁负责 Fetch、Invalidation、Error 和 SSR，避免双重请求。
-
-## 27. 类型安全的现实边界
-
-Data Mode 可以使用：
-
-```tsx
-useLoaderData<typeof lessonLoader>()
-useActionData<typeof editLessonAction>()
-useFetcher<typeof lessonAction>()
-```
-
-它让返回类型随函数推断，但 Params 名、Route ID 和跨 Route 数据仍可能依赖人工契约。
-
-Framework Mode 的 Route Module 类型生成能根据 Route 配置产生更完整类型。在大型项目中，优先采用当前版本官方类型方案，不要维护一套手写 Params Interface 却与 Path 漂移。
-
-网络 JSON 仍是 `unknown` 边界。Router 类型不会验证服务器响应。
-
-## 28. Code Splitting 与 Lazy Route
-
-大型应用不应在入口同步导入所有 Route Component。Data Router 支持 Lazy Route 定义；Framework Mode 可提供自动代码分割。
-
-拆分原则：
-
-- 以 Route Branch 为主要 Chunk 边界。
-- Loader/Component/Error Boundary 的加载时序一起评估。
-- 关键首屏避免过碎瀑布。
-- 预加载来自真实导航意图。
-- Chunk Load Failure 有刷新/版本恢复策略。
-
-教学示例静态导入是为了在一个页面展示完整关系，不代表生产 Bundle 策略。
-
-## 29. 导航阻止不是数据安全保证
-
-未保存草稿可用 Blocker/Prompt 提醒，但：
-
-- 浏览器关闭还要 `beforeunload`。
-- Mobile 进程被杀无法保证弹窗。
-- 自动保存要处理版本和离线。
-- 阻止导航不能替代服务器草稿。
-
-只在用户确实会丢不可恢复输入时阻止。过度弹窗会伤害 Back/Forward 体验。更好的方案可能是本地/服务端自动草稿和冲突恢复。
-
-## 30. SSR 与 Framework Mode
-
-Data Router 提供 `createStaticHandler`、`createStaticRouter`、`StaticRouterProvider` 等底层 SSR API，但完整生产 SSR 还需：
-
-- 请求级 Router/Context。
-- Loader/Action Server 执行边界。
-- Status、Redirect、Header 和 Cookie。
-- Loader Data 安全序列化与 Hydration。
-- Client/Server Build 和资源 Manifest。
-- Streaming/Error/Abort。
-
-这些与 Vue SSR 课程中的边界相同。React Router Framework Mode 已集成 Route Module、Rendering Strategy 和部署能力；除非已有成熟服务器平台，不要轻率手写全部基础设施。
-
-## 31. 测试 Loader 与 Action
-
-Loader/Action 接收标准 Request，服务边界可注入或 Mock Server：
-
-- 合法/非法 Params。
-- Search Params 默认值和非法 Enum。
-- 401 Redirect 与 returnTo 编码。
-- API 404 抛 Route Response。
-- Request Abort 传到底层 Fetch。
-- Form 400 返回字段错误和值。
-- 成功 Action Redirect。
-- 未知 intent 返回 400。
-
-尽量直接测试解析器和服务纯边界，再用 Router 集成测试验证接线。
-
-## 32. Router 集成测试
-
-使用 `createMemoryRouter(routes, { initialEntries })` 或当前版本的 Route Testing 工具：
-
-- 初始深层 URL 渲染正确嵌套 Layout。
-- Loader 完成前显示 Pending。
-- 点击 NavLink 更新 URL 和 Outlet。
-- GET Form 写入 Search Params。
-- Action Validation 回填输入。
-- Fetcher 发布不改变 URL。
-- Action 成功后 Loader Revalidate。
-- Error 在最近边界展示且祖先 Layout 保留。
-- Back/Forward 恢复 URL 状态。
-
-不要在单元测试复用 Browser Router；Memory Router 使历史和初始位置可控。E2E 还需验证服务器对深层 URL 的 Fallback/SSR Status。
-
-## 33. 可访问性与导航体验
-
-SPA 导航不会自动等同浏览器完整文档导航。检查：
-
-- 页面标题和 Head 随 Route 更新。
-- 导航后焦点进入合理标题/主区域。
-- Pending 使用 `role="status"`，Error 使用合适 Alert。
-- NavLink 的 Active 状态不仅依赖颜色。
-- Back/Forward 和 Scroll Restoration。
-- Form Error 与字段关联。
-- Loading 不移除当前可读内容。
-- Redirect 不形成焦点丢失或循环。
-
-Framework 提供部分 Head/Scroll 能力时优先使用官方通道；Data Mode 需要项目明确实现。
-
-## 34. 常见失败模式
-
-### 每个页面 `useEffect` Fetch
-
-产生 Loading Flash、竞态、瀑布和重复 Cache。首屏 Route Data 放 Loader。
-
-### Loader Data 再复制进 Context
-
-两份 Source of Truth，Revalidation 后 Context 仍旧。直接消费 Loader Data或建立明确 Cache 集成。
-
-### 父 Loader 当鉴权 Middleware
-
-Loader 并行，Child 请求已发出。后端逐请求授权。
-
-### 所有跳转都 `useNavigate`
-
-失去 Link/Form 原生语义。用户点击优先声明式导航。
-
-### 用本地 Boolean 管 Pending
-
-Redirect/Error 时容易忘记复位。使用 Navigation/Fetcher 状态。
-
-### Action 成功后手工 Patch 所有页面
-
-易与服务器分歧。让 Revalidation 恢复真实数据，性能问题再精确优化。
-
-### returnTo 不校验
-
-形成开放重定向。只允许站内安全路径。
-
-### 只在前端 Route 做权限
-
-攻击者直接调用 API。授权必须在服务器。
-
-## 35. 完整示例结构
+示例目录包含 15 个文件，前文的源码引用已覆盖全部实现：
 
 ```text
 examples/frontend/react-router-data/
@@ -677,63 +349,24 @@ examples/frontend/react-router-data/
 └── types.ts
 ```
 
-前文已通过源码引用展示全部 15 个文件，没有省略 Router 接线、Action 或错误处理实现。
+仓库当前没有 React Router、React 类型与测试运行时，本专题也不修改根 `package.json`。因此纯 TypeScript 文件接受仓库严格检查，TSX 接受源码、类型契约与引用审查；不会把未执行的 Router 集成测试描述为已通过。
 
-示例不包含 React Router 依赖配置；本专题不得修改根 `package.json`，当前工作树也未安装 React Router 8 类型和运行时。因此验证包括纯 TypeScript 严格检查和 TSX 语法检查，不会声称执行了完整 Router 类型构建或浏览器运行。
+## 本节小结
 
-## 36. 生产检查清单
+数据路由把一次页面切换组织成可解释的管线：Route Tree 确定页面身份与边界，Loader 读取进入页面所需的数据，Form 调用 Action 执行写操作，Router 暴露真实 Pending 状态，并在写入后重新验证 Loader。错误、Redirect 和取消都沿同一条管线处理。
 
-### 路由结构
+URL 是可持久、可分享的导航状态；HTTP 与 FormData 是不可信输入；前端鉴权只改善体验，服务器授权、CSRF、幂等和并发控制仍不可省略。Data Mode 展示这些底层契约，Framework Mode 则在此基础上提供服务端和工程化约定。
 
-- Route Tree 与 UI/Layout 生命周期一致。
-- Index、Pathless Layout、Dynamic 和 404 语义明确。
-- Router 实例稳定，测试实例隔离。
-- Route Chunk 和错误边界合理分层。
+下一课进入 [React 表单架构、Action 与复杂交互](./form-architecture-actions-and-complex-interactions.md)，进一步讨论字段状态、客户端与服务端校验、可访问性、异步提交和复杂表单所有权。
 
-### 数据
-
-- 首屏 Route Data 由 Loader 获取并传递 Request Signal。
-- Search/Params/FormData 全部解析和验证。
-- Loader Data 没有冗余复制进 Context。
-- Action 后 Revalidation 与缓存策略一致。
-
-### 交互
-
-- Navigation 与 Fetcher 使用正确场景。
-- Pending 粒度、重复提交和 Error Recovery 已设计。
-- URL 状态支持 Refresh、Share、Back/Forward。
-- Focus、Title、Scroll 和 ARIA 已验证。
-
-### 安全
-
-- 后端逐 API 鉴权和授权。
-- returnTo 防开放重定向。
-- 写操作有 CSRF、幂等/并发保护。
-- Error 不泄漏堆栈、Token 和内部数据。
-
-### 运行
-
-- 深层 URL 在 Host/SSR 可直接访问。
-- 404/Redirect/Status 在服务端语义正确。
-- Loader/Action/Fetcher 竞态与 Abort 已测试。
-- 版本、导入包和官方模式文档与 Lockfile 一致。
-
-## 37. 进一步阅读
+## 延伸阅读
 
 - [React Router：Picking a Mode](https://reactrouter.com/start/modes)
-- [React Router：Data Mode Routing](https://reactrouter.com/start/data/routing)
-- [React Router：Data Loading](https://reactrouter.com/start/data/data-loading)
+- [React Router：Data Mode](https://reactrouter.com/start/data/installation)
+- [React Router：Route Object](https://reactrouter.com/start/data/route-object)
 - [React Router：Actions](https://reactrouter.com/start/data/actions)
-- [React Router：Pending UI](https://reactrouter.com/start/data/pending-ui)
-- [React Router：Navigating](https://reactrouter.com/start/data/navigating)
-- [React Router：Error Boundaries](https://reactrouter.com/how-to/error-boundary)
-- [React Router：Network Concurrency Management](https://reactrouter.com/explanation/concurrency)
-- [React Router：State Management](https://reactrouter.com/explanation/state-management)
-
-## 38. 本节小结
-
-Data Router 把 Route 当作应用协调边界：URL 匹配决定组件 Branch，Loader 读取进入页面所需数据，Action 处理 Form 写操作，Navigation/Fetcher 提供 Pending 状态，Error Boundary 隔离失败，Revalidation 让 UI 回到服务器事实。
-
-它不会替代服务器安全、事务、幂等和缓存设计。父 Loader 不是串行 Middleware，Abort 不能撤销已提交写操作，前端 Params 类型也不能验证外部输入。把 Router 的导航职责和后端的数据职责分清，才能得到可分享、可刷新、可取消、可测试的 React 应用。
-
-下一课将进入 React 表单与复杂交互状态，进一步讨论受控/非受控字段、原生 FormData、服务器 Action、异步校验、可访问错误、乐观更新和防重复提交。
+- [React Router：Pending UI](https://reactrouter.com/start/framework/pending-ui)
+- [React Router：Middleware](https://reactrouter.com/how-to/middleware)
+- [React Router：Security](https://reactrouter.com/how-to/security)
+- [React Router：Testing](https://reactrouter.com/start/data/testing)
+- [React Router：Changelog](https://reactrouter.com/start/start/changelog)
