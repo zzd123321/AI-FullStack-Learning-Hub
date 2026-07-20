@@ -29,6 +29,7 @@ description: 从数学与机器学习基础走向 Transformer 和大语言模型
 - [标量、向量、矩阵与张量](/ai/math/scalars-vectors-matrices-tensors)
 - [线性组合、线性变换、基与矩阵乘法](/ai/math/linear-combinations-transformations-and-basis)
 - [向量长度、距离、正交与余弦相似度](/ai/math/norms-distances-orthogonality-and-cosine-similarity)
+- [特征值、特征向量与主成分分析](/ai/math/eigenvalues-eigenvectors-and-pca)
 
 先建立完整地图，再逐层补充数学、数据处理和模型实现。数学模块只选择理解机器学习所必需的内容，并始终联系真实数据和模型计算。
 
