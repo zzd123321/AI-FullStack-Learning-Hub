@@ -1,320 +1,469 @@
 ---
 title: 前端多租户、权限系统与企业级管理后台架构
-description: 系统掌握租户上下文、RBAC 与 ABAC、权限投影、缓存隔离、路由菜单、批量操作、支持会话、审计与企业后台治理
+description: 从可信租户上下文出发，理解租户隔离、RBAC/ABAC/ReBAC、权限投影、缓存与实时边界、批量命令、支持会话、审计和租户生命周期
+outline: deep
 ---
 
 # 前端多租户、权限系统与企业级管理后台架构
 
-企业后台最危险的错误通常不是按钮样式，而是“在 A 租户看到了 B 租户的数据”“撤权后旧页面还能操作”“全选只选中了当前页”“客服冒充用户却没有清晰审计”。随着租户、角色、团队、地区、套餐和资源状态组合增长，散落的 `role === 'admin'` 会迅速失控。
+管理员先打开 Acme 租户的成员列表，立即切到 Beta。Acme 的慢请求在切换完成后返回，如果页面只把结果写进同一个 `members` Store，Beta 页面就会短暂显示 Acme 的员工邮箱。
 
-本课从可信租户上下文出发，解释访问控制如何投影到前端体验，怎样隔离查询缓存和本地状态，如何设计大表格、批量命令、角色管理、支持会话及审计。核心原则始终是：前端可以预测和解释权限，服务端必须对每个动作和资源作最终决策。
+这不是一个普通的“请求竞态”问题，而是租户隔离失败。即使后端 API 从未越权，错误的前端缓存键、旧 WebSocket 订阅、共享 IndexedDB 或迟到响应仍可能把数据展示给错误的用户上下文。
+
+因此，多租户后台不能只在导航栏增加一个租户下拉框。**经过验证的 subject、tenant、policy version 和当前 generation 必须贯穿路由、请求、缓存、消息、批量任务与审计。** 本课从这条上下文链路出发，再逐步加入权限模型、管理表格、支持人员代操作和租户生命周期。
 
 ## 学习目标
 
-- 区分组织、租户、工作区、成员关系、角色、权限和策略；
-- 建立来自认证会话的可信租户上下文；
-- 理解 RBAC、permission、ABAC、ReBAC 与职责分离；
-- 设计可版本化的前端 authorization view；
-- 隔离路由、缓存、存储、实时连接和后台任务；
-- 正确处理菜单、路由守卫、字段级和资源级权限；
-- 设计大数据表格、全量选择、批量命令与乐观并发；
-- 管理邀请、角色变更、租户切换、支持冒充和高风险操作；
-- 建立可访问性、测试、观测、审计与租户生命周期治理。
+完成本课后，你应该能够：
 
-## 一、先建立领域词汇
+- 区分 Subject、Tenant、Membership、Role、Permission、Policy 与 Entitlement；
+- 解释为什么 URL/Header 中的 tenant ID 只是目标声明，不是可信身份；
+- 理解共享表、Schema/Database per Tenant 和 RLS 各自的隔离边界；
+- 组合 RBAC、ABAC、ReBAC 与职责分离表达资源级授权；
+- 设计经过运行时校验、带版本的前端 Authorization View；
+- 隔离 Query Cache、本地存储、实时连接和迟到响应；
+- 正确实现租户切换、菜单、路由、字段和行级能力；
+- 设计“全选全部匹配结果”、异步批量命令和并发控制；
+- 管理邀请、角色委派、平台管理员与支持会话；
+- 用自动化攻击测试、审计和租户生命周期证明隔离有效。
 
-```text
-Subject：发起动作的用户、服务账号或支持人员
-Tenant：数据、策略、配额和审计的隔离边界
-Membership：subject 与 tenant 的关系及其状态
-Role：便于管理的一组权限，可能带层级和约束
-Permission：对某类资源执行某动作的能力
-Resource：被读取或修改的具体对象
-Policy：综合主体、资源、动作、环境后作出决策的规则
-Entitlement：套餐或合同授予租户的产品能力
+## 从一条请求认识租户边界
+
+假设 Alice 访问：
+
+```http
+DELETE /api/tenants/acme/members/user-42
 ```
 
-“企业版可使用审计导出”是 entitlement；“Alice 能导出 Acme 的审计日志”还需要 membership、permission、资源范围和风险条件。产品开关、套餐能力和人员授权不能混为一个 boolean。
+服务端不能因为路径写着 `acme` 就相信请求属于 Acme。完整决策至少需要：
 
-## 二、多租户首先是隔离问题
+```text
+已认证 Subject：Alice 是谁？会话是否仍有效？
+        ↓
+Membership：Alice 当前是否是 Acme 的 active member？
+        ↓
+Permission：她是否拥有 member:remove？
+        ↓
+Resource Scope：user-42 是否确实属于 Acme 和她可管理的团队？
+        ↓
+Business Constraint：能否删除自己、最后一个 Owner 或受保护成员？
+        ↓
+最新 Policy / Environment：策略版本、风险、再认证是否满足？
+```
 
-多租户共享应用和基础设施，但数据所有权、密钥、配额、策略与生命周期必须按租户隔离。威胁包括跨租户 IDOR、错误缓存键、共享文件路径、队列消息缺少 tenant ID、管理员绕过和 noisy neighbor。
+任何一步不满足都应该默认拒绝。前端可以提前预测结果、解释原因，但服务端必须在每个请求上使用可信属性重新决策。
 
-前端不是主要隔离层，却很容易造成泄漏：上一租户的查询响应晚到、localStorage key 共用、Service Worker 缓存忽略租户、WebSocket 切换后仍收旧消息、错误上报附带另一租户数据。
+### 先统一领域词汇
 
-因此 tenant context 必须成为请求、缓存、状态、日志和实时订阅的显式输入，而不是页面顶部一个下拉框的隐含全局变量。
+| 概念 | 含义 | 示例 |
+| --- | --- | --- |
+| Subject | 发起动作的身份 | 用户、服务账号、支持人员 |
+| Tenant | 数据、策略、配额与生命周期隔离边界 | Acme 公司 |
+| Membership | Subject 与 Tenant 的关系及状态 | Alice 是 Acme Active Member |
+| Role | 便于运营分配的一组权限 | Billing Admin |
+| Permission | 对资源类型执行业务动作的能力 | `invoice:approve` |
+| Policy | 综合主体、资源、动作与环境的决策规则 | 只能审批自己部门之外的发票 |
+| Entitlement | 套餐或合同给予 Tenant 的产品能力 | 企业版可以导出审计日志 |
 
-## 三、URL 中的 tenantId 只是请求
+“Acme 购买了审计导出”只说明 Entitlement；“Alice 可以导出 Acme 审计”还需要 Active Membership、具体 Permission、资源范围和可能的 recent authentication。套餐开关与人员授权不能合并成一个 `canExport` 布尔值。
 
-`/t/acme/members` 中的 `acme` 可被任何用户改写。可信流程是：认证服务返回用户的有效 memberships，前端用路由值选择其中一个，服务端每次请求仍从已验证身份重新确认成员关系。
+### 路由中的 tenant ID 只是用户请求
+
+`/t/acme/members`、`X-Tenant-ID: acme` 或 `acme.example.com` 都能被客户端构造。可信流程是：认证 Session 返回或服务端查询当前有效 Membership，路由 ID 只用于从中选择目标；API 仍在每次请求中验证 Membership 与资源归属。
 
 <<< ../../../examples/frontend/multi-tenant-admin-architecture/tenant-context.ts
 
-示例拒绝未知和 suspended membership。真正的 API 不能因为前端发送 `X-Tenant-ID: acme` 就相信它；header/path 只声明目标租户，服务端从 session/token 与成员数据库派生并校验上下文。
+示例先运行时校验 `/session` 中的 Subject、Membership、状态和策略版本，拒绝重复/畸形租户，再只解析 Active Membership。Suspended 租户不会因为用户还保留旧页面就重新变成可访问。
 
-如果使用 tenant-specific hostname，同样要校验 host 与 membership。自定义域名还涉及域名所有权验证、证书、cookie Domain、缓存和 phishing 边界。
+Token 内的 Membership Claim 也可能陈旧。高风险请求应查询或使用能及时撤销的最新服务端事实，而不是把登录时的长期 JWT 当永久成员关系。
 
-## 四、租户上下文应包含什么
+## 多租户隔离必须覆盖每一层
 
-前端最小上下文通常包含：tenant ID、显示名、当前 subject、membership 状态、policy version、entitlement version 和必要 locale/timezone。不要把整个组织对象、所有角色规则或敏感配置放进全局 store。
+多租户的数据库拓扑通常有三类：
 
-服务端日志和 trace 始终记录已验证 tenant ID 与 subject ID。异步任务、Webhook、导出文件和对象存储路径同样显式携带租户，消费者不能依赖进程级“当前租户”。
+- 共享数据库、共享表，以 `tenant_id` 分区；
+- 共享数据库、Schema per Tenant；
+- Database per Tenant；
+- 大型系统还会按风险、地区或规模采用混合模式。
 
-## 五、RBAC 为什么有用，又为什么不够
+独立数据库能缩小某些误查询和运维爆炸半径，却不自动修复错误路由、共享缓存或平台管理员越权；共享表也不必然不安全，但必须把 Tenant Scope 强制带入每次读写。
 
-RBAC 把权限分配给相对稳定的角色，再把用户分配到角色，降低逐用户 ACL 的管理成本。典型关系是：
+### Tenant Scope 不是可选筛选条件
 
-```text
-User ─ membership → Tenant
-User ─ assigned → Role ─ contains → Permission(operation, resource type)
+危险查询：
+
+```sql
+SELECT * FROM documents WHERE id = :document_id;
 ```
 
-角色层级、静态/动态职责分离可以表达“管理员继承查看权限”“申请人与审批人不能是同一人”。但 `manager` 是否只能管理自己团队、是否能删除自己、资源是否已锁定，都需要属性或关系判断。
+更安全的基本形态：
 
-不要让前端业务代码认识几十个角色名。组件依赖稳定 permission，如 `member:remove`；角色如何组合权限由服务端策略系统管理。
+```sql
+SELECT * FROM documents
+WHERE tenant_id = :verified_tenant_id
+  AND id = :document_id;
+```
 
-## 六、ABAC 与 ReBAC 补充资源范围
+Repository/API 应从已经验证的请求上下文获得 Tenant，而不是让每个调用者随手传一个可选参数。资源使用随机 ID 可以降低枚举，但不能替代对象级授权。
 
-NIST 对 ABAC 的定义包含 subject、object、operation 和 environment attributes。一个决策可以考虑：用户部门、资源 tenant/team/owner、请求动作、时间、风险、设备 assurance。
+同一维度还要进入：
 
-ReBAC 更适合“项目成员”“文档所有者”“直属经理”等关系。工程中常用 RBAC 给出粗粒度 permission，再用 ABAC/ReBAC 收紧具体资源范围，而不是强行二选一。
+- Redis/CDN/Service Worker Cache Key；
+- 对象存储 Path、下载签名和加密密钥；
+- 搜索索引与向量集合；
+- 队列消息、定时任务、Webhook 和导出文件；
+- 日志、Trace、配额和 Rate Limit；
+- SSE/WebSocket Subscription。
 
-策略输入必须来自可信来源。浏览器传来的 `ownerId`、`isInternal` 或 `risk=low` 只能作为资源定位线索，服务端需要重新读取并计算。
+一个遗漏点就可能成为跨租户数据通道。OWASP 的多租户指南同样强调从已认证会话派生上下文、资源查询同时包含 tenant ID，并隔离 Cache、Storage 和异步任务。
 
-## 七、前端权限投影
+### Row-Level Security 是纵深防御
 
-前端不需要下载完整策略引擎。服务端可返回面向当前 tenant 的 authorization view：permission 集、可管理团队/项目范围、字段能力、policy version，以及必要的拒绝提示代码。
+PostgreSQL RLS 等数据层策略可以让即使应用遗漏过滤条件，普通数据库角色也只看到允许行。启用 RLS 且没有适用策略时，PostgreSQL 使用默认拒绝；`USING` 约束可见旧行，`WITH CHECK` 约束新写入行。
+
+但 RLS 不是“一开就结束”：Superuser、`BYPASSRLS` 角色和通常情况下的表 Owner 可以绕过；Owner 需要时使用 `FORCE ROW LEVEL SECURITY`。策略组合、Security Definer、View、外键/唯一约束和并发子查询也可能产生意外行为。生产连接角色、Migration/Backup 路径和策略回归测试都必须审计。
+
+应用层资源授权与数据层 RLS 应互相补强，而不是把所有业务决策塞进一条难以验证的 SQL Policy。
+
+### Noisy Neighbor 也是隔离失败
+
+一个 Tenant 的全量导出、复杂搜索或错误重试如果耗尽线程、内存和队列，会影响其他 Tenant 的可用性。按 Tenant 设计并发、配额、Job 队列和成本观测；高风险 Tenant 可以使用独立资源池或加密密钥。
+
+## 权限模型从角色开始，但不能停在角色
+
+### RBAC 解决“怎样方便地分配”
+
+RBAC 把 Permission 放进 Role，再把 Subject 的 Membership 关联 Role。业务组件依赖稳定动作，例如 `member:remove`，而不是散落：
+
+```vue
+<!-- 角色名称渗入页面后，策略一变就到处漂移 -->
+<button v-if="user.role === 'admin' || user.role === 'owner'">删除</button>
+```
+
+Role 是管理工具，不应该成为每个页面的业务协议。角色层级还要防循环和意外继承；“能否委派”与“自己拥有”也不是同一权限。
+
+### ABAC/ReBAC 说明“对哪一个资源”
+
+拥有 `member:remove` 不代表可以删除所有成员。NIST 对 ABAC 的定义包含 Subject、Object、Operation 和可选 Environment Attribute：部门、资源 Tenant/Owner/Status、时间、设备 Assurance 或风险都可以参与决策。
+
+ReBAC 更适合“项目成员”“文档所有者”“直属经理”等关系。常见组合是：
+
+```text
+RBAC：Alice 拥有 member:remove
+ABAC：目标成员属于 Alice 可管理的 team
+ReBAC：Alice 与目标项目存在 manager 关系
+业务约束：不能删除自己或最后一个 owner
+```
+
+这些属性必须来自服务端可信资源。浏览器提交的 `ownerId`、`teamId` 或 `risk=low` 只是定位/输入，不能直接成为授权事实。
+
+### 职责分离限制权限组合
+
+财务、发布和高风险审批常要求申请人与审批人不同，或同一人不能同时拥有创建供应商和付款权限。静态职责分离限制角色组合，动态职责分离限制一次流程中的实际参与者。
+
+服务端在 Role 保存、成员赋权和业务动作时都要检查，不能只靠角色编辑器隐藏 Checkbox。高风险 Role 变更可以要求双人审批、recent authentication、MFA 和生效延迟。
+
+## 前端拿到的是权限投影，不是策略引擎
+
+浏览器通常不需要下载完整策略。服务端可以返回当前 Tenant 的有限 Authorization View：Permission 集、必要资源范围、Policy Version 和稳定 Reason Code。
 
 <<< ../../../examples/frontend/multi-tenant-admin-architecture/authorization.ts
 
-示例先验证 tenant，再验证 permission、资源范围和 self-action。顺序让错误不意外泄露另一租户资源是否存在。它只能预测 UI：请求到达服务端后必须用最新成员、资源和策略重新决策。
+示例把 JSON Array 校验后转成 Set，绑定预期 Tenant，并限制未知 Permission 和 Team 数量。`canRemoveMember()` 先检查 Tenant，再检查 Permission、Scope 与 Self Action，避免后续错误理由泄露另一租户资源的属性。
 
-permission 命名以业务动作而非页面为中心，例如 `invoice:approve`，不要叫 `showApproveButton`。同一个 permission 在 Web、移动端、API 和审计中才能保持一致语义。
+这仍只是 UI 预测。服务端必须使用最新 Subject、Membership、资源和 Policy 重复决策。Authorization View 的用途是：
 
-## 八、策略版本与撤权传播
+- 决定菜单是否显示或说明升级；
+- 决定字段只读、按钮禁用与原因文案；
+- 避免用户发出必然失败的操作；
+- 让 403 后刷新能力投影并恢复界面。
 
-权限不是登录时永不变化的 claim。成员被 suspended、角色被移除、策略发布、租户切换或合同到期后，旧 authorization view 会陈旧。
+### Deny by Default 与每请求检查
 
-服务端响应携带 `policyVersion`，变更后通过 session refresh、SSE/WebSocket 提示或短期重新验证传播。403 表示当前请求不允许，前端刷新权限投影并解释状态；不要把所有 403 都当成登出。
+新页面、新 API 或未识别动作不应因为“没有匹配拒绝规则”而通过。默认拒绝，只有明确 Policy 允许才执行。OWASP 授权指南强调每个请求、具体对象都要检查，因为攻击者只需要找到一个遗漏入口。
 
-高风险写请求可携带 `expectedPolicyVersion`，服务端发现版本落后时拒绝并要求刷新。无论是否携带版本，服务端都用最新策略授权。
+GraphQL Resolver、批量 API、导出、文件下载和后台 Job 都是入口。只在路由 Middleware 检查 `role=admin`，而不检查具体对象，并不能防止 BOLA/IDOR。
 
-## 九、菜单生成不是权限系统
+### Policy Version 处理撤权和变化
 
-导航配置可以声明所需 permission/entitlement，再根据 authorization view 过滤。这样能减少无意义入口，但隐藏菜单不保护路由或 API。
+权限不是登录后永不改变的 Claim。Membership Suspended、Role 被移除、策略发布或合同到期后，旧页面会陈旧。
 
-路由进入顺序通常是：确认 session → 解析可信 tenant → 加载 entitlement/authorization → 决定渲染、403 或 tenant not found。`unknown` 期间显示稳定骨架，避免先展示敏感页面再闪退。
+Authorization View 带 `policyVersion`。变更可以通过短期重新获取、SSE/WebSocket 失效提示或 Session Refresh 传播。写请求可携带 `expectedPolicyVersion`：版本落后时服务端拒绝并要求刷新，但无论客户端传什么，服务端都使用最新 Policy 授权。
 
-对用户可能通过升级获得的能力，显示带说明的 disabled/upgrade 入口；对安全敏感或根本不可见的资源，完全隐藏。产品语义应明确，不能统一“没权限就隐藏”。
+401 表示认证失效；403 表示当前身份有效但动作不允许。403 不应该无限跳登录，而应刷新 View、清理已不可访问的数据并显示稳定原因。
 
-## 十、组件、字段与动作权限
+## 让 Tenant Scope 贯穿前端运行时
 
-页面级权限太粗。详情页可能允许 read、不允许 edit；表单可能只允许改 title，不能改 owner；表格每行可用动作还受资源状态影响。
+### Query 与 Storage Key 至少包含 Subject 和 Tenant
 
-建立统一 `Decision`/`Capability` 接口，返回 allowed 与稳定 reason code。按钮 tooltip、空状态和错误页将 reason 转为用户文案，但不显示内部策略表达式。
-
-不要在模板中散落复杂表达式：
-
-```vue
-<!-- 难以测试、语义漂移 -->
-<button v-if="user.role === 'admin' || user.id === row.ownerId">删除</button>
-```
-
-改为领域函数或 composable：`memberCapabilities(row).canRemove`。这仍只是 UI 预测。
-
-## 十一、缓存键必须包含安全上下文
-
-只用 `['members']` 作为 query key，切换租户后可能直接展示旧缓存。缓存至少按 subject、tenant、policy version 和资源参数分区。
+`['members']` 会让 Tenant 切换直接命中旧 Cache。敏感 Query Key 通常包含 Subject、Tenant、Policy/Entitlement Version、当前 Generation 和查询参数：
 
 <<< ../../../examples/frontend/multi-tenant-admin-architecture/query-keys.ts
 
-是否包含 policy version 取决于数据敏感度和缓存策略：包含会自然失效，不包含则在撤权时必须可靠清除。账号切换还要包含 subject ID，防共享设备上不同用户复用缓存。
+Generation 让“切到 Beta 再切回 Acme”也不会自动接受第一次 Acme 会话的在途响应。是否保留旧的安全 Cache 是产品取舍，但任何复用都必须重新验证 Subject、Membership 和 Policy。
 
-HTTP/CDN cache 的 key、`Vary`、私有响应和 Service Worker 也要审计。带认证的租户数据通常不能进入公共缓存；仅在前端 query key 加 tenant 并不能修复 CDN 混租户。
+本地 UI 偏好也包含 Subject/Tenant，避免共享设备账号切换后复用。成员、财务和审计数据不应默认长期放 localStorage；需要离线时，IndexedDB/Cache Storage 使用独立 Namespace、设备策略、清理与撤销生命周期。
 
-## 十二、本地存储与离线数据隔离
+前端 Query Key 不能修复 CDN 混租户。HTTP Cache 的 `private`、`Vary`、Cache Key 和 Service Worker Handler 也必须逐层验证，带认证的租户数据不能误入公共缓存。
 
-列宽、筛选器等偏好可以按 tenant key 存储，但成员列表、财务数据和导出内容不应默认长期放 localStorage。IndexedDB/离线缓存需要 subject + tenant namespace、加密/设备策略和清理生命周期。
+### 租户切换是一笔边界事务
 
-租户 offboarding、退出登录、账号切换和管理员远程撤销后，必须清除敏感缓存。客户端清理是降低暴露窗口；真正的数据撤销仍依靠服务端拒绝访问和密钥/下载链接失效。
+只改 `currentTenantId` 会留下旧请求、Store、WebSocket 和缓存。正确顺序是：
 
-## 十三、切换租户是一次边界切换
-
-不能只更新 `currentTenantId` 后继续使用旧组件树。切换前先用 membership 解析出可信 `TenantContext`；随后取消请求、关闭实时连接、清敏感缓存、重置 store，再进入新租户路由。
+1. 先让旧 Generation 失效；
+2. Abort 旧请求并关闭实时订阅；
+3. 清理敏感 Cache，失败时不要进入新 Tenant；
+4. 重置领域 Store；
+5. 激活新 Tenant Scope 并导航；
+6. 每个响应/消息应用前再次核对 Subject、Tenant 与 Generation。
 
 <<< ../../../examples/frontend/multi-tenant-admin-architecture/tenant-switch.ts
 
-每个响应应用前仍检查其 tenant/epoch，避免取消前已经完成的旧响应落入新界面。WebSocket 消息包含 tenant 与 subscription generation，旧 generation 一律丢弃。
+Abort 只能尽力取消。旧响应可能已经完成，所以 `TenantScopeCoordinator.accepts()` 才是最后的写入门。新导航失败时示例再次 Invalidate，避免留下“URL 在旧页面、全局 Scope 却是新租户”的混合状态。
 
-如果用户有未保存表单，先明确提示；不能在提示等待期间提前切换部分全局状态，形成混合租户页面。
+如果存在未保存表单，应在真正切换任何全局状态之前询问用户。一旦用户确认，再按完整事务切换，不能在对话框等待期间先更新一半 Scope。
 
-## 十四、大表格是查询产品，不是数组渲染
+### 实时消息同样要带 Scope 与 Version
 
-企业成员、订单和审计表通常需要服务端分页、排序、筛选与搜索。URL 保存可分享的非敏感查询状态，API 返回 items、稳定 cursor/total（可得时）和 query version。
+WebSocket/SSE 在服务端按已认证 Subject 和 Tenant 建立 Subscription。消息只发送资源 ID、Version 和安全摘要；客户端检查 Tenant、Subscription Generation 和资源 Version 后使 Query 失效或应用快照。
 
-排序必须有稳定 tie-breaker；offset 分页在数据变化时可能跳项，cursor 更适合持续列表。虚拟滚动只减少 DOM，不减少服务端数据、网络或授权成本。
+收到 `role.updated` 不能让浏览器自行合成更高权限，只能重新拉取 Authorization View。页面从后台或 bfcache 恢复时也重新确认 Scope。
 
-表头、排序状态、行选择和键盘导航必须可访问。不要为了“像 Excel”实现不符合 ARIA grid 交互的半成品；普通 table + 分页往往更可靠。
+## 企业表格的难点是集合语义
 
-## 十五、“全选”到底选择了什么
+成员、账单、审计通常由服务端搜索、筛选、排序与 Cursor Pagination。虚拟滚动只减少 DOM 节点，不会减少网络、数据库和授权成本。
 
-当前页全选、已加载项全选、全部匹配筛选条件是三种不同语义。对于百万行结果，不能把所有 ID 拉到浏览器。
+稳定查询需要：明确 Filter Schema、确定排序 Tie-Breaker、Cursor/Query Version、URL 中可分享但不敏感的查询状态，以及服务器返回的总数语义。Offset 在数据持续变化时可能重复/漏项，Cursor 更适合稳定翻页。
+
+### “全选”至少有三种含义
+
+- 当前页 50 条；
+- 当前浏览器已经加载的 300 条；
+- 当前筛选条件匹配的全部 12,430 条。
+
+第三种不能把所有 ID 拉到浏览器。服务端签发短期 Query Token，绑定 Subject、Tenant、Filter、Sort、Query Version 和过期时间；前端只保存 Token 与少量排除 ID。
 
 <<< ../../../examples/frontend/multi-tenant-admin-architecture/bulk-selection.ts
 
-`all-matching` 使用服务端签发、短期且绑定 tenant/subject/filter/sort/query version 的 query token，再记录排除项。确认对话显示“将影响 12,430 个匹配成员”，不是“已选 50 行”。
+示例限制显式 ID/排除数量，校验 Count 和 Token，并生成稳定排序的 JSON Command。服务端仍要验证 Token 签名/存储、期限、当前 Membership、Policy Version，以及每个对象是否仍可操作。
 
-服务端执行时重新授权每个对象或使用等价安全集合策略，并定义数据变化语义：基于创建 token 时的快照，还是执行时重新匹配。这个选择必须展示和审计。
+确认文案必须说“将影响 12,430 个匹配成员”，而不是“已选 50 行”。还要说明集合是创建 Token 时的快照，还是执行时重新匹配；两种都合理，但结果和审计完全不同。
 
-## 十六、批量操作是异步命令
+### 大批量写入应该创建 Job
 
-大批量禁用、导出或迁移不应保持一个 HTTP 请求到结束。前端提交带 operation ID、tenant、policy version 和 selection 的命令；服务端创建 job，返回进度资源。
+禁用上万成员、导出或迁移不要保持一个 HTTP 请求直到完成。前端用 Operation ID、Tenant、Expected Policy Version 和 Selection 创建 Job，服务端返回：
 
-job 状态至少有 queued/running/succeeded/partially_failed/failed/cancel_requested/canceled。逐项结果以安全下载或分页错误报告提供。取消通常是“停止尚未开始的项目”，不能承诺回滚已完成操作。
+```text
+queued → running → succeeded
+                   ↘ partially_failed / failed
+running → cancel_requested → canceled
+```
 
-命令幂等、并发限制和 tenant quota 在服务端实现。前端禁用按钮只能改善体验。
+取消一般表示停止未开始项，不能承诺回滚已经完成的动作。逐项失败通过分页或有权限、短期的下载报告提供。Job 创建和消费者都要幂等，Tenant 有并发/资源配额。
 
-## 十七、乐观更新与并发控制
+### 并发编辑需要 Version/ETag
 
-管理后台的角色、配置和成员状态会被多人同时修改。资源响应携带 version/ETag，写请求使用 `If-Match` 或 expectedVersion；冲突返回 409/412，展示差异并让用户决定刷新或重做。
+多人同时编辑 Role、成员或配置时，响应携带 Version/ETag，写请求使用 `If-Match` 或 Expected Version。409/412 表示冲突，应展示变化并让用户刷新/重做，不能 Last Write Wins 静默覆盖。
 
-权限、账单、删除等高风险修改不适合无提示 optimistic success。即使做乐观 UI，也要保留回滚快照，并在服务端拒绝后明确恢复。列表局部更新不能假设该行仍符合当前筛选条件。
+字段 Disabled 也不等于字段级授权。服务端使用明确 Command DTO，只接收允许字段，并对每个字段执行最新策略，防止 Mass Assignment。动态表单 Schema 只引用 Allowlist 组件和规则，不能把后端字符串当 Vue/React/HTML 执行。
 
-## 十八、表单与 schema 演进
+## 成员、角色和平台权限都有生命周期
 
-企业表单常受 tenant 配置、entitlement 和 permission 影响。服务端提供字段 capability 与约束，前端 schema 负责渲染和基础校验；最终业务校验仍在服务端。
+### 邀请不只是一个可转发链接
 
-不要把不可编辑字段从提交 body 静默带回旧值，否则 mass assignment 风险会被隐藏。服务端采用明确 command DTO 和字段级授权，拒绝未允许字段。
+邀请绑定 Tenant、目标身份、预期 Role、邀请人、期限与一次性 Token。接受时验证当前登录身份是否符合邀请目标；否则转发链接可能让错误账号加入。
 
-动态 schema 要有版本、组件 allowlist 和安全渲染器，不能把服务端字符串当任意 Vue/React/HTML 执行。
+Membership 可以是 invited、active、suspended、removed。移除后撤销相关 Session/API Key、停止后台任务并使权限投影失效。重新邀请不能意外恢复旧高权限和私有关系。
 
-## 十九、邀请与成员生命周期
+“最后一个 Owner”“唯一 Billing Admin”等约束必须用服务端事务保证。两个管理员同时删除对方时，前端按钮禁用无法保护不变量。
 
-邀请应绑定 tenant、目标标识、预期角色、邀请人、过期时间和一次性 token。接受时验证当前登录身份与邀请目标规则，避免转发链接让错误账号获得成员关系。
+### Role Editor 展示影响，不替代服务端约束
 
-状态可能是 invited/active/suspended/removed。移除成员后撤销 session/API key、停止后台任务并刷新权限；重新邀请不能意外恢复旧高权限和私有资源关系。
+角色页面应显示 Permission 的业务含义、风险等级、继承来源、冲突和影响人数。保存前展示 Diff，例如“新增 `billing:write`，影响 28 名成员”，比完整 JSON 更适合审核。
 
-最后一个 owner、唯一账单管理员等约束必须由服务端事务保证，不能只禁用前端按钮。
+服务端检查未知 Permission、循环继承、职责分离、越权委派和最后 Owner。管理员不能因为自己拥有某能力，就默认有权把它授予任何人。
 
-## 二十、角色管理与职责分离
+### 平台控制面不是一个超级 Tenant Role
 
-角色编辑器展示 permission 的业务含义、风险等级、继承来源和影响人数。保存前服务端检测循环继承、未知 permission、越权授予和职责冲突。
+平台运维与租户管理员属于不同控制面。平台入口应使用更强认证、短期授权、明确工单/理由和严格审计，不把 `platform_admin` 混入普通 Tenant Role。
 
-管理员不能授予自己并不拥有或无权委派的能力。高风险角色变更可要求双人审批、recent authentication、MFA 和生效延迟。
+即使平台人员也不默认拥有全租户搜索。Break-glass 访问要限定 Tenant、资源范围和时间，要求审批/告警，并在结束后撤销。
 
-权限 diff 比完整 JSON 更适合确认与审计：“新增 billing:write，影响 28 人”。
+## 支持人员代操作必须保留两个身份
 
-## 二十一、平台管理员与租户管理员
+错误做法是把 Session 中 `userId` 替换为客户 ID。这样审计只看到“客户修改了设置”，真实 Support Actor 消失，也很难限制哪些动作是代操作允许的。
 
-平台运维权限不能隐式混入普通 tenant role。平台控制面和租户数据面应有显式边界、独立入口、强认证、短期授权和更严格审计。
+正确上下文同时保留：
 
-即使平台管理员，也不要默认允许无过滤跨租户查询。break-glass 操作记录事件、理由、审批、时限和访问范围，并触发告警。
-
-## 二十二、支持冒充不是替换 userId
-
-客服“以用户身份查看”必须同时保留真实 support actor 与 represented subject，所有请求和审计记录两者。会话短期、带原因、默认只读、可随时退出，并在页面持续显示醒目横幅。
+```text
+actor = support_17
+represented_subject = customer_42
+tenant = acme
+support_session = support_session_9
+reason = ticket-123
+expires_at = ...
+allowed_actions = [...]
+```
 
 <<< ../../../examples/frontend/multi-tenant-admin-architecture/support-session.ts
 
-支付、密钥、MFA、个人隐私导出等动作通常禁止冒充执行，或需要单独升级审批。后端执行限制，不能只靠横幅和 disabled button。
+示例对服务端返回的支持会话运行时校验，页面持续显示真实 Actor 和被代表用户。Action 使用明确 Allowlist；退款、Secret、MFA Reset、删除 Tenant 等能力即使 Support Session 请求了也在 UI 投影中永久阻止。
 
-## 二十三、危险操作的交互
+前端仍不是最终控制：服务端每次请求验证 Support Session 未过期、Tenant/Represented Subject 匹配、Action 已委派，并记录双身份。默认只读，升级到受控操作需要额外审批；用户可以看见或在政策允许时获知访问记录。
 
-删除租户、轮换密钥、大规模撤权等操作需要准确对象名、影响范围、不可逆说明和 recent authentication。输入名称确认不是安全控制，只是防误触；真正控制是授权、双人审批、幂等和审计。
+## 高风险操作和租户生命周期需要可追溯状态
 
-删除应进入服务端生命周期：scheduled → grace period → deleting → deleted/retained。前端不能因一个 200 立即宣称所有备份和外部副本已清除。
+删除 Tenant、轮换 Secret、大规模撤权和权限提升都需要：准确对象名、影响范围、不可逆说明、recent authentication、权限/职责检查、Operation ID 和审计。输入租户名只是防误触，不是安全授权。
 
-## 二十四、实时事件与通知
+### 删除不是一个瞬间
 
-成员变化、job 进度和权限撤销可通过 SSE/WebSocket 推送。连接在服务端认证 tenant 和 subject，每条 subscription 明确 scope；客户端收到事件后按 tenant、generation 和 version 验证，再使查询失效。
+Tenant Offboarding 可以是：
 
-事件 payload 只含资源 ID、版本和安全摘要，详细数据重新查询。客户端不能因为收到 `role.updated` 就自行合成新的高权限。
+```text
+active → suspended → deletion_scheduled → deleting → deleted
+                         ↘ canceled during grace period
+```
 
-## 二十五、错误语义与信息泄漏
+服务端定义导出窗口、写入冻结、Session/Key 撤销、Job/Integration 停止、数据保留、备份和法务 Hold。前端展示服务端状态，不能一个 200 后就声称所有副本已经物理删除。
 
-- 401：身份失效；
-- 403：身份有效但策略拒绝，刷新 authorization view；
-- 404：资源不存在，或为防枚举统一隐藏跨租户资源；
-- 409/412：版本或业务冲突；
-- 429：主体/租户配额限制；
-- 423/自定义状态：租户 suspended/locked；
-- 202：异步命令已接受，不代表完成。
+Onboarding 同样是可重试 Workflow：创建默认策略、首位 Owner、密钥、配额、区域、域名和集成。Provisioning 未完成时不要进入半配置控制台。
 
-前端不应通过不同 loading 时间、错误文案或按钮数量泄露其他租户存在性、成员邮箱或内部风控策略。
+区域迁移、数据 Residency 和 Tenant 合并是独立高风险 Job，需要 Freeze/Dual-write 策略、校验、回滚边界和持续审计。
 
-## 二十六、测试策略
+### 审计回答的不只是“修改成功”
 
-纯逻辑首先覆盖租户选择、权限范围、缓存键和批量语义：
+一条有用的审计事件至少回答：
 
-<<< ../../../examples/frontend/multi-tenant-admin-architecture/admin-logic.test.mts
+- 真实 Actor 和 Represented Subject；
+- Tenant、资源类型/ID 与 Action；
+- 时间、Session/Support Session、Correlation ID；
+- Before/After Diff 或安全摘要；
+- Policy Version、Decision 与 Reason Code；
+- Operation/Job ID 和最终结果。
 
-还应覆盖：
+审计存储要防篡改、限制读取、遵守保留/隐私规则。普通应用日志不能替代审计；日志也不要保存另一租户的敏感资源内容。
 
-- 修改 URL/header/resource ID 不能跨租户；
-- suspended/removed membership 立即拒绝；
-- permission 有但资源 scope 不匹配；
-- 撤权、policy version 更新和活动页面收敛；
-- 租户/账号切换时请求、缓存、IndexedDB、WebSocket 隔离；
-- CDN/Service Worker/query cache 不混租户；
-- 全选当前页与 all-matching 的文案和执行集合；
-- 批量 job 部分失败、取消、重试和幂等；
-- ETag 冲突、字段级授权和 mass assignment；
-- 最后 owner、职责分离和越权授予；
-- 支持冒充的只读、过期、退出与审计；
-- 键盘、读屏、缩放和大数据量性能。
+## 用攻击路径验证隔离，而不是只测正常页面
 
-安全测试在服务端直接构造恶意请求，不能只跑浏览器 E2E。每个 API 自动验证 tenant isolation 和资源级授权。
+### 可运行示例
 
-## 二十七、可观测性与审计
+<<< ../../../examples/frontend/multi-tenant-admin-architecture/admin-runtime.test.ts
 
-日志和 trace 使用已验证的 `subjectId/tenantId/representedSubjectId/policyVersion/resource/action/decision/reasonCode/correlationId`。拒绝事件和跨租户尝试进入安全指标，但日志避免保存敏感资源内容。
+示例验证了：
 
-审计事件回答：谁（真实 actor）在何时、哪个租户、以何种会话/冒充方式、对什么对象、执行什么动作、前后差异、策略版本、结果和关联请求。审计存储防篡改、按权限访问，并遵守保留与隐私规则。
+- `/session` Membership 和 Authorization View 先做运行时校验；
+- Unknown/Suspended Tenant 与重复 Membership 失败关闭；
+- 授权先检查 Tenant，再判断 Permission 和 Team Scope；
+- Query/Storage Key 同时隔离 Subject、Tenant、Policy/Entitlement 和 Generation；
+- 租户切换后旧 Generation 的响应被拒绝；
+- All-matching Selection 校验 Count、Token 和命令上下文；
+- 支持会话保留真实 Actor，高风险 Action 始终阻止且过期失败关闭。
 
-指标按 tenant 分解但控制 cardinality：403 激增、跨租户拒绝、撤权传播延迟、job backlog、邀请滥用、支持会话、缓存隔离异常和 noisy neighbor。
+### 服务端安全测试直接修改每个边界
 
-## 二十八、租户生命周期
+浏览器 E2E 只能证明 UI 没有暴露入口，不能证明 API 安全。自动化测试应该以 Tenant A 用户身份：
 
-onboarding 创建默认策略、密钥、配额、区域、域名与首位 owner，步骤必须可重试并可补偿。provisioning 未完成前不能进入半配置控制台。
+- 修改 URL、Header、GraphQL ID 和嵌套 Resource ID 指向 Tenant B；
+- 对 List、Detail、Create、Update、Delete、Export、File Download 分别测试；
+- 操作 Suspended/Removed Membership 和刚撤权的 Session；
+- 使用同名 Cache Key、对象存储路径和 Search Filter 尝试串租户；
+- 伪造/过期 Query Token、Expected Policy Version 和 Job ID；
+- 测试 RLS 的普通角色、Owner、Security Definer/View 和 Backup 路径；
+- 在 Tenant 切换、bfcache、WebSocket 重连和迟到响应中检查 UI；
+- 尝试越权委派、删除最后 Owner、绕过职责分离和 Support Allowlist。
 
-offboarding 包括冻结写入、导出窗口、撤销凭证、停止 job/integration、数据删除/保留、备份策略和审计证明。前端显示服务端生命周期，不自己推导“已删除”。
+每个新 API 都要有对象级授权测试。安全回归不能依赖开发者记得给某个 Controller 手工补测试，最好由契约/资源矩阵自动生成基础用例。
 
-租户合并、区域迁移和数据 residency 是独立高风险流程，需要版本化 job、双写/冻结策略、校验与回滚边界。
+### 可访问性与大数据量一起验收
 
-## 二十九、常见失败模式
+企业表格优先使用语义化 Table + 分页。只有确实需要二维单元格编辑时才实现 ARIA Grid，并完整支持键盘导航、焦点和选择语义。虚拟化列表还要处理读屏顺序、焦点移出窗口和动态行高。
 
-1. 信任 URL/header 的 tenant ID；2. 查询只按 resource ID 不按 tenant；3. 用角色名散落控制按钮；4. 隐藏菜单等于授权；5. policy 只在登录时加载；6. query key 不含 subject/tenant；7. 切租户只改一个变量；8. WebSocket 继续接收旧租户事件；9. all matching 实际只处理当前页；10. 批量任务用长 HTTP 请求；11. 前端字段禁用代替字段授权；12. 平台管理员默认跨租户全读；13. 冒充覆盖真实 actor；14. 审计只记“修改成功”不记差异；15. 删除租户立即宣称物理清除。
+Permission Denied、部分失败、批量进度和租户切换都有文本状态。全选文案明确作用集合；Dangerous Action 不只靠颜色；Support Banner 持续可见且可聚焦。
 
-## 三十、渐进落地路线
+性能测试按 Tenant 数据分布覆盖查询、Cursor、虚拟化和 Job，而不是把十万行 JSON 拉到浏览器后测渲染。
 
-先建立可信 membership/tenant context、服务端资源级授权和统一 permission；再让路由、菜单、组件使用 authorization view，并隔离 query/storage/realtime；随后建设 policy version、批量 job、并发控制、角色与邀请生命周期；最后完善支持会话、职责分离、审计、租户生命周期和自动化隔离测试。
+### 观测隔离与撤权速度
 
-## 三十一、上线检查清单
+日志和 Trace 使用**已验证**的 `subjectId/tenantId/representedSubjectId/policyVersion/resource/action/decision/reasonCode/correlationId`。不要从用户 Header 原样复制 Tenant 字段后就标成可信标签。
 
-- [ ] tenant context 来自认证 membership，URL/header 仅声明目标；
-- [ ] 每个 API、查询、缓存、文件、消息和 job 都显式绑定 tenant；
-- [ ] 服务端对每个资源与动作最终授权，前端仅预测体验；
-- [ ] 业务代码依赖 permission/capability，而非散落角色名；
-- [ ] RBAC 与资源属性/关系约束组合，输入来自可信来源；
-- [ ] authorization view 有 policy version，撤权能及时传播；
-- [ ] 401、403、404、409/412、429 和 suspended 语义分离；
-- [ ] query/cache/storage key 包含必要 subject 与 tenant 维度；
-- [ ] 切换租户会取消请求、关闭实时连接、清缓存和重置 store；
-- [ ] 响应和实时事件验证 tenant、generation 与 version；
-- [ ] all-matching 有服务端 query token、准确计数和集合语义；
-- [ ] 大批量操作使用幂等异步 job，并报告部分失败；
-- [ ] 写操作有 expectedVersion/ETag，冲突不会静默覆盖；
-- [ ] 字段级 command DTO 与授权防止 mass assignment；
-- [ ] 邀请、最后 owner、角色委派和职责分离由服务端保证；
-- [ ] 平台管理、break-glass 和支持冒充有独立短期权限与审计；
-- [ ] 高风险操作有 recent auth、确认、审批和幂等；
-- [ ] 多租户恶意请求、缓存串租户和撤权竞态进入自动化测试；
-- [ ] 审计保留真实 actor、represented subject、差异与策略版本；
-- [ ] onboarding/offboarding、数据保留和删除有可恢复服务端流程。
+监控跨租户拒绝、403 激增、撤权传播延迟、Support Session、Break-glass、Job Backlog、Cache Scope Mismatch、Noisy Neighbor 和 Offboarding 停滞。Tenant ID 高基数需要采样/聚合策略，但安全事件仍能关联到具体租户。
+
+### 常见错误为什么会发生
+
+#### 把 tenant ID 当作授权证据
+
+路径和 Header 只说明客户端想访问谁。服务端必须把目标与已验证 Membership、资源 Tenant 同时匹配。
+
+#### 隐藏菜单就认为 API 安全
+
+用户能直接构造请求。Menu、Route、Button 都只是体验投影，服务端每请求默认拒绝并明确授权。
+
+#### 切换 Tenant 只更新一个 Store 字段
+
+旧 Cache、Request 和 WebSocket 仍在运行。必须 Invalidate Generation、Teardown 旧 Scope，再激活新上下文。
+
+#### Query Key 只有 tenant ID
+
+共享设备账号切换、撤权和重新进入时仍可能复用旧数据。Subject、Policy/Generation 与查询参数同样重要。
+
+#### “全选”实际只操作当前页
+
+用户认为处理全部筛选结果，服务端只收到 50 个 ID。使用绑定查询的 Token，并明确快照/执行时集合语义。
+
+#### 支持冒充直接覆盖 userId
+
+真实 Actor 消失，权限边界和审计都失真。请求上下文必须同时保留 Actor 与 Represented Subject。
+
+#### RLS 开启后停止应用层授权
+
+RLS 可能被 Owner/特权角色绕过，也不适合表达所有业务 Action。它是数据层纵深防御，不是唯一策略层。
+
+### 渐进落地路线
+
+先建立经过验证的 Session/Membership 和请求级 Tenant Context，让 Repository 查询、Cache、Storage、Queue 和日志都显式绑定 Tenant，并补上对象级授权测试。
+
+随后统一 Permission/Authorization View，加入 Policy Version，让 Menu、Route、字段和行 Action 使用同一 Capability API。前端实现 Subject/Tenant/Generation Query Key 与完整租户切换事务。
+
+再建设 Cursor Query、All-matching Token、异步 Bulk Job、ETag/Expected Version、邀请与 Role Lifecycle。最后加入职责分离、Platform Control Plane、Support Session、Break-glass、租户生命周期和持续隔离/灾难演练。
+
+### 上线检查清单
+
+- [ ] Tenant Context 来自已认证 Membership，URL/Header 只声明目标；
+- [ ] 新资源和未知动作默认拒绝，每个 API 对具体对象授权；
+- [ ] 查询使用 `tenant_id + resource_id` 或等价强制 Scope；
+- [ ] Cache、Storage、Search、File、Queue、Job、Webhook 和日志都带 Tenant；
+- [ ] RLS/Schema/Database 隔离的 Owner、Bypass、Backup 和策略组合已测试；
+- [ ] RBAC 管理 Permission，ABAC/ReBAC/业务约束收紧资源范围；
+- [ ] Entitlement 与人员授权分开，职责分离由服务端保证；
+- [ ] Authorization View 运行时校验、带 Policy Version 且能及时撤权；
+- [ ] Menu/Route/Button 只作体验预测，不替代服务端授权；
+- [ ] Query Key 包含必要 Subject、Tenant、Policy/Entitlement/Generation 和参数；
+- [ ] 租户切换先 Invalidate，再取消请求、关闭实时、清 Cache 和重置 Store；
+- [ ] 每个响应/实时消息验证 Subject、Tenant、Generation 与 Version；
+- [ ] All-matching 使用短期绑定 Query Token，并准确说明集合语义；
+- [ ] 大批量操作使用幂等 Job，支持部分失败、取消和结果报告；
+- [ ] 写操作使用 ETag/Expected Version，字段 Command 明确且逐字段授权；
+- [ ] 邀请、最后 Owner、Role 委派和职责分离有事务约束；
+- [ ] Platform Admin、Break-glass 与 Support Session 是独立短期控制面；
+- [ ] 支持会话始终保留 Actor/Represented Subject，并默认限制高风险动作；
+- [ ] 审计包含双身份、Tenant、Diff、Policy、Decision、Operation 和结果；
+- [ ] Onboarding/Offboarding、保留/删除、配额和 Noisy Neighbor 有恢复流程；
+- [ ] 跨租户恶意请求、Cache 污染、撤权竞态和 RLS Bypass 持续自动测试。
 
 ## 总结
 
-企业后台的可靠性来自显式边界：认证成员关系产生可信租户上下文，RBAC 管理稳定权限，ABAC/ReBAC 收紧具体资源，policy version 处理变化，subject + tenant 贯穿缓存与实时连接，批量命令和并发版本保护大规模修改。前端让能力可发现、拒绝可解释、操作可恢复；真正的租户隔离和授权始终由服务端、数据层与审计共同保证。
+多租户后台的核心不是更复杂的菜单，而是一条不会丢失的安全上下文：
+
+- Subject 通过 Active Membership 进入 Tenant，客户端 tenant ID 只负责选择目标；
+- Tenant Scope 贯穿数据库、Cache、Storage、Queue、文件、实时连接与日志；
+- RBAC 便于分配，ABAC/ReBAC 与业务约束决定具体资源，默认拒绝；
+- Authorization View 帮助 UI 预测，Policy Version 和服务端每请求检查处理变化；
+- Subject + Tenant + Generation 隔离 Cache 与迟到响应，切换租户是一笔边界事务；
+- Query Token 表达全部匹配集合，Bulk Job 和 Version 保护大规模并发修改；
+- Platform/Support 控制面保留真实 Actor、短期范围和完整审计；
+- 自动攻击测试、RLS 纵深防御和租户生命周期共同证明隔离，而不是依赖页面看起来正确。
+
+下一节：[前端复杂表单、审批工作流与低代码配置架构](./frontend-complex-forms-approval-workflow-and-low-code-architecture.md)，会把本课的字段权限、并发版本、职责分离和异步命令继续应用到动态表单、审批状态与配置化渲染。
 
 ## 参考资料
 
@@ -322,6 +471,7 @@ offboarding 包括冻结写入、导出窗口、撤销凭证、停止 job/integr
 - [NIST SP 800-162：Guide to Attribute Based Access Control](https://csrc.nist.gov/pubs/sp/800/162/upd2/final)
 - [OWASP：Multi-Tenant Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Multi_Tenant_Security_Cheat_Sheet.html)
 - [OWASP：Authorization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html)
+- [OWASP：Insecure Direct Object Reference Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Insecure_Direct_Object_Reference_Prevention_Cheat_Sheet.html)
 - [PostgreSQL：Row Security Policies](https://www.postgresql.org/docs/current/ddl-rowsecurity.html)
-- [MDN：HTTP conditional requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Conditional_requests)
+- [MDN：HTTP Conditional Requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Conditional_requests)
 - [WAI-ARIA APG：Grid Pattern](https://www.w3.org/WAI/ARIA/apg/patterns/grid/)
