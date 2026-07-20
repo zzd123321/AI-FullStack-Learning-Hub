@@ -9,5 +9,7 @@ assert.equal(await detectKind(new Blob(['plain text'])), 'unknown');
 
 assert.equal(isRetryableUploadError(Object.assign(new Error('busy'), { status: 503 })), true);
 assert.equal(isRetryableUploadError(Object.assign(new Error('forbidden'), { status: 403 })), false);
+assert.equal(isRetryableUploadError(new TypeError('network failed')), true);
+assert.equal(isRetryableUploadError(new Error('invalid protocol response')), false);
 assert.equal(backoffDelay(2, 500, () => 0.5), 1000);
 console.log('file detection and retry examples passed');

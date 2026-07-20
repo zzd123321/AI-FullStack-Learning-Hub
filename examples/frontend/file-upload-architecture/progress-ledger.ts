@@ -20,6 +20,7 @@ export class ProgressLedger {
   }
 
   update(partNumber: number, loadedBytes: number): number {
+    if (!Number.isFinite(loadedBytes)) throw new RangeError('Invalid loaded byte count');
     if (!this.#completed.has(partNumber)) {
       const size = this.#sizes.get(partNumber);
       if (size === undefined) throw new RangeError('Unknown part');

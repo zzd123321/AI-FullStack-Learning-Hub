@@ -4,7 +4,7 @@ export interface FilePolicy {
   readonly allowedKinds: ReadonlySet<DetectedKind>;
 }
 
-export type DetectedKind = 'jpeg' | 'png' | 'pdf' | 'zip' | 'mp4' | 'unknown';
+export type DetectedKind = 'jpeg' | 'png' | 'pdf' | 'zip' | 'iso-bmff' | 'unknown';
 
 const startsWith = (bytes: Uint8Array, signature: readonly number[]) =>
   signature.every((value, index) => bytes[index] === value);
@@ -15,7 +15,9 @@ export async function detectKind(file: Blob): Promise<DetectedKind> {
   if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'png';
   if (startsWith(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d])) return 'pdf';
   if (startsWith(bytes, [0x50, 0x4b, 0x03, 0x04])) return 'zip';
-  if (bytes.length >= 12 && new TextDecoder().decode(bytes.slice(4, 8)) === 'ftyp') return 'mp4';
+  // `ftyp` identifies the ISO Base Media family, not MP4 specifically. HEIF,
+  // QuickTime and other formats can share this box structure.
+  if (bytes.length >= 12 && new TextDecoder().decode(bytes.slice(4, 8)) === 'ftyp') return 'iso-bmff';
   return 'unknown';
 }
 

@@ -64,11 +64,20 @@ export async function uploadMultipart(
   const concurrency = options.concurrency ?? 3;
   const maxRetries = options.maxRetries ?? 3;
   if (!Number.isInteger(concurrency) || concurrency < 1) throw new RangeError('Invalid concurrency');
+  if (!Number.isSafeInteger(maxRetries) || maxRetries < 0) throw new RangeError('Invalid retry budget');
+  options.signal.throwIfAborted();
   const session = await api.createUpload(file);
   const parts = planParts(file.size, session.partSize);
   const expectedPartNumbers = new Set(parts.map((part) => part.partNumber));
-  if (session.completedParts.some((part) => !expectedPartNumbers.has(part.partNumber))) {
-    throw new Error('Server returned an invalid completed part');
+  const returnedPartNumbers = session.completedParts.map((part) => part.partNumber);
+  if (
+    session.uploadId === '' || session.assetId === ''
+    || new Set(returnedPartNumbers).size !== returnedPartNumbers.length
+    || session.completedParts.some((part) => (
+      !expectedPartNumbers.has(part.partNumber) || typeof part.etag !== 'string' || part.etag === ''
+    ))
+  ) {
+    throw new Error('Server returned an invalid upload session');
   }
   const completed = new Map(session.completedParts.map((part) => [part.partNumber, part]));
   const ledger = new ProgressLedger(parts, new Set(completed.keys()));
@@ -94,6 +103,7 @@ export async function uploadMultipart(
           options.onProgress(ledger.complete(part.partNumber), file.size);
           return;
         } catch (error) {
+          if (options.signal.aborted) throw options.signal.reason;
           if (attempt >= maxRetries || !isRetryableUploadError(error)) throw error;
           await wait(backoffDelay(attempt), options.signal);
         }

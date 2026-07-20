@@ -16,6 +16,7 @@ assert.equal(ledger.update(2, 3), 7);
 ledger.beginAttempt(2);
 assert.equal(ledger.total, 4);
 assert.equal(ledger.complete(2), 8);
+assert.throws(() => ledger.update(3, Number.NaN), /Invalid loaded/);
 
 let state = reduceUpload(initialUploadState, { type: 'select', totalBytes: 11 });
 state = reduceUpload(state, { type: 'validated' });
@@ -27,6 +28,8 @@ state = reduceUpload(state, { type: 'parts-uploaded' });
 state = reduceUpload(state, { type: 'asset-processing' });
 state = reduceUpload(state, { type: 'asset-ready' });
 assert.equal(state.phase, 'completed');
+const afterLateCancel = reduceUpload(state, { type: 'cancel' });
+assert.equal(afterLateCancel, state);
 
 assert.equal(weakFileFingerprint({ name: 'a.bin', size: 11, lastModified: 1 }), '["a.bin",11,1]');
 console.log('file upload logic examples passed');

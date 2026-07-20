@@ -19,18 +19,25 @@ export const initialUploadState: UploadState = {
 };
 
 export function reduceUpload(state: UploadState, action: UploadAction): UploadState {
-  if (action.type === 'select') return {
-    ...initialUploadState, phase: 'validating', totalBytes: action.totalBytes,
-  };
-  if (action.type === 'fail') return { ...state, phase: 'failed', error: action.message };
-  if (action.type === 'cancel') return { ...state, phase: 'cancelled' };
+  if (action.type === 'select') {
+    if (!Number.isSafeInteger(action.totalBytes) || action.totalBytes < 0) return state;
+    return {
+      ...initialUploadState, phase: 'validating', totalBytes: action.totalBytes,
+    };
+  }
+  if (['completed', 'failed', 'cancelled'].includes(state.phase)) return state;
+  if (action.type === 'fail') return state.phase === 'idle'
+    ? state : { ...state, phase: 'failed', error: action.message };
+  if (action.type === 'cancel') return state.phase === 'idle'
+    ? state : { ...state, phase: 'cancelled' };
   switch (action.type) {
     case 'validated': return state.phase === 'validating'
       ? { ...state, phase: 'creating-session' } : state;
     case 'session-created': return state.phase === 'creating-session'
+      && action.uploadId !== '' && action.assetId !== ''
       ? { ...state, phase: 'uploading', uploadId: action.uploadId, assetId: action.assetId } : state;
-    case 'progress': return state.phase === 'uploading'
-      ? { ...state, uploadedBytes: Math.min(state.totalBytes, action.uploadedBytes) } : state;
+    case 'progress': return state.phase === 'uploading' && Number.isFinite(action.uploadedBytes)
+      ? { ...state, uploadedBytes: Math.max(0, Math.min(state.totalBytes, action.uploadedBytes)) } : state;
     case 'pause': return state.phase === 'uploading' ? { ...state, phase: 'paused' } : state;
     case 'resume': return state.phase === 'paused' ? { ...state, phase: 'uploading' } : state;
     case 'parts-uploaded': return state.phase === 'uploading'
