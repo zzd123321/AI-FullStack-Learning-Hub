@@ -1,85 +1,85 @@
 ---
 title: React Reducer、Context 与跨组件状态架构
-description: 从状态所有权、纯 Reducer 和 Context 边界，到异步 Command、并发保护及 useSyncExternalStore 细粒度订阅
+description: 从状态所有权出发，逐步理解 State Shape、Reducer、Context、异步命令与外部 Store
+outline: deep
 ---
 
 # React Reducer、Context 与跨组件状态架构
 
-> 适用环境：React 19.x、TypeScript 严格模式。本课使用 React 内置能力解释状态架构原则，不把所有问题都归结为“选哪个状态库”。
+> 适用环境：React 19.x、TypeScript 严格模式。本课先建立状态架构的判断方法，再介绍 React API；不会把所有共享问题都归结为“选哪个状态库”。
 
-## 1. 学习目标
+上一课讨论了 React 怎样和外部世界同步。这一课把视线移回应用内部：组件越来越多、更新规则越来越复杂时，状态究竟应该放在哪里？
 
-完成本节后，你应该能够：
+很多项目从“Props 传得麻烦”直接跳到 Context，或者从“Setter 太多”直接跳到 Reducer。结果只是把状态搬了家，原来的矛盾仍然存在。更可靠的顺序是：
 
-- 按所有权、持久性和数据来源分类前端状态。
-- 判断状态应留在组件、提升到父级、进入 URL、Context、外部 Store 或服务端缓存。
-- 设计最小、规范化且不矛盾的 State Shape。
-- 判断 `useState` 与 `useReducer` 的适用边界。
-- 编写纯 Reducer 与可穷举的 TypeScript Action 联合。
-- 把 Event、Command、Reducer 和 Effect 的职责分开。
-- 使用 requestId 防止陈旧异步完成覆盖新状态。
-- 用 Provider 与自定义 Hook 建立明确 Context 边界。
-- 解释 Context 的传播和重新渲染成本。
-- 通过 State/Dispatch 双 Context 缩小不必要订阅。
-- 理解为什么 Context 不自动提供 Selector 和外部 Store 能力。
-- 使用 `useSyncExternalStore` 建立并发安全、可 SSR 的外部订阅协议。
-- 测试 Reducer、Provider、异步 Command 和 Store Snapshot 契约。
-
-## 2. “全局状态”不是一个精确分类
-
-开发者常说“这个值很多地方要用，放全局”。但位置只是表象，先问它是什么数据：
-
-| 类型 | 示例 | 常见所有者 |
-| --- | --- | --- |
-| 瞬时 UI | Dialog 开关、Hover、输入草稿 | 最近使用它的组件 |
-| 共享 UI | 当前选中课程、Workspace 布局 | 最近共同父级 / Reducer |
-| 导航状态 | Tab、筛选、分页、实体 ID | URL / Router |
-| 会话状态 | 当前用户最小视图、Theme、Locale | 上层 Provider / 外部会话 Store |
-| 服务端状态 | 课程列表、订单、权限 | Router/数据缓存层，服务端为 Source of Truth |
-| 外部系统状态 | Online、媒体查询、浏览器 Store | `useSyncExternalStore` 适配器 |
-| 表单状态 | 当前输入、Touched、Validation | Form/字段子树，提交后进入服务端 |
-
-同一个值被十个组件读取，不代表它应该成为进程级 Singleton。Provider 可以只包裹某个路由，路由卸载时状态自然释放。状态提升到刚好覆盖消费者的最低层，通常比“应用顶部全局 Store”更容易推理。
-
-## 3. 状态所有权的五个问题
-
-为每个候选状态回答：
-
-1. **谁读取？** 找最近共同父级。
-2. **谁修改？** 修改意图是否来自明确用户事件？
-3. **生命周期多长？** 切路由、刷新、换账号后是否保留？
-4. **谁是 Source of Truth？** DOM、URL、服务器还是 React？
-5. **是否可推导？** 能从其他 State/Props 算出就不存。
-
-例如“选中课程”只需保存 `selectedId`。保存整个 `selectedLesson` 会复制 `lessons` 中的实体，编辑列表后两份对象容易不同步。
-
-```ts
-const selectedLesson = lessons.find((lesson) => lesson.id === selectedId) ?? null
+```text
+先确认谁拥有数据
+    ↓
+设计不会互相矛盾的 State
+    ↓
+更新规则复杂时集中到 Reducer
+    ↓
+深层组件确实需要时再用 Context 传递
+    ↓
+状态本来就在 React 外部时，使用外部 Store 订阅协议
 ```
 
-这是 Render 派生值，不是另一个 State。
+## 状态架构先回答“谁拥有它”
 
-## 4. State Shape 比状态库更重要
+“很多组件都要用，所以放全局”不是充分理由。同一个值被十个组件读取，也可能只属于某个路由页面；页面离开后，它就应该释放。
 
-React 官方给出五项稳定原则：
+面对一个候选 State，可以连续问五个问题：
 
-- 相关且总一起更新的 State 可分组。
-- 避免互相矛盾的字段。
-- 避免可推导的冗余 State。
-- 避免同一实体重复存储。
-- 避免难以不可变更新的深层嵌套。
+1. 谁读取它？这些组件最近的共同祖先是谁？
+2. 谁修改它？修改由哪一个用户事件或外部事件造成？
+3. 它应该存活多久？切路由、刷新、退出账号后还要保留吗？
+4. 谁是唯一事实来源：React、URL、服务器、DOM，还是浏览器 API？
+5. 它能否由其他 Props 或 State 直接计算出来？
 
-错误：
+这些答案通常会把状态带到不同位置：
+
+| 数据 | 更自然的所有者 |
+| --- | --- |
+| Dialog 开关、Hover、局部输入 | 最近使用它的组件 |
+| 兄弟组件共同编辑的草稿 | 最近共同父级，必要时配合 Reducer |
+| 当前 Tab、筛选、分页、实体 ID | URL / Router |
+| Theme、Locale、会话视图 | 有限范围的 Provider 或会话 Store |
+| 课程列表、订单、权限 | 服务端数据层，服务器是事实来源 |
+| Online 状态、媒体查询、浏览器 Store | `useSyncExternalStore` 适配器 |
+
+### 提升状态不是把状态放到应用顶层
+
+如果两个兄弟组件需要协调，把 State 提升到它们最近的共同父级即可。Provider 也可以只包住某个路由子树。同一个 Context 甚至可以有多个 Provider，每棵子树各自拥有独立状态。
+
+所有权范围越大，生命周期越长，潜在更新面也越大。默认从最小正确范围开始，需要共享时再上移。
+
+### 可推导值不要保存第二份
+
+课程列表已经包含完整实体时，只保存 `selectedId`：
+
+```tsx
+const [selectedId, setSelectedId] = useState<string | null>(null)
+const selectedLesson =
+  lessons.find((lesson) => lesson.id === selectedId) ?? null
+```
+
+如果同时保存 `selectedLesson` 对象，列表更新后，选中对象可能还是旧副本。Render 中查找虽然每次都会执行，却始终基于同一份事实来源。
+
+URL 和服务器数据也不要轻易复制进 Context。复制之后就必须解释双向同步、冲突和失效策略；很多 Effect 循环正是由两份事实来源造成的。
+
+## State Shape 决定系统能否保持一致
+
+状态库只能存储你设计的数据结构，无法自动修复矛盾结构。例如：
 
 ```ts
-interface FormState {
+interface PublishState {
   isPublishing: boolean
   isPublished: boolean
   error: string | null
 }
 ```
 
-它允许 publishing、published 同时为 true。使用判别联合：
+它允许 `isPublishing` 和 `isPublished` 同时为 `true`，也允许成功状态仍携带错误。把互斥阶段建模成判别联合更准确：
 
 ```ts
 type PublishState =
@@ -89,63 +89,71 @@ type PublishState =
   | { status: 'error'; message: string }
 ```
 
+此时每个分支只能携带属于自己的字段，组件按 `status` 判断后，TypeScript 也会同步收窄类型。
+
 完整领域类型：
 
 <<< ../../../examples/frontend/react-state-architecture/types.ts
 
-类型能排除大量非法组合，但仍要由 Reducer 保证跨字段不变量，例如成功发布后更新课程、清除草稿、结束 Publishing 必须是一个原子转换。
+设计 State 时优先遵守这些原则：
 
-## 5. `useState` 还是 `useReducer`
+- 总是一起变化的字段可以组合；
+- 互斥状态用联合类型，不用多个 Boolean；
+- 能从现有数据计算的值不存；
+- 同一实体只保存一份，其他位置保存 ID；
+- 避免难以不可变更新的深层嵌套；
+- 每个字段都能说清生命周期和事实来源。
 
-继续使用 `useState`：
+本例把课程实体、选中 ID、按课程 ID 保存的草稿和发布状态分开。草稿没有覆盖原课程，发布成功前仍可比较“已保存标题”和“正在编辑标题”。
 
-- 状态少且彼此独立。
-- 更新规则非常直接。
-- State 只在一个小组件内使用。
-- 事件到 Setter 的关系一眼可见。
+## 什么时候 `useState` 已经不够清晰
 
-考虑 `useReducer`：
+`useState` 很适合少量、直接、彼此独立的更新：
 
-- 多个字段必须在一次事件中一致变化。
-- 更新散落在许多 Handler。
-- 下一个状态取决于复杂规则。
-- 需要记录“发生了什么”而非“把字段设成什么”。
-- 希望纯函数单测覆盖大量转换。
-- State/Dispatch 需要通过 Context 深层共享。
+```tsx
+const [open, setOpen] = useState(false)
+```
 
-Reducer 不会自动提升性能，也不是小型 Redux。一个 Boolean Toggle 使用 Reducer 只会增加 Action、Switch 和文件数量。
+当多个字段必须在一个事件中保持一致，或者相同更新规则散落在多个 Handler 中，Reducer 会更清楚。例如“发布成功”需要同时：
 
-## 6. Reducer 是纯状态转换
+- 用服务器结果更新课程；
+- 删除这门课程的草稿；
+- 把发布阶段改成成功。
+
+如果三个 Setter 分散执行，中间状态和遗漏都更难控制。Reducer 把它们变成一个原子转换：
 
 ```text
 nextState = reducer(previousState, action)
 ```
 
-Reducer 必须：
+Reducer 并不会自动提升性能，也不是所有 Boolean 的必经之路。它的价值是集中复杂的状态转换和跨字段不变量。
 
-- 输入相同，输出相同。
-- 不修改 previousState 或 Action。
-- 不发请求、不写 Storage、不导航、不弹 Toast。
-- 不读取当前时间、随机数或外部可变 Singleton。
-- 对未知 Action 有明确失败或穷举保证。
+## Reducer 只负责纯状态转换
 
 完整 Reducer：
 
 <<< ../../../examples/frontend/react-state-architecture/lesson-reducer.ts
 
-它可以安全地被 React 重试，也可以脱离 React 做表格测试、回放 Action 和验证不变量。
+一个 Reducer 应满足：
 
-## 7. Action 应描述领域事件
+- 相同 State 与 Action 得到相同结果；
+- 不修改传入的 State 或 Action；
+- 不发请求、不导航、不写 Storage、不显示 Toast；
+- 不读取当前时间、随机数或外部可变单例；
+- 没有变化时可以返回原对象；
+- 一个 Action 涉及的跨字段规则在一次返回中完成。
 
-弱 Action：
+因为它是普通纯函数，React 可以安全地重试它，测试也不需要渲染组件。
+
+### Action 描述“发生了什么”
+
+下面的 Action 把内部结构泄漏给所有调用者：
 
 ```ts
-{ type: 'setState', payload: { ... } }
+{ type: 'setState', patch: { /* 任意字段 */ } }
 ```
 
-调用方必须知道 State 内部结构，Reducer 只剩浅合并，规则散回组件。
-
-更好的 Action：
+更好的 Action 记录领域事实：
 
 ```ts
 { type: 'draftChanged', lessonId, title }
@@ -153,36 +161,34 @@ Reducer 必须：
 { type: 'publishSucceeded', lesson, requestId }
 ```
 
-它们回答“发生了什么”。Reducer 决定该事件如何改变 State。Action Payload 应包含做出纯转换所需的事实，不让 Reducer偷偷访问 API Client 或当前 URL。
+组件只报告发生的事件，Reducer 决定怎样保持不变量。`WorkspaceAction` 是判别联合，所以 `switch` 进入分支后，Payload 会自动收窄。`assertNever(action)` 还会在新增 Action 却漏写分支时产生编译错误。
 
-命名建议使用过去式事件或清晰命令式，但一个项目内保持一致。比命名形式更重要的是 Action 不暴露任意 State Patch。
+不要把 `payload` 写成 `any`，也不要把 Setter 函数塞进 Action；那会失去可穷举、可测试、可回放的优势。
 
-## 8. TypeScript 判别联合与穷举
-
-`WorkspaceAction` 以 `type` 为判别字段。Switch 进入某个 Case 后，Payload 自动收窄。
+### 不可变更新不等于复制所有内容
 
 ```ts
-function assertNever(value: never): never {
-  throw new Error(`未知 Action：${JSON.stringify(value)}`)
+return {
+  ...state,
+  drafts: { ...state.drafts, [lessonId]: title }
 }
 ```
 
-新增 Action 却忘记 Case 时，`assertNever(action)` 会产生编译错误。运行时仍抛错也能帮助发现外部反序列化的非法 Action。
+新 State 只复制发生变化的路径，未变化分支保留原引用，这叫结构共享。没有实际变化时直接返回 `state`，让 `Object.is`、Memo 和订阅层能够识别“什么都没变”。
 
-不要写：
+可以修改刚创建的局部副本：
 
 ```ts
-interface Action {
-  type: string
-  payload?: any
-}
+const nextDrafts = { ...state.drafts }
+delete nextDrafts[lessonId]
+return { ...state, drafts: nextDrafts }
 ```
 
-它放弃了 Action 和 Payload 的对应关系，Reducer 每个分支都要断言。
+这里修改的是新对象，不是传入的 State。两者不要混淆。
 
-## 9. Lazy Initializer 与初始 Props
+### 初始 Props 只是初始值
 
-Provider 使用：
+Provider 使用 `useReducer` 的第三个参数延迟创建初始状态：
 
 ```tsx
 const [state, dispatch] = useReducer(
@@ -192,518 +198,221 @@ const [state, dispatch] = useReducer(
 )
 ```
 
-第三个参数是 Lazy Initializer，负责复制初始课程、选择第一项并建立空索引。它只用于创建 Reducer 初始 State。
+`initialLessons` 后续变化不会自动重置 Reducer，这和 `useState(initialValue)` 一样。如果它只是初始快照，`initial*` 命名是准确的；如果父级才是持续事实来源，就不应再复制一份 Reducer State。
 
-`initialLessons` 后续 Prop 改变不会自动重置 Reducer。这与 `useState(initialValue)` 相同。必须明确语义：
+切换实体时确实要全量重建，可以改变 Provider 的 `key`；要合并服务器新数据，则应定义显式 Action 和冲突规则。不要用 Effect 静默覆盖用户草稿。
 
-- 如果 Prop 只是初始快照，使用 `initial*` 命名正确。
-- 如果上层是持续 Source of Truth，不应复制进 Reducer。
-- 若实体切换应重建整个 Workspace，可给 Provider 使用实体 Key。
-- 若要合并服务器新数据，应定义显式 `dataReceived` Action 和冲突规则。
+## 异步工作留在 Event 与 Service 边界
 
-不要用 Effect 默默覆盖用户草稿。
-
-## 10. 不可变更新与结构共享
-
-Reducer 返回新对象，但应保留未变化分支引用：
-
-```ts
-return {
-  ...state,
-  drafts: { ...state.drafts, [lessonId]: title }
-}
-```
-
-没有变化时直接返回原 State：
-
-```ts
-if (state.selectedId === action.lessonId) return state
-```
-
-这称为结构共享。它让 `Object.is`、Memo、Selector 和 DevTools 能识别变化范围。
-
-可以修改 Reducer 内刚创建的 Copy：
-
-```ts
-const copy = { ...record }
-delete copy[key]
-return copy
-```
-
-不能修改传入的 record。局部新对象 Mutation 与修改既存 State 是不同概念。
-
-嵌套非常深时，优先规范化 State 或拆分所有权，而不是一开始就引入复杂更新库。规范化结构通常是 `byId + allIds` 或实体数组 + selectedId/draftById 索引。
-
-## 11. Reducer 不执行异步请求
-
-发布是用户点击产生的 Command，因此流程位于 Event Handler：
+发布由用户点击造成，所以流程是：
 
 ```text
 Click
-→ dispatch publishStarted
-→ await service.publish
-→ dispatch publishSucceeded / publishFailed
+  → dispatch publishStarted
+  → await service.publish
+  → dispatch publishSucceeded 或 publishFailed
 ```
 
-完整 HTTP Service：
+HTTP Service 只负责请求协议与运行时数据校验：
 
 <<< ../../../examples/frontend/react-state-architecture/lesson-service.ts
 
-完整 Command 组件：
+Command 组件负责异步编排：
 
 <<< ../../../examples/frontend/react-state-architecture/PublishButton.tsx
 
-这样职责清晰：
+Reducer 始终同步，只接收已经发生的事实。让 Reducer 发 Fetch 或返回 Promise 会破坏纯度，也让重试、错误处理和单测变得含糊。
 
-- Service 负责 HTTP 协议。
-- Event Handler 编排异步流程。
-- Reducer 负责纯状态转换。
-- Component 渲染当前状态。
+### requestId 阻止旧请求改写新状态
 
-不要为了“把所有逻辑放 Store”让 Reducer 返回 Promise。React 要求 Reducer 同步返回下一个 State。
+用户可能重试，多个组件也可能触发同一命令。请求 A 晚于请求 B 完成时，A 已经不是当前发布任务。
 
-## 12. 异步完成也可能陈旧
+每次开始发布先生成 ID，完成 Action 带回同一个 ID。Reducer 只有在当前课程仍处于同一 `requestId` 的 publishing 状态时接受结果；否则返回原 State。
 
-即使按钮在 Publishing 时 Disabled，真实系统仍可能因重试、跨组件 Command、网络恢复或服务端推送产生多个请求。每次发布生成 requestId：
+这和上一课的 ignore 变量解决同一类“过期任务写权限”问题，只是规则被提升进 Reducer，因此所有 Command 都受到同一约束。Abort 可以节约资源，`requestId` 保证客户端状态正确；不可幂等的服务器操作还需要服务端 Idempotency Key，客户端忽略结果无法撤销已经发生的写入。
 
-```ts
-const requestId = crypto.randomUUID()
-dispatch({ type: 'publishStarted', lessonId, requestId })
-```
+## Context 解决深层传递，不负责设计状态
 
-Success/Failure 带回相同 ID。Reducer 只有在当前 Lesson 仍处于该 requestId 的 Publishing 状态时接受结果：
-
-```ts
-if (current.status !== 'publishing' || current.requestId !== action.requestId) {
-  return state
-}
-```
-
-这把“谁有权写入当前 State”变成纯规则。Abort 可以节约资源，requestId 则保护状态正确性；二者可同时使用。
-
-若操作不可幂等，还需要服务端 Idempotency Key。客户端忽略旧结果不能阻止服务器已经创建两个订单。
-
-## 13. Context 解决的是深层传递
-
-Context 让组件读取最近祖先 Provider 的 Value，不必每层透传 Props。适合：
-
-- Theme、Locale、认证视图。
-- 路由级 Workspace State/Dispatch。
-- 表单、Tabs、Compound Components。
-- 注入稳定服务或外部 Store 实例。
-
-Context 不等于全局变量：同一个 Context 可以有多个 Provider，每个子树读取最近一个，状态彼此隔离。这对多 Workspace、Storybook 和测试非常有价值。
-
-Context 默认值只在上方没有匹配 Provider 时使用，是静态 Fallback，不会动态变化。业务 Context 常使用 null 默认并由自定义 Hook 抛出明确错误，避免组件在错误位置静默使用假数据。
-
-## 14. Provider 与双 Context
+当 State 已经有清晰所有者，但很多深层组件需要读取或 Dispatch 时，逐层透传 Props 可能只是在搬运。Context 让组件直接读取最近祖先 Provider 的 Value。
 
 完整 Provider：
 
 <<< ../../../examples/frontend/react-state-architecture/LessonWorkspaceContext.tsx
 
-它拆为：
+这里使用两个 Context：
 
-- `WorkspaceStateContext`
-- `WorkspaceDispatchContext`
+- `WorkspaceStateContext` 提供会变化的 State；
+- `WorkspaceDispatchContext` 提供身份稳定的 Dispatch。
 
-`dispatch` 身份由 React 保证稳定。只消费 Dispatch 的组件不会因为 State Value 改变而接收新的 Dispatch Context Value。
+只使用 Dispatch 的组件不需要订阅 State Context。若把两者合成每次新建的 `{ state, dispatch }`，State 一变，所有 Consumer 都会收到新对象，包括只负责派发事件的组件。
 
-如果把它们合成：
+自定义 Hook 把 Context 的空值检查集中起来。组件若放在错误的 Provider 外，会立刻得到可定位错误，而不是静默使用一份永不变化的默认假数据。
 
-```tsx
-<Context.Provider value={{ state, dispatch }}>
-```
+### Context 不是进程级单例
 
-每次 State 变化都会创建新对象，所有 Context Consumer 都收到新 Value，包括只需要 dispatch 的按钮。
+同一个 Context 可以放置多个 Provider。每个 Consumer 读取离自己最近的那一个，因此两个课程工作台可以各自拥有独立状态。这也是 Provider 测试隔离和组件预览的基础。
 
-双 Context 是低成本改进，但读取 State Context 的组件仍会在任何 Workspace State 对象变化时 Render。它不是细粒度 Selector 系统。
+Provider 应包住实际消费者的最小稳定子树。按业务域和变化频率拆分，不要创建一个返回几十个无关字段的 `useAppContext()`。
 
-React 19 支持直接写 `<SomeContext value={value}>`；`.Provider` 形式仍清晰表达 Provider，并兼容既有代码。项目选择一种风格即可。
+### Context 更新怎样传播
 
-## 15. 自定义 Context Hook 是契约边界
+React 用 `Object.is` 比较 Provider 的前后 Value。Value 变化时，读取该 Context 的 Consumer 会重新 Render；给中间祖先加 `memo` 不能挡住 Context 传播。
 
-```tsx
-export function useWorkspaceState(): WorkspaceState {
-  const state = useContext(WorkspaceStateContext)
-  if (state === null) {
-    throw new Error('必须在 LessonWorkspaceProvider 内使用')
-  }
-  return state
-}
-```
+双 Context 只能隔离 Dispatch 消费者。所有读取整个 Workspace State 的组件仍会在 State 对象变化时得到新 Value。这不是错误，小型或中低频领域状态通常完全足够；但 Context 本身没有 Selector，也不是细粒度性能工具。
 
-优势：
+可以按以下顺序控制范围：
 
-- Consumer 不知道 Context 实例和 null 细节。
-- Provider 缺失时立即得到可定位错误。
-- 将来可以调整 Context 拆分而不改所有调用方。
-- 测试有统一 Wrapper 边界。
+1. 让 State 靠近实际使用处；
+2. 缩小 Provider 覆盖范围；
+3. 按领域和变化频率拆 Context；
+4. 避免字段没变却每次创建新 Value；
+5. 只有经过测量确实需要 Selector 时，再评估外部 Store。
 
-不要写一个 `useAppContext()` 返回几十个无关域。Context 按变化频率和业务所有权拆分，不只是按 TypeScript 文件拆分。
+Prop Drilling 并非总是坏事。只有两三层时，Props 让依赖更显式，也让组件更容易独立复用。
 
-## 16. 完整 Workspace 数据流
+## 工作台中的单向数据流
 
-侧边栏读取课程并派发选择事件：
+侧边栏读取课程并报告选择事件：
 
 <<< ../../../examples/frontend/react-state-architecture/LessonSidebar.tsx
 
-编辑器读取选中 ID，派发草稿事件，并组合发布 Command：
+编辑器从原课程和草稿推导输入值，报告编辑与放弃事件：
 
 <<< ../../../examples/frontend/react-state-architecture/LessonEditor.tsx
 
-页面组合：
+页面负责组合这些能力：
 
 <<< ../../../examples/frontend/react-state-architecture/LessonWorkspace.tsx
 
-数据流：
+整个同步路径只有一个方向：
 
 ```text
-User Event
+用户事件
   → dispatch(Action)
     → reducer(previousState, action)
       → nextState
-        → Context publishes new State
-          → consumers render derived UI
+        → Context 发布新 State
+          → Consumer Render 派生 UI
 ```
 
-HTTP Command 在 Event 与 Dispatch 之间执行，不进入 Reducer。所有组件都以同一 Workspace State 为 Source of Truth。
+Service 的异步 Command 位于用户事件与完成 Action 之间，不进入 Reducer。所有组件都从同一个 Workspace State 读取结果。
 
-## 17. Context 更新如何传播
+## 什么时候需要 React 外部的 Store
 
-Provider Value 用 `Object.is` 比较。Value 变化时，读取该 Context 的 Consumer 会重新 Render；祖先使用 `memo` 不能阻止 Context 的新值传给 Consumer。
+Context 传递的是一个 Value。若状态源本来就在 React 外部，并且自己维护 Snapshot 和订阅，例如浏览器 Online 状态、媒体查询、跨 React Root 的 Store，就不应再用 Effect 把它复制进本地 State。
 
-因此要避免：
+`useSyncExternalStore` 定义了三项契约：
 
-```tsx
-<AuthContext.Provider value={{ user, logout }}>
-```
+- `subscribe(listener)`：注册更新通知并返回 Unsubscribe；
+- `getSnapshot()`：返回当前不可变快照；
+- `getServerSnapshot()`：SSR/Hydration 使用的服务端快照。
 
-如果 Provider 因无关 State Render，每次新对象都会通知 Consumer。可以：
+手写“Render 读取一次，Effect 再订阅”可能漏掉两者之间发生的更新，并发 Render 也可能让不同组件读到不同版本。
 
-- 把 Provider 移到合适边界，隔离无关更新。
-- 把 State 与 Actions 拆 Context。
-- 让 Value 只包含该域必要内容。
-- 在身份确有语义时 Memoize Value。
-- 高更新频率且需要 Selector 时使用外部 Store。
+### Snapshot 必须可缓存
 
-Memoize Provider Value 只能避免“字段都没变但对象新建”的通知；真正字段变化仍应传播。
+Store 没变化时，`getSnapshot()` 必须返回与上次 `Object.is` 相同的值。每次都返回 `{ ...state }` 会让 React 认为状态永远在变化。
 
-## 18. Context 不是性能优化工具
-
-Prop Drilling 有时反而让依赖显式、更新局部。只有当中间层不关心数据且层级很深时 Context 才更自然。
-
-在引入 Context 前考虑：
-
-- 直接传 Props 是否只有两三层？
-- 能否把需要数据的组件作为 Children 传进来？
-- 状态是否应更靠近使用处？
-- 它是否其实属于 URL 或服务器缓存？
-
-Context 降低调用处参数噪声，但增加隐式环境依赖。组件必须在特定 Provider 下才能工作，测试和复用都要提供环境。
-
-## 19. 为什么需要 `useSyncExternalStore`
-
-当状态源存在 React 外部，并且：
-
-- 多个组件需要不同 Selector。
-- 更新频率较高。
-- Store 自己管理订阅。
-- 需要在并发 Render 中读取一致快照。
-- 需要 SSR Client/Server Snapshot 对齐。
-
-使用 `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)`，不要手写 Effect 订阅 + State 镜像。
-
-手写 Effect 订阅可能在 Render 读取旧值到 Effect 注册之间漏掉更新；并发 Render 还可能出现同一界面不同组件读到不同版本的撕裂。
-
-## 20. 外部 Store 的三个契约
-
-### Subscribe
-
-接收 Callback，返回 Unsubscribe。函数身份应稳定，Store 更新后通知所有 Listener。
-
-### Get Snapshot
-
-返回 Store 当前不可变快照。Store 没变时必须返回与上次 `Object.is` 相同的值，不能每次 `{ ...state }`，否则 React 会认为永远变化。
-
-### Get Server Snapshot
-
-SSR/Hydration 时返回服务端快照。客户端首次 Snapshot 必须与服务器生成 HTML 的数据一致，通常通过序列化载荷恢复。
-
-本课 Store：
+本课的进度 Store 只在值真实变化时创建新快照：
 
 <<< ../../../examples/frontend/react-state-architecture/progress-store.ts
 
-它缓存 Snapshot；只有进度真的变化才创建新对象并通知。
-
-## 21. Context 注入 Store，External Store 负责订阅
-
-完整适配：
+Context 可以负责注入稳定 Store 实例，Consumer 再使用专用订阅协议：
 
 <<< ../../../examples/frontend/react-state-architecture/ProgressContext.tsx
 
-Context Value 是稳定的 `ProgressStore` 实例，不随每次进度变化替换。Consumer 使用：
-
-```tsx
-useSyncExternalStore(
-  store.subscribe,
-  () => store.getSnapshot()[lessonId] ?? 0,
-  () => 0
-)
-```
-
-Selector 返回 Primitive。其他 Lesson 进度变化后 React 会调用 Snapshot，但该 Lesson 的选中值仍相同，可以跳过不必要 Commit。
+`useLessonProgress` 的 Snapshot Selector 返回一个 Number。其他课程的进度变化后，即使 React 重新读取 Snapshot，这门课程的值仍相等，就不必提交无关 UI。
 
 进度控件：
 
 <<< ../../../examples/frontend/react-state-architecture/ProgressSlider.tsx
 
-这种“Context 负责依赖注入，Store 负责订阅”是很多状态库 React Binding 的底层形态。
+这种“Context 负责找到 Store，Store 负责细粒度订阅”的组合，是许多状态库 React Binding 的基本形态。
 
-## 22. SSR Snapshot 不能随便返回 0
+### SSR 快照必须与 Hydration 对得上
 
-教学示例 `getServerSnapshot` 返回 0，适用于进度只在客户端存在、服务器也渲染 0 的情况。若服务器已知道用户进度，则必须：
+示例的 `getServerSnapshot` 固定返回 `0`，表示服务端也把进度渲染为 0，真实进度只在客户端接管后出现。若服务器已知道用户进度，则不能随便返回 0：
 
-1. 服务端用该进度创建 Store Snapshot。
-2. HTML 输出同一值。
-3. 安全序列化 Initial Snapshot。
-4. 客户端 Provider 用载荷恢复 Store。
-5. `getServerSnapshot` 返回恢复后的同一快照语义。
+1. 服务端用已知进度生成 HTML；
+2. 安全序列化同一份初始快照；
+3. 客户端 Provider 用该快照恢复 Store；
+4. `getServerSnapshot` 在 Hydration 阶段返回同一语义的值。
 
-否则 Hydration 首帧不一致。外部 Store 的 SSR 设计与上一模块 SSR 课程中的状态交接原则相同。
+否则首次客户端内容与服务端 HTML 不一致。外部 Store 解决订阅一致性，不会替你设计 SSR 数据交接。
 
-## 23. Context、External Store 与数据缓存的边界
+## 不同状态容器各自解决什么问题
 
-| 方案 | 擅长 | 不擅长 |
+| 方案 | 擅长 | 不应承担 |
 | --- | --- | --- |
-| State + Props | 局部、显式 UI 状态 | 很深跨层共享 |
-| Reducer | 复杂同步转换与事件建模 | 自己处理网络缓存 |
-| Context | 低中频环境/域状态传递 | 细粒度 Selector、高频更新 |
-| External Store | 细粒度订阅、跨根状态 | 自动解决服务器数据一致性 |
-| Router/URL | 可分享导航状态 | 瞬时草稿与秘密数据 |
-| Server Data Cache | Fetch、Cache、Dedup、Invalidation | 本地 Hover/Dialog 等 UI |
+| State + Props | 局部、显式 UI 状态 | 很深的跨层共享 |
+| Reducer | 复杂同步转换和不变量 | 网络缓存与副作用 |
+| Context | 在有限子树传递依赖 | 高频细粒度 Selector |
+| URL / Router | 可刷新、可分享的导航状态 | 密码、瞬时草稿 |
+| External Store | React 外部状态与精细订阅 | 自动管理服务端缓存 |
+| Server Data Layer | Fetch、Cache、Dedup、Invalidation | Hover、Dialog 等局部交互 |
 
-不要把服务器返回的所有课程复制进 Context 后手写 Loading、Cache、Retry、Invalidation。服务端状态仍由数据层拥有；Reducer 可以保存选中 ID、未提交草稿和当前工作流状态。
+筛选、分页、排序和当前实体 ID 如果要支持刷新、Back/Forward 和复制链接，通常应让 URL 成为事实来源。不要先放 Context，再用两个 Effect 双向同步 URL。
 
-## 24. URL 是经常被遗漏的状态容器
+服务器返回的课程实体也不应全部复制进 Context 后自己重写缓存系统。数据层拥有服务器状态；Reducer 可以拥有未提交草稿、选中 ID 和客户端工作流阶段。
 
-筛选、分页、排序、当前实体 ID 若需要：
+### 与 Pinia / Vuex 经验对照
 
-- 刷新保留。
-- Back/Forward 正常。
-- 复制链接分享。
-- 服务端直接渲染相同页面。
-
-它们通常属于 URL。把它们只放 Context，会让导航语义丢失；再用 Effect 双向同步 URL 和 Context 又容易循环。
-
-优先让 Router Search Params 成为 Source of Truth，在 Render 中解析为领域值。临时输入草稿可本地保存，用户 Apply 后一次性更新 URL。
-
-## 25. Reducer 与有限状态机
-
-Reducer 能表达状态转换，但并不自动成为严格状态机。若工作流有：
-
-- 大量互斥状态。
-- 允许/禁止转换。
-- 并行状态。
-- Guard、Timeout、重试。
-- 需要可视化与形式化测试。
-
-应把 State 建模为明确的判别联合，并在 Reducer 中拒绝非法转换；复杂到一定程度可评估专用状态机工具。
-
-不要保留十几个 Boolean 再称其为 Reducer 架构。Reducer 的价值正是集中不变量。
-
-## 26. 与 Pinia/Vuex 经验对照
-
-| Vue 状态经验 | React 对应理解 |
+| Vue 经验 | React 中更接近的概念 |
 | --- | --- |
-| Pinia Store State | Reducer State 或外部 Store Snapshot |
-| Getter | Render Selector/派生值 |
-| Action | Event/Command 编排，可能 Dispatch 多个 Action |
-| `$patch` | 不推荐作为领域 Reducer 的通用外部 API |
-| `storeToRefs` | Context 无内置细粒度 Selector；外部 Store Binding 处理 |
+| Store State | Reducer State 或外部 Store Snapshot |
+| Getter | Render 中的派生值或 Selector |
+| Action | Event/Command 编排，可 Dispatch 多个 Action |
 | Provide/Inject | Context，最近 Provider 决定 Value |
+| `storeToRefs` | Context 没有同等 Selector；外部 Store Binding 负责 |
 
-React 内置 Reducer 没有全局注册表、DevTools 插件协议、持久化或异步 Action 约定。Context 也不提供 Selector。不要期待 `useReducer + Context` 自动等于 Pinia；规模扩大后需根据实际需求选择数据层或外部 Store。
+`useReducer + Context` 不会自动得到 Pinia 的全局注册、DevTools、持久化和细粒度订阅。不要为了形式相似而强行一一映射，先判断当前问题需要哪一种能力。
 
-## 27. App 装配与 Provider 顺序
+## 完整装配与 Provider 生命周期
 
-完整装配：
+应用装配：
 
 <<< ../../../examples/frontend/react-state-architecture/App.tsx
 
-Provider 顺序表达依赖。如果 Workspace 需要 Progress Store，它必须位于 Progress Provider 内；如果互不依赖，顺序只决定覆盖范围。
-
-避免“Provider Hell”的方法不是创建一个万能 AppContext，而是：
-
-- 按路由懒加载只需要的 Provider。
-- 提取语义化 `AppProviders` / `WorkspaceProviders` 组合组件。
-- 删除可以回到 Props、URL 或模块 Service 的 Context。
-- 明确 Provider 生命周期，避免导航时意外重建 Store。
-
-## 28. Reducer 测试
-
-Reducer 是纯函数，直接测试，无需渲染 React：
-
-```ts
-const initial = createInitialWorkspaceState(lessons)
-const changed = workspaceReducer(initial, {
-  type: 'draftChanged',
-  lessonId: 'react-state',
-  title: '新的标题'
-})
-
-expect(changed.drafts['react-state']).toBe('新的标题')
-expect(initial.drafts['react-state']).toBeUndefined()
-```
-
-重点测试：
-
-- 每类 Action 的转换。
-- 未变化 Action 返回同一引用。
-- previousState 未被修改。
-- Publish Success 原子更新课程并清草稿。
-- 旧 requestId 的 Success/Failure 被忽略。
-- 空课程 Initial State 得到 null selectedId。
-- 非法 Action 在运行时失败。
-
-表格测试适合覆盖状态 × Action 的合法/非法组合。
-
-## 29. Context 与 Command 测试
-
-### Provider 缺失
-
-渲染使用 Hook 的组件但不提供 Provider，断言得到清晰错误。这验证边界没有静默 Fallback。
-
-### 用户流程
-
-从 DOM 操作：选择课程、修改标题、放弃、发布。断言 UI 与 Service 调用，不直接调用 dispatch 绕过组件。
-
-### 异步并发
-
-使用可控 Service Promise，让请求 B 成为当前 requestId 后再完成 A，断言 A 被 Reducer 忽略。
-
-### Provider 隔离
-
-渲染两个 Provider，各自编辑同一 Lesson ID，确认状态不串线。这验证 Context 不是 Singleton。
-
-## 30. External Store 契约测试
-
-对 `ProgressStore` 直接测试：
-
-- 未变化值不通知。
-- 更新时 Snapshot 引用变化。
-- 未更新时 `getSnapshot()` 返回同一引用。
-- Unsubscribe 后不再收到通知。
-- 值被限制在 0—100 且取整。
-
-React 集成测试：
-
-- 更新 Lesson A 只改变 A 显示值。
-- Provider Unmount 后订阅被释放。
-- Server Snapshot 与首次 Client Snapshot 一致。
-- Strict Mode 下无重复 Store 实例泄漏。
-
-不要在 `getSnapshot()` 每次返回新对象；React 会警告结果应缓存，并可能形成循环。
-
-## 31. 常见失败模式
-
-### 所有状态放 App 顶层
-
-更新面巨大，路由卸载后数据仍驻留。把所有权下移到最近边界。
-
-### 用 Context 保存每次键入
-
-整个 Consumer 子树频繁 Render。表单草稿留在 Form，提交或明确共享时再提升。
-
-### Reducer 中执行 Fetch
-
-破坏纯度、无法重试与单测。Fetch 是 Command/数据层职责。
-
-### Action 直接传 Setter Function
-
-Reducer 行为不可序列化、不可回放，调用方仍控制内部结构。Action 传事实数据。
-
-### Provider Value 每次新建
-
-无关父 Render 也通知 Consumer。移动 Provider、拆 Context 或稳定 Value。
-
-### 把 Context 默认值当测试替身
-
-生产忘记 Provider 也静默运行假数据。业务 Context 使用 null + Guard Hook。
-
-### 外部 Store Snapshot 每次新建
-
-违反缓存契约，导致无穷变化。Store 更新时才创建新不可变 Snapshot。
-
-### 客户端状态复制服务器缓存
-
-两套 Source of Truth 产生失效与覆盖。服务器实体交给数据层，本地只保存 UI/草稿/工作流。
-
-## 32. 完整示例结构
-
-```text
-examples/frontend/react-state-architecture/
-├── App.tsx
-├── LessonEditor.tsx
-├── LessonSidebar.tsx
-├── LessonWorkspace.tsx
-├── LessonWorkspaceContext.tsx
-├── ProgressContext.tsx
-├── ProgressSlider.tsx
-├── PublishButton.tsx
-├── lesson-reducer.ts
-├── lesson-service.ts
-├── main.tsx
-├── progress-store.ts
-└── types.ts
-```
-
-前文已经展示核心文件。下面补齐入口，保证 13 个文件都能在页面直接看到完整源码。
-
-### 浏览器入口
+浏览器入口：
 
 <<< ../../../examples/frontend/react-state-architecture/main.tsx
 
-示例不包含 React 依赖与构建配置，因为本专题不得修改根 `package.json`。当前工作树没有 React 类型包，验证会区分纯 TypeScript 严格检查与 TSX 语法检查，不声称执行了完整 React 类型构建。
+Provider 顺序表达覆盖范围和依赖关系。减少“Provider 堆叠”的方法不是合并成万能 Context，而是按路由装载所需 Provider、提取有语义的组合组件，并删除本来应该属于 Props、URL 或模块 Service 的 Context。
 
-## 33. 生产检查清单
+示例目录共 13 个文件，以上源码引用已覆盖全部实现，页面中可以直接查看完整代码。仓库当前没有 React 类型与测试运行时，因此验证会明确区分纯 TypeScript 检查与 TSX 源码审查，不会把未运行的 React 构建描述为已通过。
 
-### 所有权
+## 如何验证这套架构
 
-- 每个 State 有唯一 Source of Truth 和明确生命周期。
-- URL、服务器数据、表单草稿与 UI 状态没有混为一体。
-- 可推导值不重复存储。
-- Provider 范围不超过实际消费者。
+Reducer 是纯函数，最先用表格测试覆盖：
 
-### Reducer
+- 每种 Action 的正常转换；
+- 未变化或非法目标返回原引用；
+- previousState 没有被修改；
+- 发布成功会原子更新课程并清理草稿；
+- 旧 `requestId` 的成功与失败都被忽略；
+- 空课程初始状态得到 `selectedId: null`。
 
-- Reducer 纯、同步、不可变且可穷举。
-- Action 描述领域事件，不接受任意 Patch。
-- 复杂异步完成有 requestId/版本保护。
-- Side Effect 位于 Event/Command/数据层。
+Context 集成测试从用户可见行为出发：选择课程、修改标题、放弃草稿、发布并显示结果。再验证缺少 Provider 时错误清晰，以及两个 Provider 的状态互不串线。
 
-### Context
+外部 Store 要直接验证契约：
 
-- 缺失 Provider 会明确失败。
-- State 与 Dispatch 按需要拆分。
-- Value 身份和变化频率经过检查。
-- 没有用万能 Context 隐藏所有依赖。
+- 值没变时不通知，Snapshot 引用保持不变；
+- 值变化时创建新 Snapshot 并通知；
+- Unsubscribe 后不再收到通知；
+- 进度被限制在 0—100；
+- SSR Snapshot 与首次 Hydration Snapshot 一致。
 
-### External Store
+性能判断应使用 React Profiler 和实际交互指标。Render 并不等于 DOM 一定更新，“Render 次数最少”也不是架构正确性的替代品。
 
-- Subscribe 返回正确 Cleanup。
-- Snapshot 未变化时引用稳定。
-- SSR Snapshot 与 Hydration 数据一致。
-- Selector 粒度与更新频率有测试和测量。
+## 本节小结
 
-### 验证
+状态架构的起点不是状态库，而是唯一事实来源和生命周期。局部交互留在组件，需要兄弟协作时提升到最近共同父级；更新规则复杂时用纯 Reducer 集中不变量；深层组件确实需要同一领域状态时，用有限范围的 Context 传递；URL、服务器数据和外部 Store 继续由各自擅长的容器拥有。
 
-- Reducer 不变量由纯单测覆盖。
-- Provider 隔离、用户流程和异步竞态已测试。
-- React Profiler 验证实际更新范围。
-- 不以“Render 次数越少”代替正确性和用户性能指标。
+Reducer 回答“发生一个事件后，状态怎样纯粹地变化”；Event Handler 与 Service 负责异步 Command；`requestId` 收回旧任务的写权限。Context 解决传递，`useSyncExternalStore` 解决 React 外部状态的一致订阅，它们不是同一个层面的工具。
 
-## 34. 进一步阅读
+下一课进入 [React Router、数据路由与应用边界](./react-router-data-routing-and-application-boundaries.md)，继续讨论 URL 为什么是状态容器，以及 Loader、Action、Pending UI 和错误边界怎样围绕路由组织。
+
+## 延伸阅读
 
 - [React：Choosing the State Structure](https://react.dev/learn/choosing-the-state-structure)
 - [React：Sharing State Between Components](https://react.dev/learn/sharing-state-between-components)
@@ -713,11 +422,3 @@ examples/frontend/react-state-architecture/
 - [React：useReducer](https://react.dev/reference/react/useReducer)
 - [React：useContext](https://react.dev/reference/react/useContext)
 - [React：useSyncExternalStore](https://react.dev/reference/react/useSyncExternalStore)
-
-## 35. 本节小结
-
-状态架构的起点不是选库，而是确定所有权和 Source of Truth。局部交互留在组件，需要共同协调时提升；复杂同步转换交给纯 Reducer；Context 负责在明确子树中传递依赖；URL 保存导航状态；服务器实体由数据缓存层拥有；真正外部、高频且需细粒度订阅的数据实现 `useSyncExternalStore` 契约。
-
-Reducer 把“发生了什么”和“状态如何变化”集中起来，异步 Command 留在 Event 边界，并用 requestId 守住并发写权限。Context 与 External Store 各自解决不同问题，组合时也应保持边界清晰。
-
-下一课将进入 React Router 与数据路由架构，讨论嵌套路由、Loader、Action、Pending UI、错误边界、URL 状态和鉴权为什么应由路由层统一协调。

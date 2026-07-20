@@ -21,6 +21,7 @@ export function PublishButton({ lessonId, service }: PublishButtonProps) {
     if (!lesson || publishState.status === 'publishing' || title.trim() === '') return
 
     const requestId = crypto.randomUUID()
+    // Reducer 用 requestId 判断异步完成是否仍属于当前发布任务。
     dispatch({ type: 'publishStarted', lessonId, requestId })
 
     try {

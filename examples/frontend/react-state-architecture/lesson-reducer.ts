@@ -32,6 +32,10 @@ function currentPublishState(
   return state.publishById[lessonId] ?? { status: 'idle' }
 }
 
+function hasLesson(state: WorkspaceState, lessonId: string): boolean {
+  return state.lessons.some((lesson) => lesson.id === lessonId)
+}
+
 function resetCompletedPublishState(
   state: WorkspaceState,
   lessonId: string
@@ -52,11 +56,12 @@ export function workspaceReducer(
 ): WorkspaceState {
   switch (action.type) {
     case 'lessonSelected':
-      return state.selectedId === action.lessonId
+      return state.selectedId === action.lessonId || !hasLesson(state, action.lessonId)
         ? state
         : { ...state, selectedId: action.lessonId }
 
     case 'draftChanged':
+      if (!hasLesson(state, action.lessonId)) return state
       return {
         ...state,
         drafts: { ...state.drafts, [action.lessonId]: action.title },
@@ -64,6 +69,7 @@ export function workspaceReducer(
       }
 
     case 'draftDiscarded':
+      if (!hasLesson(state, action.lessonId)) return state
       return {
         ...state,
         drafts: withoutKey(state.drafts, action.lessonId),
@@ -71,6 +77,7 @@ export function workspaceReducer(
       }
 
     case 'publishStarted':
+      if (!hasLesson(state, action.lessonId)) return state
       return {
         ...state,
         publishById: {
