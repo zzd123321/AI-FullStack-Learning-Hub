@@ -32,6 +32,7 @@ description: 从数学与机器学习基础走向 Transformer 和大语言模型
 - [特征值、特征向量与主成分分析](/ai/math/eigenvalues-eigenvectors-and-pca)
 - [随机变量、概率分布、期望与条件概率](/ai/math/random-variables-distributions-and-conditional-probability)
 - [协方差、相关系数、常见分布与大数定律](/ai/math/covariance-correlation-distributions-and-law-of-large-numbers)
+- [导数、梯度与链式法则](/ai/math/derivatives-gradients-and-chain-rule)
 
 先建立完整地图，再逐层补充数学、数据处理和模型实现。数学模块只选择理解机器学习所必需的内容，并始终联系真实数据和模型计算。
 
