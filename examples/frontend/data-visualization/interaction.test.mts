@@ -9,6 +9,7 @@ const points = [
 ] as const;
 assert.equal(findNearestByX(points, 37)?.sourceIndex, 1);
 assert.equal(findNearestByX(points, 200), undefined);
+assert.throws(() => findNearestByX(points, Number.NaN), RangeError);
 
 const initial = {
   focusedIndex: null,
@@ -22,5 +23,10 @@ assert.equal(selected.selectedIndex, 0);
 const zoomed = reduceInteraction(selected, { type: 'zoom', anchor: 50, factor: 2 });
 assert.deepEqual(zoomed.visibleXDomain, { min: 25, max: 75 });
 assert.equal(reduceInteraction(zoomed, { type: 'zoom', anchor: 50, factor: 0 }), zoomed);
+assert.equal(
+  reduceInteraction(zoomed, { type: 'zoom', anchor: 50, factor: Number.POSITIVE_INFINITY }),
+  zoomed,
+);
+assert.equal(reduceInteraction(zoomed, { type: 'pan', delta: Number.NaN }), zoomed);
 
 console.log('interaction examples passed');

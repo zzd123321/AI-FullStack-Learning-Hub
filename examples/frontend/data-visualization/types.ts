@@ -3,10 +3,14 @@ export interface DataPoint {
   readonly value: number;
 }
 
-export interface ScreenPoint extends DataPoint {
+export interface ModelPoint extends DataPoint {
+  /** 输入数组中的位置；排序后仍保留，便于把选择映射回领域记录。 */
+  readonly sourceIndex: number;
+}
+
+export interface ScreenPoint extends ModelPoint {
   readonly x: number;
   readonly y: number;
-  readonly sourceIndex: number;
 }
 
 export interface PlotRect {
@@ -22,7 +26,7 @@ export interface Domain {
 }
 
 export interface ChartModel {
-  readonly points: readonly DataPoint[];
+  readonly points: readonly ModelPoint[];
   readonly xDomain: Domain;
   readonly yDomain: Domain;
 }

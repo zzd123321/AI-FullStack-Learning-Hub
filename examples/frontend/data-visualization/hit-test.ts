@@ -5,6 +5,9 @@ export function findNearestByX(
   pointerX: number,
   maxDistance = 24,
 ): ScreenPoint | undefined {
+  if (!Number.isFinite(pointerX) || !Number.isFinite(maxDistance) || maxDistance < 0) {
+    throw new RangeError('pointerX and maxDistance must be finite; maxDistance cannot be negative');
+  }
   if (sortedPoints.length === 0) return undefined;
 
   let low = 0;

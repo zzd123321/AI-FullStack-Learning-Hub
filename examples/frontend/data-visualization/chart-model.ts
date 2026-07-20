@@ -23,7 +23,10 @@ export function createChartModel(input: readonly DataPoint[]): ChartModel {
     }
   }
 
-  const points = [...input].sort((left, right) => left.timestamp - right.timestamp);
+  // 先记录原始位置再排序，否则排序后的下标无法映射回调用方数据。
+  const points = input
+    .map((point, sourceIndex) => ({ ...point, sourceIndex }))
+    .sort((left, right) => left.timestamp - right.timestamp);
   return Object.freeze({
     points: Object.freeze(points),
     xDomain: extent(points.map((point) => point.timestamp), { min: 0, max: 1 }),
@@ -41,10 +44,9 @@ export function projectPoints(model: ChartModel, plot: PlotRect): readonly Scree
     max: plot.y,
   });
 
-  return model.points.map((point, sourceIndex) => ({
+  return model.points.map((point) => ({
     ...point,
     x: xScale(point.timestamp),
     y: yScale(point.value),
-    sourceIndex,
   }));
 }

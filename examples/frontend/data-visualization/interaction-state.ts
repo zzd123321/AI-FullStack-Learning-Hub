@@ -29,6 +29,7 @@ export function reduceInteraction(
     case 'select-focused':
       return { ...state, selectedIndex: state.focusedIndex };
     case 'pan':
+      if (!Number.isFinite(action.delta)) return state;
       return {
         ...state,
         visibleXDomain: {
@@ -37,7 +38,9 @@ export function reduceInteraction(
         },
       };
     case 'zoom': {
-      if (!(action.factor > 0)) return state;
+      if (!Number.isFinite(action.anchor) || !Number.isFinite(action.factor) || action.factor <= 0) {
+        return state;
+      }
       const { min, max } = state.visibleXDomain;
       return {
         ...state,

@@ -2,6 +2,7 @@ import { createChartModel, projectPoints } from './chart-model.js';
 import type { DataPoint } from './types.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
+let chartCount = 0;
 
 export function createAccessibleLineChart(
   data: readonly DataPoint[],
@@ -12,8 +13,9 @@ export function createAccessibleLineChart(
   const title = document.createElementNS(SVG_NS, 'title');
   const description = document.createElementNS(SVG_NS, 'desc');
   const path = document.createElementNS(SVG_NS, 'path');
-  const titleId = `chart-title-${crypto.randomUUID()}`;
-  const descriptionId = `chart-description-${crypto.randomUUID()}`;
+  const chartId = ++chartCount;
+  const titleId = `chart-title-${chartId}`;
+  const descriptionId = `chart-description-${chartId}`;
 
   title.id = titleId;
   title.textContent = titleText;

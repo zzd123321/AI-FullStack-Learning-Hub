@@ -1,6 +1,7 @@
 export class WebGLResourceManager {
   readonly #buffers = new Set<WebGLBuffer>();
   #lost = false;
+  #disposed = false;
 
   constructor(
     readonly canvas: HTMLCanvasElement,
@@ -12,6 +13,7 @@ export class WebGLResourceManager {
   }
 
   createBuffer(data: BufferSource, usage = this.gl.STATIC_DRAW): WebGLBuffer {
+    if (this.#disposed) throw new Error('WebGL resource manager is disposed');
     if (this.#lost) throw new Error('WebGL context is lost');
     const buffer = this.gl.createBuffer();
     if (!buffer) throw new Error('Unable to allocate a WebGL buffer');
@@ -22,6 +24,8 @@ export class WebGLResourceManager {
   }
 
   dispose(): void {
+    if (this.#disposed) return;
+    this.#disposed = true;
     this.canvas.removeEventListener('webglcontextlost', this.#onContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.#onContextRestored);
     for (const buffer of this.#buffers) this.gl.deleteBuffer(buffer);
@@ -35,6 +39,7 @@ export class WebGLResourceManager {
   };
 
   readonly #onContextRestored = (): void => {
+    if (this.#disposed) return;
     this.#lost = false;
     this.restoreScene();
   };

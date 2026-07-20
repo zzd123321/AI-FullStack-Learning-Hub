@@ -16,13 +16,21 @@ export function mountCanvasLineChart(
   let data: readonly DataPoint[] = [];
   let projected: readonly ScreenPoint[] = [];
   let frameId: number | null = null;
+  let lastAnnouncedSourceIndex: number | null = null;
+  let destroyed = false;
 
   const draw = () => {
     frameId = null;
     const rect = canvas.getBoundingClientRect();
-    const ratio = Math.max(1, window.devicePixelRatio || 1);
-    canvas.width = Math.round(rect.width * ratio);
-    canvas.height = Math.round(rect.height * ratio);
+    // DPR 不设上限时，大型 4K 画布的内存和填充成本会按面积增长。
+    const ratio = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+    const bufferWidth = Math.round(rect.width * ratio);
+    const bufferHeight = Math.round(rect.height * ratio);
+    // 改 width/height 会清空位图与上下文状态，所以只在真实尺寸变化时重设。
+    if (canvas.width !== bufferWidth || canvas.height !== bufferHeight) {
+      canvas.width = bufferWidth;
+      canvas.height = bufferHeight;
+    }
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, rect.width, rect.height);
 
@@ -43,13 +51,18 @@ export function mountCanvasLineChart(
   };
 
   const scheduleDraw = () => {
-    if (frameId !== null) return;
+    if (destroyed || frameId !== null) return;
     frameId = requestAnimationFrame(draw);
   };
   const onPointerMove = (event: PointerEvent) => {
     const rect = canvas.getBoundingClientRect();
     const nearest = findNearestByX(projected, event.clientX - rect.left);
-    if (nearest) announce(`时间 ${nearest.timestamp}，数值 ${nearest.value}`);
+    if (nearest && nearest.sourceIndex !== lastAnnouncedSourceIndex) {
+      lastAnnouncedSourceIndex = nearest.sourceIndex;
+      // 实际产品应在这里使用显式 locale/timeZone/unit 的格式化器。
+      announce(`时间 ${nearest.timestamp}，数值 ${nearest.value}`);
+    }
+    if (!nearest) lastAnnouncedSourceIndex = null;
   };
   const resizeObserver = new ResizeObserver(scheduleDraw);
   resizeObserver.observe(canvas);
@@ -57,13 +70,19 @@ export function mountCanvasLineChart(
 
   return {
     update(points) {
+      if (destroyed) throw new Error('Canvas chart handle is destroyed');
       data = points;
       scheduleDraw();
     },
     destroy() {
+      if (destroyed) return;
+      destroyed = true;
       resizeObserver.disconnect();
       canvas.removeEventListener('pointermove', onPointerMove);
       if (frameId !== null) cancelAnimationFrame(frameId);
+      // 释放大型 backing store；调用方若复用 canvas，可在下次挂载时重新设置。
+      canvas.width = 0;
+      canvas.height = 0;
     },
   };
 }
