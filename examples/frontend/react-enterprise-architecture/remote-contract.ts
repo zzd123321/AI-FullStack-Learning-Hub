@@ -15,14 +15,15 @@ export function parseRemoteManifest(
   const record = input as Record<string, unknown>;
   if (
     record.schemaVersion !== 1 ||
-    typeof record.name !== "string" ||
+    typeof record.name !== "string" || record.name.trim() === "" ||
     typeof record.entryUrl !== "string" ||
-    typeof record.exposedModule !== "string" ||
-    typeof record.hostApiMajor !== "number"
+    typeof record.exposedModule !== "string" || record.exposedModule.trim() === "" ||
+    !Number.isSafeInteger(record.hostApiMajor) || Number(record.hostApiMajor) < 1
   ) {
     throw new Error("Remote manifest fields are invalid");
   }
 
+  // Manifest 来自网络，不能因为有 TypeScript 接口就直接信任其中的脚本地址。
   const entryUrl = new URL(record.entryUrl, window.location.origin);
   if (!allowedOrigins.has(entryUrl.origin)) throw new Error("Remote origin is not allowed");
   if (record.hostApiMajor !== supportedHostApiMajor) {

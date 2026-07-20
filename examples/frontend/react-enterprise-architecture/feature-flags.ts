@@ -6,6 +6,8 @@ export interface PercentageFlag {
 }
 
 function stableBucket(value: string): number {
+  // 同一 flag + userId 必须稳定落入同一桶，否则刷新页面就会切换版本。
+  // 这是教学用的 FNV-1a 风格哈希，不用于密码学或安全决策。
   let hash = 2166136261;
   for (const character of value) {
     hash ^= character.codePointAt(0) ?? 0;

@@ -1,5 +1,6 @@
 import { createRoot, type Root } from "react-dom/client";
 import { App } from "./App.js";
+import { AppErrorBoundary } from "./AppErrorBoundary.js";
 import { AppProviders, type AppDependencies } from "./AppProviders.js";
 
 export class LessonWidgetElement extends HTMLElement {
@@ -32,9 +33,11 @@ export class LessonWidgetElement extends HTMLElement {
     if (!this.isConnected || !this.#dependencies) return;
     this.#root ??= createRoot(this.#mountPoint);
     this.#root.render(
-      <AppProviders dependencies={this.#dependencies}>
-        <App />
-      </AppProviders>,
+      <AppErrorBoundary telemetry={this.#dependencies.telemetry}>
+        <AppProviders dependencies={this.#dependencies}>
+          <App />
+        </AppProviders>
+      </AppErrorBoundary>,
     );
   }
 }
