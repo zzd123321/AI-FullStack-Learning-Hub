@@ -24,7 +24,11 @@ description: 从数学与机器学习基础走向 Transformer 和大语言模型
 
 - [人工智能、机器学习、深度学习与生成式 AI 的关系](/ai/foundations/ai-ml-dl-generative-ai)
 
-这一课先建立完整地图。后续课程会沿着地图逐层补充数学、数据处理和模型实现。
+### 必要数学
+
+- [标量、向量、矩阵与张量](/ai/math/scalars-vectors-matrices-tensors)
+
+先建立完整地图，再逐层补充数学、数据处理和模型实现。数学模块只选择理解机器学习所必需的内容，并始终联系真实数据和模型计算。
 
 ## 阶段项目
 
