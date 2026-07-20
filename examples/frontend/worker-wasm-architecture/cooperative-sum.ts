@@ -11,5 +11,8 @@ export async function cooperativeSum(
     for (let index = start; index < end; index += 1) total += values[index] ?? 0;
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
   }
+  // Cancellation may arrive during the final yield, after the last chunk was
+  // computed but before the result is published.
+  if (isCancelled()) throw new DOMException('Task cancelled', 'AbortError');
   return total;
 }
