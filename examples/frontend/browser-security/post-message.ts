@@ -6,11 +6,11 @@ interface EditorReadyMessage {
 
 const EDITOR_ORIGIN = "https://editor.example.com";
 
-function parseEditorMessage(value: unknown): EditorReadyMessage | null {
+export function parseEditorMessage(value: unknown): EditorReadyMessage | null {
   if (typeof value !== "object" || value === null) return null;
   const record = value as Record<string, unknown>;
   return record.version === 1 && record.type === "editor-ready" &&
-    typeof record.documentId === "string"
+    typeof record.documentId === "string" && /^[a-z0-9][a-z0-9-]{1,79}$/.test(record.documentId)
     ? record as unknown as EditorReadyMessage
     : null;
 }
