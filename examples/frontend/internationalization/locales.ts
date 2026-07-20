@@ -9,10 +9,15 @@ export function negotiateLocale(requested: readonly string[]): SupportedLocale {
   for (const candidate of canonical) {
     const exact = supportedLocales.find((locale) => locale === candidate);
     if (exact) return exact;
-    const language = new Intl.Locale(candidate).language;
-    const languageMatch = supportedLocales.find(
-      (locale) => new Intl.Locale(locale).language === language,
-    );
+
+    const desired = new Intl.Locale(candidate);
+    // 只按 language 回退会把 zh-TW（通常为繁体）错误匹配到 zh-CN（简体）。
+    // maximize() 用 CLDR likely-subtags 补出 Script；实际产品还应明确记录这项策略。
+    const desiredScript = desired.maximize().script;
+    const languageMatch = supportedLocales.find((locale) => {
+      const supported = new Intl.Locale(locale);
+      return supported.language === desired.language && supported.maximize().script === desiredScript;
+    });
     if (languageMatch) return languageMatch;
   }
   return defaultLocale;

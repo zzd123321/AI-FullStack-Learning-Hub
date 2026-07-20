@@ -2,8 +2,11 @@ import type { SupportedLocale } from './locales.js';
 
 const numberCache = new Map<string, Intl.NumberFormat>();
 const dateCache = new Map<string, Intl.DateTimeFormat>();
+const listCache = new Map<SupportedLocale, Intl.ListFormat>();
+const collatorCache = new Map<SupportedLocale, Intl.Collator>();
 
 export function formatMoney(locale: SupportedLocale, value: number, currency: string): string {
+  if (!Number.isFinite(value)) throw new RangeError('Money value must be finite');
   const key = `${locale}:${currency}`;
   let formatter = numberCache.get(key);
   if (!formatter) {
@@ -18,6 +21,7 @@ export function formatInstant(
   instant: Date,
   timeZone: string,
 ): string {
+  if (!Number.isFinite(instant.getTime())) throw new RangeError('Instant must be a valid Date');
   const key = `${locale}:${timeZone}`;
   let formatter = dateCache.get(key);
   if (!formatter) {
@@ -30,10 +34,19 @@ export function formatInstant(
 }
 
 export function formatList(locale: SupportedLocale, values: readonly string[]): string {
-  return new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(values);
+  let formatter = listCache.get(locale);
+  if (!formatter) {
+    formatter = new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' });
+    listCache.set(locale, formatter);
+  }
+  return formatter.format(values);
 }
 
 export function compareLabels(locale: SupportedLocale, left: string, right: string): number {
-  return new Intl.Collator(locale, { usage: 'sort', numeric: true, sensitivity: 'base' })
-    .compare(left, right);
+  let formatter = collatorCache.get(locale);
+  if (!formatter) {
+    formatter = new Intl.Collator(locale, { usage: 'sort', numeric: true, sensitivity: 'base' });
+    collatorCache.set(locale, formatter);
+  }
+  return formatter.compare(left, right);
 }
