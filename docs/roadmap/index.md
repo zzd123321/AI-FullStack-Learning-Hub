@@ -69,35 +69,15 @@ description: 面向有前端经验开发者的全栈与 AI 分阶段学习计划
 
 ## 当前任务
 
-- [x] 创建站点 MVP
-- [x] 学习“从 JavaScript 到 TypeScript”
-- [x] 学习 TypeScript 对象类型与函数类型
-- [x] 学习 TypeScript 联合类型、交叉类型与类型收窄
-- [x] 学习 TypeScript 泛型基础与约束
-- [x] 学习 TypeScript keyof、typeof 与索引访问类型
-- [x] 学习 TypeScript 条件类型与 infer
-- [x] 学习 TypeScript 映射类型与常用工具类型
-- [x] 学习 TypeScript 模板字面量类型与类型安全契约
-- [x] 学习 TypeScript 工程配置与模块边界
-- [x] 学习 Java 开发环境、JDK/JRE/JVM 与第一个程序
-- [x] 学习 Java 变量、基本类型、运算符与控制流程
-- [x] 学习 Java 方法、参数传递、数组与可变参数
-- [x] 学习 Java 类、对象、构造器与封装
-- [x] 学习 Java 继承、接口、多态与组合
-- [x] 学习 Vue 3 Composition API 与组件类型设计
-- [x] 学习 Vue 3 响应式系统与副作用管理
-- [x] 学习 Vue 3 组件通信与可复用组件
-- [x] 学习关系模型与第一条 SQL 查询
-- [x] 学习 AI、机器学习、深度学习与生成式 AI 基础
-- [x] 学习一次大模型请求的完整生命周期
-- [x] 完成 Vue 3 状态管理、路由、表单、性能、测试、SSR 与迁移专题
-- [x] 进入 React，并完成核心模型、Effect、状态架构与数据路由
-- [x] 完成 Java 语言进阶、集合、泛型、Stream、并发与 JVM 基础专题
-- [x] 完成 SQL 查询、连接、聚合、子查询与安全写入基础专题
-- [x] 学习 Token 预算、结构化输出、工具调用与向量检索
-- [x] 完成 React 表单、性能、测试、服务端边界与大型应用架构专题
-- [x] 完成浏览器事件循环、渲染、网络与 Fetch 专题
-- [x] 完成数据库索引、执行计划、事务、隔离级别、锁、MVCC、设计与 Redis 基础专题
-- [x] 完成 JVM 诊断、Maven 与 Spring Boot 首批 Web 开发课程
+- [x] 站点 MVP、中文导航与本地全文搜索
+- [x] 前端开发：TypeScript、Vue 3、React、浏览器、工程化与架构专题
+- [x] 后端开发：Java、Spring Boot、Python、FastAPI 与后端架构专题
+- [x] 数据库：SQL、索引、事务、Redis 与数据库设计主线
+- [x] 人工智能基础：AI 概念与机器学习所需数学基础
+- [x] 大模型应用：请求链路、Prompt、工具调用、检索、RAG、评估与 Agent
+- [ ] 大模型应用：MCP 客户端、服务端与安全边界
+- [ ] 大模型应用：安全、成本、可观测性与部署
 
-当前课程：[Spring MVC 参数绑定、校验、错误响应与测试](/backend/spring-boot/mvc-parameter-binding-validation-error-response-and-testing)
+当前课程：[大模型应用开发：MCP 的客户端、服务端与安全边界](/ai-application/)
+
+已完成的大模型应用课程可在专题首页按导航顺序复习；下一步从 MCP 开始，随后补齐安全、成本、可观测性和部署。
