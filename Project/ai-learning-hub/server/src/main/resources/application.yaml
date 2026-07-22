@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: ai-learning-hub-server
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/ai_learning_hub?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC}
+    username: ${DB_USERNAME:learning_app}
+    password: ${DB_PASSWORD:change-me-for-local-only}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+security:
+  jwt:
+    # 仅用于本地学习。部署前必须通过 JWT_SECRET 覆盖，并使用安全的密钥管理服务。
+    secret: ${JWT_SECRET:YWktbGVhcm5pbmctaHViLWxvY2FsLWRldmVsb3BtZW50LXNlY3JldC0zMi1ieXRlcw==}
+    access-token-minutes: 15
+    refresh-token-days: 30
+    secure-cookie: ${JWT_SECURE_COOKIE:false}
+
+bootstrap:
+  admin:
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
+    display-name: ${ADMIN_DISPLAY_NAME:本地管理员}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

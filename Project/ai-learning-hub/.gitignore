@@ -1,0 +1,13 @@
+# Frontend
+web/node_modules/
+web/dist/
+
+# Backend
+server/target/
+
+# Local environment and IDE files
+.env
+.env.*.local
+.DS_Store
+.idea/
+.vscode/
